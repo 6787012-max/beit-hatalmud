@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>הדרכה — מערכת מעקב תלמידים</title>
+<link href="../vendor/heebo.css" rel="stylesheet">
+<link rel="stylesheet" href="../vendor/bootstrap-icons.css">
+<style>
+  :root{--primary:#164e63;--primary-dark:#0e3546;--primary-light:#2b7c98;--accent:#c98a1a;--accent-soft:#f6e9cf;--line:#e4e9ef;--muted:#5f6f7e;--card:#fff;--bg:#f3f6f9}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Heebo',sans-serif;background:var(--bg);color:#1c2733;line-height:1.6}
+  header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#eaf3f7;padding:28px 20px;text-align:center}
+  header h1{font-size:1.55rem;font-weight:800}
+  header p{color:#cfe2ea;font-size:.95rem;margin-top:4px}
+  main{max-width:960px;margin:0 auto;padding:22px 16px 60px}
+  a.back{display:inline-flex;align-items:center;gap:6px;color:var(--primary);font-weight:700;text-decoration:none;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:20px;box-shadow:0 1px 2px rgba(16,40,56,.06),0 6px 20px rgba(16,40,56,.07)}
+  .card h2{font-size:1.2rem;color:var(--primary-dark);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:700;padding:3px 11px;border-radius:999px}
+  .who{color:var(--muted);font-size:.9rem;margin:6px 0 14px}
+  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:#fff;padding:12px 24px;border-radius:11px;text-decoration:none;font-weight:700;border:none;cursor:pointer;font-family:inherit;font-size:1rem}
+  .btn:hover{background:var(--primary-dark)}
+  .btn-ghost{background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
+  .roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:6px}
+  .role{display:block;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center;text-decoration:none;color:inherit;transition:transform .12s,border-color .12s}
+  .role:hover{transform:translateY(-3px);border-color:var(--primary-light)}
+  .role .ic{font-size:1.6rem;color:var(--primary)}
+  .role b{display:block;margin-top:6px;font-size:1.05rem}
+  .role small{color:var(--muted);font-size:.82rem}
+  .screen{border-block-start:1px solid var(--line);padding:16px 0}
+  .screen:first-of-type{border:none}
+  .screen h3{font-size:1.08rem;color:var(--primary-dark);display:flex;align-items:center;gap:8px}
+  .screen .intro{color:var(--muted);font-size:.92rem;margin:4px 0 10px}
+  .screen ol{margin:0 0 10px;padding-inline-start:22px;line-height:1.9}
+  .screen .tips{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:.92rem}
+  .screen .tips ul{margin:4px 0 0;padding-inline-start:20px}
+  .role-note{background:var(--accent-soft);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:.95rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>הדרכה — מערכת מעקב תלמידים</h1>
+  <p>מכינה בית התלמוד</p>
+</header>
+<main>
+  <a class="back" href="../"><i class="bi bi-arrow-right"></i> חזרה למערכת</a>
+
+  <section class="card">
+    <h2><i class="bi bi-play-circle"></i> סרטוני הדרכה</h2>
+    <p class="who">הדרך המהירה ללמוד את המערכת. הסרטונים מוטמעים בעמוד ומתנגנים גם מאחורי סינון תוכן.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn" href="katzar.html"><i class="bi bi-play-fill"></i> קצר — כניסה ודיווח <span class="badge">1:12</span></a>
+      <a class="btn btn-ghost" href="maleh.html"><i class="bi bi-collection-play"></i> מלא — כל המערכת <span class="badge">4:21</span></a>
+      <a class="btn btn-ghost" href="shivuki.html"><i class="bi bi-stars"></i> תדמית — 40 שניות</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><i class="bi bi-person-badge"></i> הדרכה מותאמת לתפקיד שלך</h2>
+    <p class="who">בחר את התפקיד שלך — ותראה רק את המסכים שמותר לך לראות, לפי הסדר.</p>
+    <div class="roles" id="roleGrid"></div>
+  </section>
+
+  <div id="guideArea"></div>
+</main>
+
+<script src="../js/guide-data.js"></script>
+<script>
+(function () {
+  var G = window.CV3_GUIDE, esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
+  var ROLE_ICON = { 'מנהל': 'bi-person-gear', 'מפקח': 'bi-eye', 'מחנך': 'bi-person-workspace', 'מלמד': 'bi-pencil-square', 'מזכירה': 'bi-cash-coin' };
+
+  function block(entry) {
+    var h = '<div class="screen"><h3><i class="bi ' + esc(entry.icon) + '"></i> ' + esc(entry.title) + '</h3>';
+    if (entry.intro) h += '<div class="intro">' + esc(entry.intro) + '</div>';
+    if (entry.steps) h += '<ol>' + entry.steps.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ol>';
+    if (entry.tips && entry.tips.length) h += '<div class="tips"><b><i class="bi bi-lightbulb"></i> חשוב לזכור:</b><ul>' + entry.tips.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    return h + '</div>';
+  }
+
+  function showRole(key) {
+    var role = G.roles[key]; if (!role) return;
+    var ids = role.screens === 'all' ? Object.keys(G.screens) : role.screens;
+    var html = '<section class="card"><h2><i class="bi ' + (ROLE_ICON[key] || 'bi-person') + '"></i> הדרכה — ' + esc(role.label) + '</h2>';
+    if (role.note) html += '<div class="role-note"><i class="bi bi-info-circle"></i> ' + esc(role.note) + '</div>';
+    html += block(G.common);
+    html += ids.map(function (id) { return G.screens[id] ? block(G.screens[id]) : ''; }).join('');
+    html += '</section>';
+    var area = document.getElementById('guideArea');
+    area.innerHTML = html;
+    location.hash = encodeURIComponent(key);
+    area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  var grid = document.getElementById('roleGrid');
+  Object.keys(G.roles).forEach(function (key) {
+    var r = G.roles[key];
+    var n = r.screens === 'all' ? Object.keys(G.screens).length : r.screens.length;
+    var a = document.createElement('a');
+    a.className = 'role'; a.href = '#' + encodeURIComponent(key);
+    a.innerHTML = '<span class="ic"><i class="bi ' + (ROLE_ICON[key] || 'bi-person') + '"></i></span><b>' + esc(r.label) + '</b><small>' + n + ' מסכים</small>';
+    a.addEventListener('click', function (e) { e.preventDefault(); showRole(key); });
+    grid.appendChild(a);
+  });
+
+  // קישור ישיר: /hadracha/#מלמד פותח ישר את ההדרכה של המלמד
+  var h = decodeURIComponent((location.hash || '').replace('#', ''));
+  if (h && G.roles[h]) showRole(h);
+})();
+</script>
+</body>
+</html>

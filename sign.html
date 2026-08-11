@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>חתימת אישור — מכינה בית התלמוד</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/config.js"></script>
+</head>
+<body>
+  <div class="sign-wrap">
+    <div class="sign-card">
+      <div class="sign-logo"><img src="img/logo.png" class="login-logo-img" alt="לוגו"></div>
+      <div class="sign-inst" id="inst"></div>
+      <div id="content"><p style="text-align:center;color:var(--muted)">טוען…</p></div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    const q = new URLSearchParams(location.search);
+    const fid = q.get('f'), token = q.get('t');
+    const C = window.CV3 || {};
+    const content = document.getElementById('content');
+    document.getElementById('inst').textContent = C.INSTANCE_NAME || '';
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const sb = (C.SUPABASE_URL && C.SUPABASE_ANON_KEY && window.supabase)
+      ? window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY) : null;
+
+    const TYPES = ['text', 'textarea', 'select', 'checkbox', 'question', 'signature'];
+    function parseFields(raw) {
+      let arr = raw;
+      if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (_) { arr = null; } }
+      if (!Array.isArray(arr)) arr = [];
+      return arr.filter(x => x && x.label).map((x, i) => ({
+        key: x.key || ('f' + i),
+        label: String(x.label),
+        type: TYPES.indexOf(x.type) >= 0 ? x.type : 'text',
+        options: Array.isArray(x.options) ? x.options : [],
+        required: !!x.required,
+      }));
+    }
+    function parseAnswers(raw) {
+      let a = raw;
+      if (typeof a === 'string') { try { a = JSON.parse(a); } catch (_) { a = null; } }
+      return (a && typeof a === 'object') ? a : {};
+    }
+
+    if (!fid) { content.innerHTML = '<h2>קישור לא תקין</h2><p>חסר מזהה טופס בקישור.</p>'; return; }
+    if (!sb) {
+      content.innerHTML = '<h2>מצב הדגמה</h2><p>המערכת נמצאת במצב הדגמה. חתימת הורים פעילה במערכת החיה של המוסד (לאחר חיבור Supabase ע״י המנהל).</p>';
+      return;
+    }
+
+    async function load() {
+      // גישה מאובטחת דרך RPC (SECURITY DEFINER) — לפי טוקן אישי, או לפי מזהה טופס לקישור כללי.
+      let form = null, resp = null;
+      if (token) {
+        const { data } = await sb.rpc('get_signing', { p_token: token });
+        if (data && data[0]) {
+          const d = data[0];
+          form = { title: d.title, body: d.body, fields: parseFields(d.fields) };
+          resp = { status: d.status, signer_name: d.signer_name, signed_at: d.signed_at, answers: parseAnswers(d.answers), signature: d.signature };
+        }
+      } else {
+        const { data } = await sb.rpc('get_form', { p_form_id: Number(fid) });
+        if (data && data[0]) form = { title: data[0].title, body: data[0].body, fields: parseFields(data[0].fields) };
+      }
+      if (!form) { content.innerHTML = '<h2>הטופס לא נמצא</h2><p>ייתכן שהקישור אינו תקין או שהטופס הוסר.</p>'; return; }
+      render(form, resp);
+    }
+
+    // בונה קנבס לחתימה ידנית (עכבר + מגע). מחזיר אובייקט עם isBlank ו-dataURL.
+    function setupCanvas(canvas) {
+      const ctx = canvas.getContext('2d');
+      // התאמת רזולוציה לרוחב בפועל
+      const ratio = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth || 300, cssH = canvas.clientHeight || 150;
+      canvas.width = cssW * ratio; canvas.height = cssH * ratio;
+      ctx.scale(ratio, ratio);
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cssW, cssH);
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      let drawing = false, dirty = false, lastX = 0, lastY = 0;
+      const pos = e => {
+        const rc = canvas.getBoundingClientRect();
+        const t = (e.touches && e.touches[0]) || e;
+        return { x: t.clientX - rc.left, y: t.clientY - rc.top };
+      };
+      const start = e => { e.preventDefault(); drawing = true; const p = pos(e); lastX = p.x; lastY = p.y; };
+      const move = e => {
+        if (!drawing) return; e.preventDefault();
+        const p = pos(e);
+        ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+        lastX = p.x; lastY = p.y; dirty = true;
+      };
+      const end = () => { drawing = false; };
+      canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+      return {
+        clear() { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cssW, cssH); dirty = false; },
+        isBlank() { return !dirty; },
+        dataURL() { return canvas.toDataURL('image/png'); },
+      };
+    }
+
+    function fieldInputHTML(fld) {
+      const id = 'fld_' + fld.key;
+      const req = fld.required ? ' <span style="color:#c0392b">*</span>' : '';
+      let inner = '';
+      if (fld.type === 'text') inner = '<input class="inp" id="' + id + '">';
+      else if (fld.type === 'textarea' || fld.type === 'question') inner = '<textarea class="inp" id="' + id + '" rows="3"></textarea>';
+      else if (fld.type === 'select') inner = '<select class="inp" id="' + id + '"><option value="">— בחר —</option>' + fld.options.map(o => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join('') + '</select>';
+      else if (fld.type === 'checkbox') return '<label class="fld fld-wide" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="' + id + '"><span>' + esc(fld.label) + req + '</span></label>';
+      else if (fld.type === 'signature') return '<div class="fld fld-wide"><span>' + esc(fld.label) + req + '</span>' +
+        '<canvas id="' + id + '" class="sign-canvas" style="width:100%;height:160px;border:1px dashed var(--line,#bbb);border-radius:10px;background:#fff;touch-action:none;display:block"></canvas>' +
+        '<button type="button" class="btn-ghost sm" data-clear="' + id + '" style="margin-top:6px"><i class="bi bi-eraser"></i> נקה</button></div>';
+      return '<label class="fld fld-wide"><span>' + esc(fld.label) + req + '</span>' + inner + '</label>';
+    }
+
+    function render(form, resp) {
+      const signed = resp && resp.status === 'signed';
+      const fields = (form.fields && form.fields.length) ? form.fields : [];
+      if (signed) {
+        const ans = resp.answers || {};
+        const ansHTML = fields.filter(f => f.type !== 'signature').map(f => {
+          let v = ans[f.key];
+          if (f.type === 'checkbox') v = (v === true || v === 'true' || v === 'כן') ? 'כן' : 'לא';
+          if (v == null || v === '') v = '—';
+          return '<div class="det-row"><span class="det-lbl">' + esc(f.label) + '</span><span class="det-val">' + esc(v) + '</span></div>';
+        }).join('');
+        const sig = resp.signature && /^data:image\//.test(resp.signature)
+          ? '<div style="margin-top:10px"><div style="color:var(--muted);font-size:.85rem;margin-bottom:4px">חתימה:</div><img src="' + esc(resp.signature) + '" alt="חתימה" style="max-width:100%;border:1px solid var(--line,#ccc);border-radius:8px;background:#fff"></div>'
+          : '';
+        content.innerHTML =
+          '<h2>' + esc(form.title) + '</h2>' +
+          (form.body ? '<p class="sign-body">' + esc(form.body) + '</p>' : '') +
+          '<div class="sign-done"><i class="bi bi-check2-circle"></i><div>התקבלה חתימה בתאריך ' + esc(resp.signed_at || '') + ' על-ידי ' + esc(resp.signer_name || '') + '.<br>תודה רבה!</div></div>' +
+          (ansHTML ? '<div class="det-grid" style="margin-top:10px">' + ansHTML + '</div>' : '') + sig;
+        return;
+      }
+
+      content.innerHTML =
+        '<h2>' + esc(form.title) + '</h2>' +
+        (form.body ? '<p class="sign-body">' + esc(form.body) + '</p>' : '') +
+        '<label class="fld fld-wide"><span>שם החותם (הורה) *</span><input class="inp" id="sname" placeholder="שם מלא"></label>' +
+        fields.map(fieldInputHTML).join('') +
+        '<button class="btn-primary" id="signBtn" style="width:100%;margin-top:8px"><i class="bi bi-pencil-square"></i> אני מאשר/ת וחותם/ת</button>';
+
+      // הפעלת קנבסים
+      const canvases = {};
+      fields.forEach(f => { if (f.type === 'signature') { const el = document.getElementById('fld_' + f.key); if (el) canvases[f.key] = setupCanvas(el); } });
+      content.querySelectorAll('[data-clear]').forEach(b => b.addEventListener('click', () => {
+        const key = b.dataset.clear.replace(/^fld_/, ''); if (canvases[key]) canvases[key].clear();
+      }));
+
+      const btn = document.getElementById('signBtn');
+      btn.addEventListener('click', async () => {
+        const name = document.getElementById('sname').value.trim();
+        if (name.length < 2) { alert('נא להזין שם מלא'); return; }
+
+        // איסוף תשובות + ולידציה
+        const answers = {};
+        let sigDataUrl = '';
+        for (const f of fields) {
+          const el = document.getElementById('fld_' + f.key);
+          if (f.type === 'signature') {
+            const cv = canvases[f.key];
+            if (cv && !cv.isBlank()) sigDataUrl = cv.dataURL();
+            if (f.required && (!cv || cv.isBlank())) { alert('נא לחתום בשדה "' + f.label + '"'); return; }
+            continue;
+          }
+          let val;
+          if (f.type === 'checkbox') val = el && el.checked;
+          else val = el ? el.value.trim() : '';
+          if (f.required && (val === '' || val === false || val == null)) { alert('נא למלא את השדה "' + f.label + '"'); return; }
+          answers[f.key] = val;
+        }
+        // אם אין שדה חתימה מוגדר — עדיין ניתן לחתום (חתימה ברירת מחדל: שם החותם בלבד)
+        if (!sigDataUrl && fields.some(f => f.type === 'signature')) {
+          // שדה חתימה קיים אך לא חובה ולא צויר — נשלח ריק
+        }
+
+        btn.disabled = true;
+        let res;
+        if (token) {
+          res = await sb.rpc('submit_signature', { p_token: token, p_name: name, p_answers: answers, p_signature: sigDataUrl || null });
+        } else {
+          res = await sb.rpc('submit_general', { p_form_id: Number(fid), p_name: name, p_answers: answers, p_signature: sigDataUrl || null });
+        }
+        if (res.error || res.data === false) { alert('שגיאה בשמירת החתימה. ייתכן שכבר נחתם.'); btn.disabled = false; return; }
+        render(form, { status: 'signed', signer_name: name, signed_at: new Date().toISOString().slice(0, 10), answers: answers, signature: sigDataUrl });
+      });
+    }
+    load();
+  })();
+  </script>
+</body>
+</html>

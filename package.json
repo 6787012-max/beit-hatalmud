@@ -1,0 +1,9 @@
+{
+  "name": "cheder-v3",
+  "version": "0.1.0",
+  "description": "מערכת מעקב התנהגות ולמידה לתלמוד תורה — GitHub Pages + Supabase, מאובטחת מהיסוד",
+  "private": true,
+  "scripts": {
+    "serve": "python -m http.server 8090 --bind 127.0.0.1"
+  }
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>מערכת מעקב — מכינה בית התלמוד</title>
+  <meta name="theme-color" content="#123a52">
+  <meta name="description" content="מערכת מעקב התנהגות ולמידה למכינה — תלמידים, התנהגות, נוכחות, מבחנים ודוחות. מאובטח, חינם, לשכפול.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <!-- פונט ואייקונים מקומיים — בלי תלות ב-CDN חיצוני שסינון תוכן עלול לחסום -->
+  <link href="vendor/heebo.css" rel="stylesheet">
+  <link rel="stylesheet" href="vendor/bootstrap-icons.css">
+  <link rel="stylesheet" href="css/main.css">
+  <!-- שכבת הנתונים המאובטחת (Supabase) — טעונה לפני הסקריפטים שלנו.
+       מוגשת מקומית ולא מ-CDN: כשה-CDN לא היה נגיש (סינון תוכן/רשת איטית)
+       window.sb נשאר null, המערכת נפלה בשקט למאגר-דמו בזיכרון,
+       והנתונים שהוקלדו נעלמו ברענון. -->
+  <script src="vendor/supabase.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><img src="img/logo.png" alt="לוגו המכינה" class="logo-img"></span>
+      <div class="brand-txt">
+        <strong>מערכת מעקב</strong>
+        <small id="instanceName">מכינה בית התלמוד</small>
+      </div>
+    </div>
+    <div class="appbar-actions">
+      <span id="userInfo" class="user-info" hidden></span>
+      <span id="statusDot" class="status" title="מצב מערכת"><span class="dot"></span><span id="statusTxt">…</span></span>
+      <button class="icon-btn" id="darkBtn" title="מצב לילה/יום" aria-label="החלף מצב תצוגה"><i class="bi bi-moon-stars"></i></button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="page active" id="page-home">
+      <div class="home-hero">
+        <h1>ברוכים הבאים</h1>
+        <p>מערכת מעקב התנהגות ולמידה — בחרו תחום כדי להתחיל.</p>
+      </div>
+      <div id="homeReports"></div>
+      <div class="tile-grid" id="tileGrid"></div>
+      <div id="teacherHome" style="display:none"></div>
+    </section>
+    <div id="pages"></div>
+  </main>
+
+  <footer class="foot">
+    <span>מערכת מעקב · מכינה בית התלמוד</span>
+    <span class="foot-sep">·</span>
+    <span>נבנה מאובטח מהיסוד · GitHub Pages + Supabase</span>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/students.js"></script>
+  <script src="js/picker.js"></script>
+  <script src="js/behavior.js"></script>
+  <script src="js/tracking.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/cashbox.js"></script>
+  <script src="js/forms.js"></script>
+  <script src="js/teacher.js"></script>
+  <script src="js/tasks.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/staffcard.js"></script>
+  <script src="js/guide-data.js"></script>
+  <script src="js/help.js"></script>
+  <script src="js/yemot.js"></script>
+  <script src="js/voicereports.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
