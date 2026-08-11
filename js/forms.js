@@ -5,6 +5,10 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const today = () => new Date().toISOString().slice(0, 10);
   const tok = () => Math.random().toString(36).slice(2, 10);
+  // קוד קישור ציבורי חזק ובלתי-נחיש (24 תווי hex = 96 ביט אקראיות)
+  const gTok = () => (window.crypto && crypto.getRandomValues)
+    ? Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('')
+    : (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
   const signBase = () => location.href.replace(/[^/]*$/, '') + 'sign.html';
 
   const TYPES = [
@@ -73,7 +77,7 @@
       }).join('');
       page.querySelector('#formsEmpty').hidden = forms.length > 0;
       page.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => detailView(forms.find(f => f.id == b.dataset.open))));
-      page.querySelectorAll('[data-link]').forEach(b => b.addEventListener('click', () => copyLink(signBase() + '?f=' + b.dataset.link)));
+      page.querySelectorAll('[data-link]').forEach(b => b.addEventListener('click', () => publicLinkModal(forms.find(f => f.id == b.dataset.link))));
       page.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
         const f = forms.find(x => x.id == b.dataset.del); if (!f) return;
         if (!(await window.UI.confirm('למחוק את הטופס "' + esc(f.title) + '" וכל החתימות שלו?'))) return;
@@ -124,7 +128,7 @@
         bodyHTML: '<div class="form-grid">' +
           '<label class="fld fld-wide"><span>כותרת הטופס *</span><input class="inp mb0" id="nf_title" placeholder="לדוגמה: אישור טיול"></label>' +
           '<label class="fld fld-wide"><span>תוכן / הנחיה להורים</span><textarea class="inp mb0" id="nf_body" rows="3" placeholder="טקסט שההורה יראה לפני החתימה"></textarea></label>' +
-          '<label class="fld fld-wide"><span>נמענים</span><select class="inp mb0" id="nf_scope"><option value="">כל התלמידים</option>' + clsOpts + '</select></label>' +
+          '<label class="fld fld-wide"><span>נמענים</span><select class="inp mb0" id="nf_scope"><option value="__public__">🌐 טופס ציבורי — קישור אחד לכל ההורים (למשל טופס רישום)</option><option value="">כל התלמידים (קישור אישי לכל אחד)</option>' + clsOpts + '</select></label>' +
           '</div>' +
           '<div class="fld fld-wide" style="margin-top:6px"><span style="display:block;margin-bottom:6px;font-weight:600">שדות למילוי (אופציונלי)</span>' +
           '<div id="nf_fields"></div>' +
@@ -135,6 +139,13 @@
           if (!title) { window.UI.toast('כותרת חובה', 'err'); return false; }
           const body = mel.querySelector('#nf_body').value.trim(), scope = mel.querySelector('#nf_scope').value;
           const fields = collectFields(mel.querySelector('#nf_fields'));
+          // טופס ציבורי — קישור אחד לכולם, בלי רשומות פר-תלמיד
+          if (scope === '__public__') {
+            const patch = { link_token: gTok(), is_public: true };
+            const fr = await window.store.add('forms', { title, body, fields, created_at: today(), link_token: patch.link_token, is_public: true });
+            const form = (fr.data && fr.data[0]) || Object.assign({ id: Date.now(), title, body, fields, created_at: today() }, patch); forms.push(form);
+            window.UI.toast('נוצר טופס ציבורי'); drawList(); publicLinkModal(form); return true;
+          }
           const targets = studs.filter(s => !scope || String(s.class_id) === scope);
           if (!targets.length) { window.UI.toast('אין תלמידים בנמענים שנבחרו', 'err'); return false; }
           const fr = await window.store.add('forms', { title, body, fields, created_at: today() });
@@ -287,6 +298,46 @@
     function copyLink(url) {
       if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => window.UI.toast('הקישור הועתק'), () => window.UI.toast(url));
       else window.UI.toast(url);
+    }
+
+    // ---------- קישור כללי ציבורי מאובטח (קוד אקראי + דדליין + סגירה) ----------
+    async function publicLinkModal(f) {
+      if (!f) return;
+      // ודא שיש קוד אקראי והקישור פעיל
+      if (!f.link_token || !f.is_public) {
+        const patch = { link_token: f.link_token || gTok(), is_public: true };
+        await window.store.update('forms', f.id, patch); Object.assign(f, patch);
+      }
+      const url = signBase() + '?g=' + f.link_token;
+      const pubCount = resp.filter(r => r.form_id == f.id && r.student_id == null).length;
+      const m = window.UI.modal({
+        title: 'קישור כללי — ' + f.title,
+        bodyHTML:
+          '<p class="login-hint">שלחו את הקישור לכל ההורים — כל אחד ממלא בעצמו. הקישור אקראי (אי אפשר לנחש), ומי שפותח אותו לא יכול לגשת לטפסים אחרים או לתשובות של הורים אחרים.</p>' +
+          '<label class="fld fld-wide"><span>הקישור לשליחה</span><input class="inp mb0" id="pl_url" readonly value="' + esc(url) + '" style="direction:ltr;text-align:left"></label>' +
+          '<div class="det-actions" style="margin:8px 0 14px"><button class="btn-primary sm" id="pl_copy"><i class="bi bi-clipboard"></i> העתק קישור</button>' +
+          '<button class="btn-ghost sm" id="pl_wa"><i class="bi bi-whatsapp"></i> שליחה בוואטסאפ</button></div>' +
+          '<label class="fld fld-wide"><span>תאריך סיום (אופציונלי) — אחריו הטופס נסגר אוטומטית</span><input type="date" class="inp mb0" id="pl_until" value="' + esc(f.open_until || '') + '"></label>' +
+          '<div class="det-actions" style="margin-top:8px"><button class="btn-ghost sm" id="pl_save"><i class="bi bi-save"></i> שמור תאריך</button>' +
+          '<button class="btn-ghost sm ' + (f.closed ? '' : 'danger') + '" id="pl_toggle">' + (f.closed ? '<i class="bi bi-unlock"></i> פתח מחדש' : '<i class="bi bi-lock"></i> סגור עכשיו') + '</button></div>' +
+          '<p class="tl-note" id="pl_stat" style="margin-top:12px">התקבלו עד כה: <b>' + pubCount + '</b> מילויים' + (f.closed ? ' · <b style="color:#c0392b">הטופס סגור</b>' : '') + '</p>',
+      });
+      const $ = s => m.el.querySelector(s);
+      $('#pl_copy').addEventListener('click', () => copyLink(url));
+      $('#pl_wa').addEventListener('click', () => window.open('https://wa.me/?text=' + encodeURIComponent('קישור למילוי טופס: ' + url), '_blank'));
+      $('#pl_save').addEventListener('click', async () => {
+        const v = $('#pl_until').value || null;
+        await window.store.update('forms', f.id, { open_until: v }); f.open_until = v;
+        window.UI.toast('התאריך נשמר');
+      });
+      $('#pl_toggle').addEventListener('click', async () => {
+        const nc = !f.closed;
+        await window.store.update('forms', f.id, { closed: nc }); f.closed = nc;
+        $('#pl_toggle').innerHTML = nc ? '<i class="bi bi-unlock"></i> פתח מחדש' : '<i class="bi bi-lock"></i> סגור עכשיו';
+        $('#pl_toggle').classList.toggle('danger', !nc);
+        $('#pl_stat').innerHTML = 'התקבלו עד כה: <b>' + pubCount + '</b> מילויים' + (nc ? ' · <b style="color:#c0392b">הטופס סגור</b>' : '');
+        window.UI.toast(nc ? 'הטופס נסגר' : 'הטופס נפתח מחדש');
+      });
     }
 
     listView();
