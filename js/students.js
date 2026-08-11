@@ -91,12 +91,19 @@
       const tasksSec = '<div class="det-sec"><h4><i class="bi bi-kanban"></i> משימות הקשורות <span class="det-badge">' + tsk.length + '</span></h4>' +
         (tsk.length ? tsk.slice(-4).reverse().map(t => li('<strong>' + esc(t.title) + '</strong> ' + taskChip(t.status), hebDate(t.due_date))).join('')
           : '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">אין משימות משויכות</div>') + '</div>';
+      // פרטי רישום (מתוך טופס הרישום שההורה מילא) — כל השדות שאינם ריקים
+      const regSec = (s.reg && typeof s.reg === 'object' && Object.keys(s.reg).length)
+        ? '<div class="det-sec"><h4><i class="bi bi-card-list"></i> פרטי רישום <span class="det-badge">' + Object.keys(s.reg).filter(k => { const v = s.reg[k]; return v != null && String(v).trim() !== '' && !/^data:image\//.test(String(v)); }).length + '</span></h4><div class="det-grid">' +
+          Object.keys(s.reg).map(k => { const v = s.reg[k]; if (v == null || String(v).trim() === '' || /^data:image\//.test(String(v))) return ''; return '<div class="det-row"><span class="det-lbl">' + esc(k) + '</span><span class="det-val">' + esc(v) + '</span></div>'; }).join('') +
+          '</div></div>'
+        : '';
       m.el.querySelector('.modal-body').innerHTML =
         '<div class="det-head"><span class="ava lg">' + esc((s.name || '?').slice(0, 2)) + '</span>' +
         '<div><div class="det-name">' + esc(s.name) + '</div><span class="chip ' + (s.status === 'פעיל' ? 'ok' : 'off') + '">' + esc(s.status || '') + '</span></div></div>' +
         '<div class="det-grid">' + row('כיתה', classNameOf(classes, s.class_id)) + row('שם הורה', s.parent_name) +
           (s.parent_phone ? '<div class="det-row"><span class="det-lbl">טלפון</span><span class="det-val"><a href="tel:' + esc(s.parent_phone) + '">' + esc(s.parent_phone) + '</a></span></div>' : '') +
           row('הערות', s.notes) + '</div>' +
+        regSec +
         '<div class="det-stats">' +
           '<div class="ds"><b>' + beh.length + '</b><span>דיווחים</span></div>' +
           '<div class="ds"><b>' + attC.present + '</b><span>נוכחות</span></div>' +

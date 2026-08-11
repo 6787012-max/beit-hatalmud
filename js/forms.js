@@ -171,6 +171,7 @@
       page.innerHTML =
         '<div class="page-head"><button class="back" id="fBack">→ חזרה לרשימת הטפסים</button><h2>' + esc(f.title) + '</h2>' +
         '<div class="head-actions">' +
+          '<button class="btn-primary sm" id="fCards"><i class="bi bi-person-vcard"></i> צור/עדכן כרטיסי תלמיד</button>' +
           '<button class="btn-ghost sm" id="fPrintAll"><i class="bi bi-printer"></i> הדפס את כל החתומים</button>' +
           '<button class="btn-ghost sm" id="fCsv"><i class="bi bi-download"></i> ייצוא CSV</button></div></div>' +
         (f.body ? '<div class="qr-card"><p style="margin:0">' + esc(f.body) + '</p></div>' : '') +
@@ -184,6 +185,7 @@
       page.querySelector('#fBack').addEventListener('click', listView);
       page.querySelector('#fCsv').addEventListener('click', () => exportCsv(f));
       page.querySelector('#fPrintAll').addEventListener('click', () => printAll(f));
+      page.querySelector('#fCards').addEventListener('click', () => buildCards(f));
     }
     function drawDetail(f) {
       const rs = respOf(f.id);
@@ -298,6 +300,37 @@
     function copyLink(url) {
       if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => window.UI.toast('הקישור הועתק'), () => window.UI.toast(url));
       else window.UI.toast(url);
+    }
+
+    // ---------- הפיכת מילויי הטופס לכרטיסי תלמיד ----------
+    // כל מילוי → כרטיס תלמיד עם כל פרטי הרישום. התאמה לפי ת"ז (אם קיים) או לפי שם מלא.
+    async function buildCards(f) {
+      const fields = parseFields(f);
+      const valOf = (ans, label) => { const fl = fields.find(x => x.label === label); return fl ? (ans[fl.key] == null ? '' : String(ans[fl.key]).trim()) : ''; };
+      const rs = respOf(f.id).filter(r => r.status === 'signed');
+      if (!rs.length) { window.UI.toast('אין מילויים להמרה', 'err'); return; }
+      if (!(await window.UI.confirm('ליצור/לעדכן כרטיסי תלמיד מתוך ' + rs.length + ' מילויים?'))) return;
+      const allStuds = await window.store.list('students');
+      let created = 0, updated = 0, skipped = 0;
+      for (const r of rs) {
+        const ans = parseAnswers(r);
+        const reg = {};
+        fields.forEach(fl => { if (fl.type === 'signature') return; const v = ans[fl.key]; if (v != null && String(v).trim() !== '') reg[fl.label] = v; });
+        const first = valOf(ans, 'שם התלמיד'); if (!first) { skipped++; continue; }
+        const family = valOf(ans, 'משפחה');
+        const tz = valOf(ans, 'תעודת זהות');
+        const fullName = family ? (first + ' ' + family) : first;
+        const row = {
+          name: fullName, family: family || null, tz: tz || null,
+          parent_name: valOf(ans, 'שם האב') || valOf(ans, 'שם האם') || null,
+          parent_phone: valOf(ans, 'נייד אב') || valOf(ans, 'נייד אם') || valOf(ans, 'טלפון בבית') || null,
+          reg, status: 'פעיל',
+        };
+        const existing = tz ? allStuds.find(s => (s.tz || '') === tz) : allStuds.find(s => s.name === fullName);
+        if (existing) { await window.store.update('students', existing.id, row); updated++; }
+        else { const rr = await window.store.add('students', row); if (rr.data && rr.data[0]) allStuds.push(rr.data[0]); created++; }
+      }
+      window.UI.toast('נוצרו ' + created + ' כרטיסים · עודכנו ' + updated + (skipped ? ' · דולגו ' + skipped : ''));
     }
 
     // ---------- קישור כללי ציבורי מאובטח (קוד אקראי + דדליין + סגירה) ----------
