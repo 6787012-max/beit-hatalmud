@@ -113,6 +113,26 @@
         }).filter(Boolean).join('');
         return rows ? '<div class="det-sec"><h4><i class="bi ' + g.icon + '"></i> ' + esc(g.title) + '</h4><div class="det-grid">' + rows + '</div></div>' : '';
       }).join('');
+      // פאנלי מייל + דרייב (חיפוש לפי כתובת ההורים / שם התלמיד)
+      const pEmails = [regVal(s, 'אימייל אב'), regVal(s, 'אימייל אם')].map(x => x.trim()).filter(Boolean);
+      const gmailQ = pEmails.map(e => 'from:(' + e + ') OR to:(' + e + ')').join(' OR ');
+      const gmailUrl = gmailQ ? 'https://mail.google.com/mail/u/0/#search/' + encodeURIComponent(gmailQ) : '';
+      const driveUrl = 'https://drive.google.com/drive/u/0/search?q=' + encodeURIComponent(s.name || '');
+      const linksHTML =
+        '<div class="stu-links">' +
+          '<div class="stu-link-col">' +
+            '<h4><i class="bi bi-envelope"></i> מיילים עם ההורים</h4>' +
+            (pEmails.length ? '<p class="sub">' + esc(pEmails.join(' · ')) + '</p>' : '<p class="sub">אין כתובת מייל בכרטיס</p>') +
+            (gmailUrl ? '<a class="btn-ghost sm" href="' + esc(gmailUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-left"></i> פתח בג׳ימייל</a>' : '') +
+            '<div class="stu-link-results" id="stuMailRes"></div>' +
+          '</div>' +
+          '<div class="stu-link-col">' +
+            '<h4><i class="bi bi-folder2-open"></i> קבצים בדרייב</h4>' +
+            '<p class="sub">חיפוש: ' + esc(s.name || '') + '</p>' +
+            '<a class="btn-ghost sm" href="' + esc(driveUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-left"></i> פתח בדרייב</a>' +
+            '<div class="stu-link-results" id="stuDriveRes"></div>' +
+          '</div>' +
+        '</div>';
       m.el.querySelector('.modal-body').innerHTML =
         '<div class="det-head"><span class="ava lg">' + esc((s.name || '?').slice(0, 2)) + '</span>' +
         '<div><div class="det-name">' + esc(s.name) + '</div><span class="chip ' + (s.status === 'פעיל' ? 'ok' : 'off') + '">' + esc(s.status || '') + '</span></div></div>' +
@@ -126,6 +146,7 @@
           '<div class="ds"><b>' + tst.length + '</b><span>מבחנים</span></div>' +
           '<div class="ds"><b>' + (med.length ? '⚠' : '—') + '</b><span>רפואי</span></div>' +
         '</div>' +
+        linksHTML +
         sec('התנהגות', 'bi-clipboard-check', beh, e => li('<strong>' + esc(catName(e.category_id)) + '</strong>' + (e.note ? ' — ' + esc(e.note) : ''), e.event_date, sevc(e.severity))) +
         sec('מבחנים', 'bi-card-checklist', tst, t => li(esc(t.subject) + ' · <strong>' + esc(t.grade) + '</strong>', t.date)) +
         sec('ציוני תפקוד', 'bi-bar-chart-line', fnc, f => li(esc(f.area) + ' · <strong>' + esc(f.score) + '</strong>', f.date)) +
@@ -145,6 +166,52 @@
       m.el.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => { m.close(); showPage(btn.dataset.go); }));
       const eb = m.el.querySelector('[data-edit2]'); if (eb) eb.addEventListener('click', () => { m.close(); openForm(s); });
       const pb = m.el.querySelector('[data-print2]'); if (pb) pb.addEventListener('click', () => window.print());
+
+      // ---------- תוצאות חיות: מייל + דרייב (דרך Apps Script של המכינה, מאובטח לפי הרשאת המשתמש) ----------
+      m.el.classList.add('modal-wide');
+      const GAS = (window.CV3 && window.CV3.GAS_URL) || '';
+      if (GAS && window.sb) {
+        const mailEl = m.el.querySelector('#stuMailRes'), driveEl = m.el.querySelector('#stuDriveRes');
+        const loading = el => { if (el) el.innerHTML = '<div class="ld"><i class="bi bi-hourglass-split"></i> טוען…</div>'; };
+        const fail = el => { if (el) el.innerHTML = '<div class="ld">לא ניתן לטעון כרגע</div>'; };
+        const jsonp = (url, cb) => {
+          const name = '__cb' + Math.random().toString(36).slice(2);
+          const sc = document.createElement('script'); let done = false;
+          const to = setTimeout(() => { if (!done) { done = true; cb(null); clean(); } }, 15000);
+          function clean() { try { delete window[name]; } catch (_) { window[name] = undefined; } if (sc.parentNode) sc.parentNode.removeChild(sc); clearTimeout(to); }
+          window[name] = d => { if (done) return; done = true; cb(d); clean(); };
+          sc.onerror = () => { if (!done) { done = true; cb(null); clean(); } };
+          sc.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + name;
+          document.body.appendChild(sc);
+        };
+        const renderMail = d => {
+          if (!mailEl) return; if (!d) return fail(mailEl);
+          if (d.error) { mailEl.innerHTML = '<div class="ld">' + esc(d.error) + '</div>'; return; }
+          const items = d.items || [];
+          if (!items.length) { mailEl.innerHTML = '<div class="ld">אין מיילים</div>'; return; }
+          mailEl.innerHTML = items.slice(0, 30).map(it =>
+            '<div class="r-item"><div class="r-top"><span class="r-t">' + esc(it.subject || '(ללא נושא)') + '</span>' +
+            (it.link ? '<a class="r-open" href="' + esc(it.link) + '" target="_blank" rel="noopener" title="פתח בג׳ימייל"><i class="bi bi-box-arrow-up-left"></i></a>' : '') + '</div>' +
+            '<div class="r-m">' + esc(it.from || '') + ' · ' + esc(it.date || '') + '</div>' +
+            (it.snippet ? '<div class="r-snip">' + esc(it.snippet) + '</div>' : '') + '</div>').join('');
+        };
+        const renderDrive = d => {
+          if (!driveEl) return; if (!d) return fail(driveEl);
+          if (d.error) { driveEl.innerHTML = '<div class="ld">' + esc(d.error) + '</div>'; return; }
+          const items = d.items || [];
+          if (!items.length) { driveEl.innerHTML = '<div class="ld">אין קבצים</div>'; return; }
+          driveEl.innerHTML = items.slice(0, 30).map(it =>
+            '<a class="r-item r-file" href="' + esc(it.link || '#') + '" target="_blank" rel="noopener"><span class="r-t"><i class="bi bi-file-earmark"></i> ' + esc(it.name || '') + '</span>' +
+            '<span class="r-m">' + esc(it.type || '') + (it.modified ? ' · ' + esc(it.modified) : '') + '</span></a>').join('');
+        };
+        (async () => {
+          let jwt = '';
+          try { const r = await window.sb.auth.getSession(); jwt = (r && r.data && r.data.session && r.data.session.access_token) || ''; } catch (_) {}
+          const base = GAS + (GAS.indexOf('?') >= 0 ? '&' : '?') + 'sid=' + encodeURIComponent(s.id) + '&token=' + encodeURIComponent(jwt);
+          if (pEmails.length) { loading(mailEl); jsonp(base + '&type=mail', renderMail); } else if (mailEl) mailEl.innerHTML = '<div class="ld">אין כתובת מייל בכרטיס</div>';
+          loading(driveEl); jsonp(base + '&type=drive', renderDrive);
+        })();
+      }
     }
 
     function openForm(existing) {

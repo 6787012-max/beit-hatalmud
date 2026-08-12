@@ -403,3 +403,22 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .ym-pane{margin-top:4px}
 .ym-check{display:inline-flex;align-items:center;gap:7px;font-size:.9rem;color:var(--ink);cursor:pointer;background:var(--accent-soft);padding:7px 12px;border-radius:9px}
 .ym-check input{width:16px;height:16px;cursor:pointer}
+
+/* ===== כרטיס תלמיד רחב + פאנלי מייל/דרייב ===== */
+.modal-card.modal-wide{max-width:1040px}
+.stu-links{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0}
+.stu-link-col{border:1px solid var(--line); border-radius:12px; padding:12px; background:rgba(0,0,0,.02)}
+.stu-link-col h4{margin:0 0 8px; font-size:.95rem; display:flex; align-items:center; gap:6px}
+.stu-link-col .sub{color:var(--muted); font-size:.8rem; margin:0 0 8px; word-break:break-all}
+.stu-link-results{margin-top:8px; max-height:230px; overflow:auto; font-size:.85rem}
+.stu-link-results a{display:block; padding:7px 8px; border-bottom:1px solid var(--line); color:var(--text,#1c2b33); text-decoration:none}
+.stu-link-results a:hover{background:rgba(0,0,0,.05)}
+.stu-link-results .r-t{font-weight:600; display:block}
+.stu-link-results .r-m{color:var(--muted); font-size:.78rem}
+.stu-link-results .ld{color:var(--muted); padding:8px 2px}
+@media (max-width:640px){ .stu-links{grid-template-columns:1fr} .modal-card.modal-wide{max-width:520px} }
+.stu-link-results .r-item{padding:8px; border:1px solid var(--line); border-radius:9px; margin-bottom:7px; background:var(--card)}
+.stu-link-results .r-top{display:flex; align-items:flex-start; justify-content:space-between; gap:6px}
+.stu-link-results .r-open{color:var(--primary,#123a52); flex:0 0 auto; text-decoration:none}
+.stu-link-results a.r-file{display:block; text-decoration:none; color:var(--text,#1c2b33)}
+.stu-link-results .r-snip{color:var(--muted); font-size:.78rem; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
