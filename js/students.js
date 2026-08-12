@@ -167,49 +167,36 @@
       const eb = m.el.querySelector('[data-edit2]'); if (eb) eb.addEventListener('click', () => { m.close(); openForm(s); });
       const pb = m.el.querySelector('[data-print2]'); if (pb) pb.addEventListener('click', () => window.print());
 
-      // ---------- תוצאות חיות: מייל + דרייב (דרך Apps Script של המכינה, מאובטח לפי הרשאת המשתמש) ----------
+      // ---------- מייל+דרייב מתוך Supabase (אונדקסו ע"י Apps Script בענן — עוקף חסימת NetFree) ----------
       m.el.classList.add('modal-wide');
-      const GAS = (window.CV3 && window.CV3.GAS_URL) || '';
-      if (GAS && window.sb) {
+      if (window.sb) {
         const mailEl = m.el.querySelector('#stuMailRes'), driveEl = m.el.querySelector('#stuDriveRes');
-        const loading = el => { if (el) el.innerHTML = '<div class="ld"><i class="bi bi-hourglass-split"></i> טוען…</div>'; };
-        const fail = el => { if (el) el.innerHTML = '<div class="ld">לא ניתן לטעון כרגע</div>'; };
-        const jsonp = (url, cb) => {
-          const name = '__cb' + Math.random().toString(36).slice(2);
-          const sc = document.createElement('script'); let done = false;
-          const to = setTimeout(() => { if (!done) { done = true; cb(null); clean(); } }, 15000);
-          function clean() { try { delete window[name]; } catch (_) { window[name] = undefined; } if (sc.parentNode) sc.parentNode.removeChild(sc); clearTimeout(to); }
-          window[name] = d => { if (done) return; done = true; cb(d); clean(); };
-          sc.onerror = () => { if (!done) { done = true; cb(null); clean(); } };
-          sc.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + name;
-          document.body.appendChild(sc);
-        };
-        const renderMail = d => {
-          if (!mailEl) return; if (!d) return fail(mailEl);
-          if (d.error) { mailEl.innerHTML = '<div class="ld">' + esc(d.error) + '</div>'; return; }
-          const items = d.items || [];
-          if (!items.length) { mailEl.innerHTML = '<div class="ld">אין מיילים</div>'; return; }
+        const load = el => { if (el) el.innerHTML = '<div class="ld"><i class="bi bi-hourglass-split"></i> טוען…</div>'; };
+        const renderMail = items => {
+          if (!mailEl) return;
+          if (!pEmails.length) { mailEl.innerHTML = '<div class="ld">אין כתובת מייל בכרטיס</div>'; return; }
+          if (!items || !items.length) { mailEl.innerHTML = '<div class="ld">אין מיילים (או טרם עודכן)</div>'; return; }
           mailEl.innerHTML = items.slice(0, 30).map(it =>
             '<div class="r-item"><div class="r-top"><span class="r-t">' + esc(it.subject || '(ללא נושא)') + '</span>' +
             (it.link ? '<a class="r-open" href="' + esc(it.link) + '" target="_blank" rel="noopener" title="פתח בג׳ימייל"><i class="bi bi-box-arrow-up-left"></i></a>' : '') + '</div>' +
             '<div class="r-m">' + esc(it.from || '') + ' · ' + esc(it.date || '') + '</div>' +
             (it.snippet ? '<div class="r-snip">' + esc(it.snippet) + '</div>' : '') + '</div>').join('');
         };
-        const renderDrive = d => {
-          if (!driveEl) return; if (!d) return fail(driveEl);
-          if (d.error) { driveEl.innerHTML = '<div class="ld">' + esc(d.error) + '</div>'; return; }
-          const items = d.items || [];
-          if (!items.length) { driveEl.innerHTML = '<div class="ld">אין קבצים</div>'; return; }
+        const renderDrive = items => {
+          if (!driveEl) return;
+          if (!items || !items.length) { driveEl.innerHTML = '<div class="ld">אין קבצים (או טרם עודכן)</div>'; return; }
           driveEl.innerHTML = items.slice(0, 30).map(it =>
             '<a class="r-item r-file" href="' + esc(it.link || '#') + '" target="_blank" rel="noopener"><span class="r-t"><i class="bi bi-file-earmark"></i> ' + esc(it.name || '') + '</span>' +
             '<span class="r-m">' + esc(it.type || '') + (it.modified ? ' · ' + esc(it.modified) : '') + '</span></a>').join('');
         };
+        load(mailEl); load(driveEl);
         (async () => {
-          let jwt = '';
-          try { const r = await window.sb.auth.getSession(); jwt = (r && r.data && r.data.session && r.data.session.access_token) || ''; } catch (_) {}
-          const base = GAS + (GAS.indexOf('?') >= 0 ? '&' : '?') + 'sid=' + encodeURIComponent(s.id) + '&token=' + encodeURIComponent(jwt);
-          if (pEmails.length) { loading(mailEl); jsonp(base + '&type=mail', renderMail); } else if (mailEl) mailEl.innerHTML = '<div class="ld">אין כתובת מייל בכרטיס</div>';
-          loading(driveEl); jsonp(base + '&type=drive', renderDrive);
+          let mails = [], files = [];
+          try {
+            const { data } = await window.sb.from('student_links').select('mails,files').eq('student_id', s.id).maybeSingle();
+            if (data) { mails = data.mails || []; files = data.files || []; }
+          } catch (_) {}
+          renderMail(mails); renderDrive(files);
         })();
       }
     }
