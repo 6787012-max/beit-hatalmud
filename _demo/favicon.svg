@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="מערכת מעקב">
+  <rect width="64" height="64" rx="14" fill="#164e63"/>
+  <path d="M32 15 L55 24.5 L32 34 L9 24.5 Z" fill="#ffffff"/>
+  <path d="M19 29.5 v8.5 c0 4.2 26 4.2 26 0 v-8.5 l-13 5.4 z" fill="#ffffff" opacity=".9"/>
+  <rect x="53.5" y="24.5" width="2" height="12.5" rx="1" fill="#f7c948"/>
+  <circle cx="54.5" cy="38.5" r="2.6" fill="#f7c948"/>
+</svg>

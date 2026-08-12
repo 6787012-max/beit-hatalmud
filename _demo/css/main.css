@@ -1,0 +1,438 @@
+/* cheder-v3 · main.css — שלד RTL נקי (חלק 1) */
+:root{
+  --primary:#0a4256; --primary-dark:#003048; --primary-light:#2b7c98;
+  --accent:#a87830; --accent-soft:#f3e7cf;
+  --bg:#f3f6f9; --card:#ffffff; --ink:#1c2733; --muted:#5f6f7e; --line:#e4e9ef;
+  --ok:#1f8a5b; --danger:#c0392b;
+  --radius:14px; --shadow:0 1px 2px rgba(16,40,56,.06), 0 6px 20px rgba(16,40,56,.07);
+  --font:'Heebo', 'Segoe UI', system-ui, 'Arial Hebrew', Arial, sans-serif;
+}
+body.dark{
+  --primary:#3aa0c0; --primary-dark:#0b2530; --primary-light:#4fb6d6;
+  --accent:#caa24a; --accent-soft:#2a2416;
+  --bg:#0d151c; --card:#151f28; --ink:#e7edf3; --muted:#93a3b2; --line:#243139;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 26px rgba(0,0,0,.34);
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font); background:var(--bg); color:var(--ink);
+  line-height:1.6; -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; min-height:100vh;
+}
+
+/* ===== appbar ===== */
+.appbar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:linear-gradient(135deg, var(--primary-dark), var(--primary));
+  color:#eaf3f7; padding:12px 20px; box-shadow:var(--shadow);
+  position:sticky; top:0; z-index:50;
+}
+.brand{display:flex; align-items:center; gap:12px}
+.logo{
+  width:40px; height:40px; border-radius:11px; display:grid; place-items:center;
+  background:rgba(255,255,255,.14); font-size:1.25rem; color:#fff;
+}
+.brand-txt{display:flex; flex-direction:column; line-height:1.15}
+.brand-txt strong{font-weight:800; font-size:1.05rem}
+.brand-txt small{font-size:.76rem; opacity:.85}
+.appbar-actions{display:flex; align-items:center; gap:10px}
+.status{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; background:rgba(255,255,255,.12); padding:5px 11px; border-radius:999px}
+.status .dot{width:9px; height:9px; border-radius:50%; background:#f1c40f; box-shadow:0 0 0 3px rgba(241,196,15,.2)}
+.status.ok .dot{background:#2ecc71; box-shadow:0 0 0 3px rgba(46,204,113,.22)}
+.status.down .dot{background:#e74c3c; box-shadow:0 0 0 3px rgba(231,76,60,.22)}
+.icon-btn{
+  width:38px; height:38px; border-radius:10px; border:none; cursor:pointer;
+  background:rgba(255,255,255,.12); color:#fff; font-size:1.05rem; display:grid; place-items:center;
+  transition:background .15s;
+}
+.icon-btn:hover{background:rgba(255,255,255,.22)}
+
+/* ===== main / pages ===== */
+#main{flex:1; width:100%; max-width:1120px; margin:0 auto; padding:22px 18px 40px}
+.page{display:none}
+.page.active{display:block; animation:fade .25s ease}
+@keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+.home-hero{
+  background:linear-gradient(135deg, var(--primary-dark), var(--primary) 75%, var(--primary-light));
+  color:#eaf3f7; border-radius:18px; padding:26px 28px; margin:4px 2px 24px;
+  box-shadow:0 8px 26px color-mix(in srgb,var(--primary) 26%, transparent); position:relative; overflow:hidden;
+}
+.home-hero::after{content:""; position:absolute; inset-inline-start:-30px; bottom:-50px; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle, rgba(255,255,255,.14), transparent 70%)}
+.home-hero::before{content:"\F19D"; font-family:"bootstrap-icons"; position:absolute; inset-inline-end:22px; top:50%; transform:translateY(-50%); font-size:4.6rem; opacity:.12; color:#fff}
+.home-hero h1{font-size:1.6rem; font-weight:800; color:#fff; margin-bottom:4px; position:relative}
+.home-hero p{color:#d3e3e9; position:relative; max-width:60ch}
+
+/* ===== tile groups ===== */
+.tile-group{margin-bottom:24px}
+.group-title{
+  font-size:.82rem; font-weight:800; letter-spacing:.06em; color:var(--muted);
+  text-transform:uppercase; margin:0 2px 12px; display:flex; align-items:center; gap:10px;
+}
+.group-title::after{content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--line),transparent)}
+.tile-grid-inner{display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:12px}
+.tile{
+  background:var(--card); border:1px solid var(--line); border-radius:15px;
+  padding:15px 16px; cursor:pointer; box-shadow:var(--shadow); text-decoration:none; color:inherit;
+  display:flex; align-items:center; gap:13px; position:relative; overflow:hidden;
+  transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+.tile::before{content:""; position:absolute; inset-inline-start:0; top:0; bottom:0; width:4px; background:var(--tc,var(--primary)); opacity:.9}
+.tile:hover{transform:translateY(-3px); box-shadow:0 12px 28px color-mix(in srgb,var(--tc,var(--primary)) 22%, transparent); border-color:color-mix(in srgb,var(--tc,var(--primary)) 45%, transparent)}
+.tile .ic{
+  width:48px; height:48px; border-radius:13px; display:grid; place-items:center; flex:none;
+  font-size:1.4rem; color:var(--tc,var(--primary));
+  background:color-mix(in srgb, var(--tc,var(--primary)) 13%, transparent);
+  transition:transform .14s ease;
+}
+.tile:hover .ic{transform:scale(1.08)}
+.tile .t{font-weight:700; font-size:1rem; flex:1}
+.tile-arrow{color:var(--muted); font-size:1.3rem; opacity:.4; transition:transform .14s ease, opacity .14s ease}
+.tile:hover .tile-arrow{opacity:.9; transform:translateX(-4px); color:var(--tc,var(--primary))}
+
+/* ===== placeholder page ===== */
+.page-head{display:flex; align-items:center; gap:10px; margin:4px 2px 16px}
+.page-head .back{cursor:pointer; color:var(--primary); font-weight:700; background:none; border:none; font-size:.9rem; display:inline-flex; align-items:center; gap:5px}
+.page-head h2{font-size:1.35rem; font-weight:800; color:var(--primary-dark)}
+.soon-card{
+  background:var(--card); border:1px dashed var(--line); border-radius:var(--radius);
+  padding:40px 24px; text-align:center; color:var(--muted); box-shadow:var(--shadow);
+}
+.soon-card .ic{font-size:2.4rem; color:var(--primary-light); display:block; margin-bottom:10px}
+.soon-card b{color:var(--ink)}
+.soon-card .part{display:inline-block; margin-top:10px; font-size:.82rem; color:var(--accent); background:var(--accent-soft); padding:3px 12px; border-radius:999px; font-weight:700}
+
+/* ===== footer ===== */
+.foot{
+  text-align:center; color:var(--muted); font-size:.78rem; padding:16px;
+  border-top:1px solid var(--line); background:var(--card);
+}
+.foot-sep{margin:0 6px; opacity:.5}
+
+@media (max-width:520px){
+  .appbar{padding:10px 14px}
+  .brand-txt strong{font-size:.98rem}
+  #main{padding:16px 12px 34px}
+  .tile-grid{grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:11px}
+}
+
+/* ===== user info (header) ===== */
+.user-info{display:inline-flex; align-items:center; gap:8px; font-size:.8rem; color:#eaf3f7}
+.user-info .ui-name{background:rgba(255,255,255,.12); padding:5px 11px; border-radius:999px; display:inline-flex; align-items:center; gap:6px; white-space:nowrap}
+
+/* ===== login ===== */
+.login-wrap{min-height:60vh; display:grid; place-items:center; padding:20px}
+.login-card{
+  background:var(--card); border:1px solid var(--line); border-radius:18px;
+  box-shadow:var(--shadow); padding:34px 28px; width:100%; max-width:400px; text-align:center;
+}
+.login-logo{
+  width:64px; height:64px; border-radius:18px; margin:0 auto 14px; display:grid; place-items:center;
+  font-size:1.9rem; color:#fff; background:linear-gradient(135deg,var(--primary-dark),var(--primary));
+}
+.login-card h2{font-weight:800; color:var(--primary-dark); font-size:1.4rem}
+.login-sub{color:var(--muted); margin-bottom:20px; font-size:.9rem}
+.lbl{display:block; text-align:right; font-size:.82rem; font-weight:700; color:var(--muted); margin:0 2px 6px}
+.inp{
+  width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:11px;
+  background:var(--bg); color:var(--ink); font-family:inherit; font-size:1rem; margin-bottom:14px;
+}
+.inp:focus{outline:none; border-color:var(--primary-light); box-shadow:0 0 0 3px rgba(43,124,152,.15)}
+.btn-primary{
+  width:100%; padding:12px 16px; border:none; border-radius:11px; cursor:pointer;
+  background:var(--primary); color:#fff; font-family:inherit; font-weight:700; font-size:1rem;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; transition:background .15s;
+}
+.btn-primary:hover{background:var(--primary-dark)}
+.login-msg{margin-top:12px; font-size:.88rem; color:var(--primary-dark); min-height:1.2em}
+.login-hint{margin-top:10px; font-size:.76rem; color:var(--muted)}
+.demo-note{
+  background:var(--accent-soft); color:#7a5b12; border-radius:10px; padding:10px 12px;
+  font-size:.82rem; margin-bottom:16px; text-align:right;
+}
+body.dark .demo-note{color:var(--accent)}
+
+/* ===== buttons (shared) ===== */
+.btn-primary.sm,.btn-ghost.sm{width:auto; padding:8px 14px; font-size:.88rem}
+.btn-ghost{border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:11px; cursor:pointer; font-family:inherit; font-weight:700; padding:10px 14px; display:inline-flex; align-items:center; gap:7px; transition:background .15s}
+.btn-ghost:hover{background:var(--bg)}
+.inp.mb0{margin-bottom:0}
+.head-actions{display:flex; gap:8px; margin-inline-start:auto; flex-wrap:wrap}
+.page-head{flex-wrap:wrap}
+
+/* ===== toolbar + table ===== */
+.toolbar{display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px; margin:4px 2px 12px}
+.count-line{font-size:.8rem; color:var(--muted); margin:0 2px 8px}
+.table-wrap{overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow)}
+table.tbl{width:100%; border-collapse:collapse; min-width:560px}
+table.tbl th,table.tbl td{text-align:start; padding:11px 14px; border-bottom:1px solid var(--line); font-size:.9rem; vertical-align:middle}
+table.tbl thead th{font-size:.74rem; letter-spacing:.04em; color:var(--muted); text-transform:uppercase; background:var(--bg)}
+table.tbl tbody tr:last-child td{border-bottom:none}
+table.tbl tbody tr:hover{background:var(--bg)}
+.ava{display:inline-grid; place-items:center; width:30px; height:30px; border-radius:9px; background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); font-weight:800; font-size:.72rem; margin-inline-end:6px}
+.chip{font-size:.72rem; font-weight:700; padding:2px 9px; border-radius:999px}
+.chip.ok{background:color-mix(in srgb,var(--ok) 14%,transparent); color:var(--ok)}
+.chip.off{background:color-mix(in srgb,var(--muted) 16%,transparent); color:var(--muted)}
+.row-act{white-space:nowrap; text-align:end}
+.mini{border:none; background:var(--bg); color:var(--muted); width:30px; height:30px; border-radius:8px; cursor:pointer; margin-inline-start:4px}
+.mini:hover{background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary)}
+.mini.danger:hover{background:color-mix(in srgb,var(--danger) 14%,transparent); color:var(--danger)}
+.empty-state{text-align:center; color:var(--muted); padding:34px; background:var(--card); border:1px dashed var(--line); border-radius:14px; margin-top:10px}
+.empty-state .bi{font-size:2rem; display:block; margin-bottom:8px; opacity:.6}
+
+/* ===== modal ===== */
+.modal-ov{position:fixed; inset:0; background:rgba(15,30,40,.5); display:grid; place-items:center; z-index:200; padding:16px; animation:fade .15s}
+.modal-card{background:var(--card); border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); width:100%; max-width:520px; max-height:90vh; overflow:auto}
+.modal-head{display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line)}
+.modal-head h3{font-size:1.1rem; font-weight:800; color:var(--primary-dark)}
+.modal-x{border:none; background:none; cursor:pointer; color:var(--muted); font-size:1.1rem}
+.modal-body{padding:18px}
+.modal-foot{display:flex; justify-content:flex-start; gap:8px; padding:14px 18px; border-top:1px solid var(--line)}
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.fld{display:flex; flex-direction:column; gap:5px; font-size:.82rem; font-weight:700; color:var(--muted)}
+.fld-wide{grid-column:1 / -1}
+.fld input,.fld select,.fld textarea{font-weight:400}
+
+/* ===== student detail ===== */
+.ava.lg{width:56px; height:56px; border-radius:15px; font-size:1.1rem}
+.det-head{display:flex; align-items:center; gap:14px; margin-bottom:16px}
+.det-name{font-size:1.2rem; font-weight:800; color:var(--primary-dark); margin-bottom:4px}
+.det-grid{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:11px; overflow:hidden; margin-bottom:16px}
+@media (max-width:560px){ .det-grid{grid-template-columns:1fr} }
+.name-link{cursor:pointer; color:var(--primary); font-weight:700; text-decoration:none}
+.name-link:hover{text-decoration:underline}
+.det-row{display:flex; justify-content:space-between; gap:12px; padding:10px 14px; background:var(--card); font-size:.9rem}
+.det-lbl{color:var(--muted); font-weight:700}
+.det-val{color:var(--ink); text-align:end}
+.det-actions{display:flex; gap:8px; flex-wrap:wrap}
+.det-stats{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px}
+.det-stats .ds{background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:10px; text-align:center}
+.det-stats .ds b{display:block; font-size:1.25rem; font-weight:800; color:var(--primary-dark); font-variant-numeric:tabular-nums}
+.det-stats .ds span{font-size:.72rem; color:var(--muted)}
+.det-sec{margin-bottom:12px}
+.det-sec h4{font-size:.82rem; font-weight:800; color:var(--muted); margin-bottom:6px; display:flex; align-items:center; gap:7px}
+.det-sec h4 .bi{color:var(--primary)}
+.det-badge{font-size:.68rem; font-weight:800; background:color-mix(in srgb,var(--primary) 13%,transparent); color:var(--primary); padding:1px 8px; border-radius:999px}
+.det-item{display:flex; align-items:center; gap:9px; padding:7px 11px; background:var(--bg); border-radius:9px; margin-bottom:5px; font-size:.86rem}
+.di-main{flex:1} .di-meta{color:var(--muted); font-size:.76rem; white-space:nowrap}
+
+/* ===== user management ===== */
+.card-h-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+.card-h-row h3{margin:0}
+.cb-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:6px; margin-top:4px}
+.cb{display:flex; align-items:center; gap:6px; font-weight:400; font-size:.86rem; background:var(--bg); padding:6px 10px; border-radius:8px; cursor:pointer}
+.cb input{accent-color:var(--primary)}
+
+/* ===== print (student card) ===== */
+@media print {
+  body * { visibility: hidden !important; }
+  .modal-ov, .modal-ov * { visibility: visible !important; }
+  .modal-ov { position: absolute !important; inset: 0 !important; background: #fff !important; padding: 0 !important; display: block !important; }
+  .modal-card { max-height: none !important; box-shadow: none !important; max-width: 100% !important; border: none !important; }
+  .modal-x, .modal-foot, .det-actions { display: none !important; }
+}
+
+/* ===== toast ===== */
+.toast-host{position:fixed; bottom:20px; inset-inline-start:20px; z-index:300; display:flex; flex-direction:column; gap:8px}
+.toast{background:var(--primary-dark); color:#fff; padding:10px 16px; border-radius:11px; box-shadow:var(--shadow); font-size:.9rem; opacity:0; transform:translateY(10px); transition:opacity .25s, transform .25s}
+.toast.show{opacity:1; transform:none}
+.toast.err{background:var(--danger)}
+
+/* ===== quick report + timeline ===== */
+.qr-card{background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:16px 18px; margin:2px 2px 16px}
+.qr-card h3{font-size:1rem; font-weight:800; color:var(--primary-dark); margin-bottom:12px; display:flex; align-items:center; gap:7px}
+.qr-card h3 .bi{color:var(--accent)}
+.qr-grid{display:grid; grid-template-columns:1.3fr 1.3fr .9fr 2fr auto; gap:10px; align-items:center}
+/* בורר תלמיד חכם (כיתה · חיפוש חי) — משתרע על שורה מלאה בתוך qr-grid/toolbar */
+.stu-pick{grid-column:1 / -1; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start}
+.stu-pick .pk-class{flex:0 1 150px; min-width:120px}
+.stu-pick .pk-combo{position:relative; flex:3 1 240px}
+.stu-pick .pk-search{width:100%; font-weight:600}
+.pk-results{position:absolute; top:calc(100% + 4px); inset-inline:0; background:var(--card); border:1px solid var(--line);
+  border-radius:10px; max-height:260px; overflow:auto; z-index:60; box-shadow:0 8px 26px rgba(0,0,0,.16)}
+.pk-res-item{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 13px; cursor:pointer; font-size:.93rem}
+.pk-res-item small{color:var(--muted); font-weight:500}
+.pk-res-item:hover, .pk-res-item.active{background:var(--primary); color:#fff}
+.pk-res-item:hover small, .pk-res-item.active small{color:#e8f5ee}
+.pk-empty{padding:11px 13px; color:var(--muted); font-size:.9rem}
+/* טפסים — פס התקדמות חתימות */
+.prog{height:9px; background:var(--line); border-radius:6px; overflow:hidden}
+.prog-bar{height:100%; background:linear-gradient(90deg,var(--primary),var(--primary-dark)); border-radius:6px; transition:width .4s}
+.form-card .card-h-row{align-items:center}
+/* מצב צפייה-בלבד (מפקח) — מסתיר כפתורי פעולה/עריכה/מחיקה; רואים הכל, לא משנים */
+body.mode-readonly .btn-primary,
+body.mode-readonly [data-del], body.mode-readonly [data-tog],
+body.mode-readonly .att-btn, body.mode-readonly .row-act,
+body.mode-readonly #qCatAdd, body.mode-readonly #stuAdd, body.mode-readonly #usrAdd,
+body.mode-readonly .det-actions{ display:none !important; }
+body.mode-readonly .qr-card input, body.mode-readonly .qr-card select, body.mode-readonly .qr-card textarea{ pointer-events:none; opacity:.6; }
+/* חריג — פעולות אישיות (שינוי סיסמה) חייבות לעבוד בכל מצב, גם בצפייה-בלבד */
+body.mode-readonly .btn-primary.always-on, body.mode-writeonly .btn-primary.always-on{ display:inline-flex !important; }
+/* מצב הזנה-בלבד (מלמד) — טופס הזנה בלבד, בלי צפייה ברשימות/דוחות */
+body.mode-writeonly #timeline, body.mode-writeonly .table-wrap, body.mode-writeonly #recList,
+body.mode-writeonly #logList, body.mode-writeonly .dash-grid, body.mode-writeonly .stat-row,
+body.mode-writeonly #noteList, body.mode-writeonly .toolbar, body.mode-writeonly .count-line,
+body.mode-writeonly #evEmpty, body.mode-writeonly #recEmpty, body.mode-writeonly #logEmpty{ display:none !important; }
+/* חריג — רכיבים שהם עצמם ממשק ההזנה (למשל טבלת הנוכחות) חייבים להישאר גלויים
+   במצב הזנה-בלבד, אחרת המלמד לא יכול לבצע את התפקיד היחיד שהותר לו. */
+body.mode-writeonly .toolbar.entry-ui, body.mode-writeonly .table-wrap.entry-ui{ display:grid !important; }
+body.mode-writeonly .table-wrap.entry-ui{ display:block !important; }
+/* גם סיכום הנוכחות היומי הוא חלק מממשק ההזנה — בלעדיו המלמד מסמן ולא רואה כמה סימן */
+body.mode-writeonly .toolbar.entry-ui .count-line{ display:block !important; }
+/* תצוגת מורים — בית פשוט ויפה */
+.teacher-card{background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); padding:22px; margin-bottom:18px; border-top:4px solid var(--primary)}
+.teacher-card h3{margin:0 0 14px; font-size:1.15rem; display:flex; align-items:center; gap:8px; color:var(--primary-dark)}
+.teacher-card .btn-primary{font-size:1.05rem; padding:12px 20px}
+.teacher-actions{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
+.teacher-btn{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:26px 14px;
+  background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); cursor:pointer;
+  font-size:1.1rem; font-weight:700; color:var(--primary-dark); transition:transform .12s, box-shadow .12s}
+.teacher-btn i{font-size:2rem; color:var(--primary)}
+.teacher-btn:hover{transform:translateY(-3px); box-shadow:0 10px 26px rgba(0,0,0,.14)}
+/* דף חתימת הורים (sign.html) */
+.sign-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; background:var(--bg)}
+.sign-card{width:100%; max-width:460px; background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); padding:26px}
+.sign-logo{width:56px; height:56px; margin:0 auto 8px; border-radius:15px; display:flex; align-items:center; justify-content:center; font-size:1.7rem; color:#fff; background:linear-gradient(135deg,var(--primary),var(--primary-dark))}
+.sign-inst{text-align:center; color:var(--muted); font-weight:700; margin-bottom:14px}
+.sign-card h2{text-align:center; margin:.2rem 0 .6rem}
+.sign-body{color:var(--muted); line-height:1.6; margin-bottom:14px}
+.sign-done{display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; color:var(--primary-dark); padding:12px}
+.sign-done i{font-size:2.4rem}
+.toolbar .stu-pick{grid-column:auto}
+@media (max-width:600px){ .stu-pick{flex-direction:column} .stu-pick>*{flex:1 1 auto; width:100%} }
+.tl-item{display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:11px; padding:11px 14px; margin-bottom:8px; box-shadow:var(--shadow)}
+.tl-main{flex:1; font-size:.92rem}
+.tl-note{color:var(--muted)}
+.tl-meta{font-size:.78rem; color:var(--muted); white-space:nowrap}
+.sev-dot{width:11px; height:11px; border-radius:50%; flex:none}
+.sev-dot.hi{background:var(--danger)} .sev-dot.mid{background:var(--accent)} .sev-dot.lo{background:var(--ok)}
+
+/* ===== admin ===== */
+.chip-list{display:flex; flex-wrap:wrap; gap:7px}
+.about-list{list-style:none; padding:0; display:grid; gap:6px; font-size:.9rem; color:var(--ink)}
+.about-list li{padding-inline-start:16px; position:relative}
+.about-list li::before{content:"›"; position:absolute; inset-inline-start:0; color:var(--primary)}
+button.chip{border:none; cursor:pointer; font-family:inherit}
+.role-sel{width:auto; min-width:90px}
+
+/* ===== dashboard ===== */
+.stat-row{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:2px 2px 14px}
+.stat-card{background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:16px; display:flex; flex-direction:column; align-items:flex-start; gap:2px}
+.stat-ic{width:38px; height:38px; border-radius:10px; display:grid; place-items:center; font-size:1.1rem; color:var(--primary); background:color-mix(in srgb,var(--primary) 11%,transparent); margin-bottom:6px}
+.stat-num{font-size:1.7rem; font-weight:800; color:var(--primary-dark); font-variant-numeric:tabular-nums; line-height:1}
+.stat-lbl{font-size:.8rem; color:var(--muted)}
+.dash-grid{display:grid; grid-template-columns:1.4fr 1fr; gap:14px}
+.dash-grid canvas{max-height:180px}
+.qk-res{margin-top:12px; display:flex; flex-direction:column; gap:4px; max-height:300px; overflow:auto}
+.qk-item{text-align:start; border:none; background:var(--bg); border-radius:9px; padding:9px 12px; cursor:pointer; font-family:inherit; font-size:.92rem; color:var(--ink)}
+.qk-item:hover{background:color-mix(in srgb,var(--primary) 10%,transparent)}
+.qk-type{font-size:.68rem; font-weight:800; color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,transparent); padding:1px 7px; border-radius:999px; margin-inline-end:6px}
+
+/* ===== attendance ===== */
+.att-cell{display:flex; gap:6px}
+.att-btn{border:1px solid var(--line); background:var(--card); color:var(--muted); border-radius:8px; padding:5px 12px; cursor:pointer; font-family:inherit; font-size:.82rem; font-weight:700; transition:all .12s}
+.att-btn.p.on{background:var(--ok); color:#fff; border-color:var(--ok)}
+.att-btn.l.on{background:var(--accent); color:#fff; border-color:var(--accent)}
+.att-btn.a.on{background:var(--danger); color:#fff; border-color:var(--danger)}
+
+@media (max-width:760px){
+  .stat-row{grid-template-columns:1fr 1fr}
+  .dash-grid{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .toolbar{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .qr-grid{grid-template-columns:1fr !important}
+  .appbar{gap:8px; padding:10px 12px}
+  .appbar-actions{gap:7px}
+  .status{display:none}
+  .brand-txt small{display:none}
+  .user-info .ui-name{max-width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .head-actions{width:100%}
+}
+
+/* לוגו החיידר (תמונה אמיתית מהגרסה הקודמת) */
+.logo{ overflow:hidden; background:#fff; padding:2px; }
+.logo-img{ width:100%; height:100%; object-fit:contain; display:block; border-radius:9px; }
+.login-logo{ background:#fff !important; overflow:hidden; padding:5px; box-shadow:0 4px 14px rgba(0,0,0,.12); }
+.login-logo-img{ width:100%; height:100%; object-fit:contain; display:block; }
+
+/* אריח מודגש (משימות ופרויקטים) */
+.tile-feature{ box-shadow:0 6px 20px color-mix(in srgb, var(--tc) 28%, transparent); border:1.5px solid var(--tc); position:relative; }
+.tile-feature::after{ content:'★'; position:absolute; top:8px; left:10px; color:var(--tc); font-size:.8rem; opacity:.7 }
+/* כותרות קבוצה בקיבוץ */
+.group-sec .group-title{ border-bottom:1px solid var(--line); padding-bottom:3px }
+
+/* ===== כפתור עזרה צף + עזרה מסך ===== */
+.help-fab{position:fixed; inset-inline-end:20px; bottom:20px; z-index:40; width:52px; height:52px;
+  border-radius:50%; border:none; cursor:pointer; background:var(--primary); color:#fff; font-size:1.5rem;
+  box-shadow:0 6px 20px color-mix(in srgb,var(--primary) 40%,transparent); display:grid; place-items:center;
+  transition:transform .15s, background .15s}
+.help-fab:hover{transform:scale(1.08); background:var(--primary-dark)}
+@media (max-width:520px){ .help-fab{width:46px; height:46px; font-size:1.3rem; inset-inline-end:14px; bottom:14px} }
+
+/* ===== מצב טעינה ניטרלי למסך (מחליף את כרטיס השלד הישן) ===== */
+.page-loading{display:grid; place-items:center; gap:10px; padding:60px 20px; color:var(--muted)}
+.page-loading .spin{font-size:2rem; color:var(--primary-light); display:inline-block; animation:cv3spin 1s linear infinite}
+@keyframes cv3spin{to{transform:rotate(360deg)}}
+
+/* ===== פאנל ימות — דפדפן שלוחות ומצב קו ===== */
+.ym-stats{display:flex;flex-wrap:wrap;gap:14px}
+.ym-stat{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex:1;min-width:170px}
+.ym-stat i{font-size:1.4rem;color:var(--primary)}
+.ym-stat .ym-k{display:block;font-size:.78rem;color:var(--muted)}
+.ym-stat b{font-size:1.02rem;color:var(--ink)}
+.ym-crumb{display:flex;align-items:center;flex-wrap:wrap;gap:2px;font-size:.9rem;margin-bottom:10px;color:var(--muted)}
+.ym-crumb .ym-bc{color:var(--primary);cursor:pointer;font-weight:700;padding:2px 4px;border-radius:6px}
+.ym-crumb .ym-bc:hover{background:color-mix(in srgb,var(--primary) 12%,transparent)}
+.ym-sep{opacity:.5}
+.ym-dir{display:flex;flex-direction:column;gap:8px}
+.ym-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 15px;cursor:pointer;transition:border-color .12s,transform .1s}
+.ym-row[data-nav]:hover{border-color:var(--primary-light);transform:translateX(-3px)}
+.ym-row.ym-file{cursor:default}
+.ym-ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);font-size:1.15rem;flex:none}
+.ym-row .ym-main{flex:1}
+.ym-row .ym-main b{font-weight:700}
+.ym-note{color:var(--muted);font-weight:400;font-size:.9rem}
+.ym-badge{font-size:.76rem;background:var(--accent-soft);color:var(--accent);padding:3px 10px;border-radius:999px;font-weight:700;white-space:nowrap}
+.ym-arrow{color:var(--muted);opacity:.5}
+
+/* ===== פאנל ימות — טאבים, הקלטה, צ'קבוקס ===== */
+.ym-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.ym-tab{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 14px;cursor:pointer;font-family:inherit;font-size:.9rem;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px;transition:all .12s}
+.ym-tab:hover{border-color:var(--primary-light)}
+.ym-tab.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.ym-pane{margin-top:4px}
+.ym-check{display:inline-flex;align-items:center;gap:7px;font-size:.9rem;color:var(--ink);cursor:pointer;background:var(--accent-soft);padding:7px 12px;border-radius:9px}
+.ym-check input{width:16px;height:16px;cursor:pointer}
+
+/* ===== כרטיס תלמיד רחב + פאנלי מייל/דרייב ===== */
+.modal-card.modal-wide{max-width:1040px}
+.stu-links{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0}
+.stu-link-col{border:1px solid var(--line); border-radius:12px; padding:12px; background:rgba(0,0,0,.02)}
+.stu-link-col h4{margin:0 0 8px; font-size:.95rem; display:flex; align-items:center; gap:6px}
+.stu-link-col .sub{color:var(--muted); font-size:.8rem; margin:0 0 8px; word-break:break-all}
+.stu-link-results{margin-top:8px; max-height:230px; overflow:auto; font-size:.85rem}
+.stu-link-results a{display:block; padding:7px 8px; border-bottom:1px solid var(--line); color:var(--text,#1c2b33); text-decoration:none}
+.stu-link-results a:hover{background:rgba(0,0,0,.05)}
+.stu-link-results .r-t{font-weight:600; display:block}
+.stu-link-results .r-m{color:var(--muted); font-size:.78rem}
+.stu-link-results .ld{color:var(--muted); padding:8px 2px}
+@media (max-width:640px){ .stu-links{grid-template-columns:1fr} .modal-card.modal-wide{max-width:520px} }
+.stu-link-results .r-item{padding:8px; border:1px solid var(--line); border-radius:9px; margin-bottom:7px; background:var(--card)}
+.stu-link-results .r-top{display:flex; align-items:flex-start; justify-content:space-between; gap:6px}
+.stu-link-results .r-open{color:var(--primary,#123a52); flex:0 0 auto; text-decoration:none}
+.stu-link-results a.r-file{display:block; text-decoration:none; color:var(--text,#1c2b33)}
+.stu-link-results .r-snip{color:var(--muted); font-size:.78rem; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+/* מייל מתרחב בכרטיס */
+.stu-link-results details.r-item{padding:8px}
+.stu-link-results details.r-item summary{cursor:pointer; list-style:none; outline:none}
+.stu-link-results details.r-item summary::-webkit-details-marker{display:none}
+.stu-link-results details.r-item summary::marker{content:''}
+.stu-link-results details.r-item[open] summary .r-snip{display:none}
+.stu-link-results .r-full{white-space:pre-wrap; word-break:break-word; font-size:.8rem; line-height:1.5; max-height:280px; overflow:auto; margin:8px 0 6px; padding:8px 10px; background:rgba(0,0,0,.04); border-radius:8px; font-family:inherit}
+.stu-link-results details .r-open{display:inline-flex; align-items:center; gap:4px; font-size:.82rem}
+/* סימן-מים עדין של הלוגו במסך הבית */
+.home-hero{position:relative; overflow:hidden}
+.home-hero::after{content:""; position:absolute; inset-inline-end:-24px; bottom:-34px; width:210px; height:210px; background:url(../img/logo.png) center/contain no-repeat; opacity:.07; pointer-events:none}
