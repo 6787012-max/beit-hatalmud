@@ -176,16 +176,18 @@
           if (!mailEl) return;
           if (!pEmails.length) { mailEl.innerHTML = '<div class="ld">אין כתובת מייל בכרטיס</div>'; return; }
           if (!items || !items.length) { mailEl.innerHTML = '<div class="ld">אין מיילים (או טרם עודכן)</div>'; return; }
-          mailEl.innerHTML = items.slice(0, 30).map(it =>
-            '<div class="r-item"><div class="r-top"><span class="r-t">' + esc(it.subject || '(ללא נושא)') + '</span>' +
-            (it.link ? '<a class="r-open" href="' + esc(it.link) + '" target="_blank" rel="noopener" title="פתח בג׳ימייל"><i class="bi bi-box-arrow-up-left"></i></a>' : '') + '</div>' +
+          mailEl.innerHTML = items.slice(0, 100).map(it =>
+            '<details class="r-item"><summary><span class="r-t">' + esc(it.subject || '(ללא נושא)') + '</span>' +
             '<div class="r-m">' + esc(it.from || '') + ' · ' + esc(it.date || '') + '</div>' +
-            (it.snippet ? '<div class="r-snip">' + esc(it.snippet) + '</div>' : '') + '</div>').join('');
+            (it.snippet ? '<div class="r-snip">' + esc(it.snippet) + '</div>' : '') + '</summary>' +
+            (it.body ? '<pre class="r-full">' + esc(it.body) + '</pre>' : '<div class="r-m" style="padding:6px 0">אין תוכן שמור</div>') +
+            (it.link ? '<a class="r-open" href="' + esc(it.link) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-left"></i> פתח וענה בג׳ימייל</a>' : '') +
+            '</details>').join('');
         };
         const renderDrive = items => {
           if (!driveEl) return;
           if (!items || !items.length) { driveEl.innerHTML = '<div class="ld">אין קבצים (או טרם עודכן)</div>'; return; }
-          driveEl.innerHTML = items.slice(0, 30).map(it =>
+          driveEl.innerHTML = items.slice(0, 100).map(it =>
             '<a class="r-item r-file" href="' + esc(it.link || '#') + '" target="_blank" rel="noopener"><span class="r-t"><i class="bi bi-file-earmark"></i> ' + esc(it.name || '') + '</span>' +
             '<span class="r-m">' + esc(it.type || '') + (it.modified ? ' · ' + esc(it.modified) : '') + '</span></a>').join('');
         };

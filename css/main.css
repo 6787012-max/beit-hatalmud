@@ -422,3 +422,11 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .stu-link-results .r-open{color:var(--primary,#123a52); flex:0 0 auto; text-decoration:none}
 .stu-link-results a.r-file{display:block; text-decoration:none; color:var(--text,#1c2b33)}
 .stu-link-results .r-snip{color:var(--muted); font-size:.78rem; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+/* מייל מתרחב בכרטיס */
+.stu-link-results details.r-item{padding:8px}
+.stu-link-results details.r-item summary{cursor:pointer; list-style:none; outline:none}
+.stu-link-results details.r-item summary::-webkit-details-marker{display:none}
+.stu-link-results details.r-item summary::marker{content:''}
+.stu-link-results details.r-item[open] summary .r-snip{display:none}
+.stu-link-results .r-full{white-space:pre-wrap; word-break:break-word; font-size:.8rem; line-height:1.5; max-height:280px; overflow:auto; margin:8px 0 6px; padding:8px 10px; background:rgba(0,0,0,.04); border-radius:8px; font-family:inherit}
+.stu-link-results details .r-open{display:inline-flex; align-items:center; gap:4px; font-size:.82rem}
