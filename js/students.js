@@ -63,7 +63,7 @@
       const body = page.querySelector('#stuBody');
       body.innerHTML = rows.map(s =>
         '<tr>' +
-        '<td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> ' + esc(s.name) + '</td>' +
+        '<td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> <span class="name-link" data-view="' + s.id + '">' + esc(s.name) + '</span></td>' +
         '<td>' + esc(classNameOf(classes, s.class_id)) + '</td>' +
         '<td>' + esc(s.parent_name) + '</td>' +
         '<td>' + (s.parent_phone ? '<a href="tel:' + esc(s.parent_phone) + '">' + esc(s.parent_phone) + '</a>' : '') + '</td>' +
@@ -112,7 +112,14 @@
           return '<div class="det-row"><span class="det-lbl">' + esc(label) + '</span><span class="det-val">' + esc(v) + '</span></div>';
         }).filter(Boolean).join('');
         return rows ? '<div class="det-sec"><h4><i class="bi ' + g.icon + '"></i> ' + esc(g.title) + '</h4><div class="det-grid">' + rows + '</div></div>' : '';
-      }).join('');
+      }).join('') + (function () {
+        if (!hasReg) return '';
+        const known = {}; REG_GROUPS.forEach(g => g.fields.forEach(l => known[l] = 1));
+        const extra = Object.keys(s.reg).filter(k => !known[k] && String(s.reg[k] == null ? '' : s.reg[k]).trim() && !/^data:image\//.test(String(s.reg[k])));
+        if (!extra.length) return '';
+        return '<div class="det-sec"><h4><i class="bi bi-list-ul"></i> פרטים נוספים</h4><div class="det-grid">' +
+          extra.map(k => '<div class="det-row"><span class="det-lbl">' + esc(k) + '</span><span class="det-val">' + esc(s.reg[k]) + '</span></div>').join('') + '</div></div>';
+      })();
       // פאנלי מייל + דרייב (חיפוש לפי כתובת ההורים / שם התלמיד)
       const pEmails = [regVal(s, 'אימייל אב'), regVal(s, 'אימייל אם')].map(x => x.trim()).filter(Boolean);
       const gmailQ = pEmails.map(e => 'from:(' + e + ') OR to:(' + e + ')').join(' OR ');
@@ -230,8 +237,8 @@
       window.UI.modal({
         title: existing ? 'עריכת תלמיד' : 'תלמיד חדש', bodyHTML: body, saveLabel: 'שמירה',
         onSave: async (m) => {
-          const reg = {};
-          regFields.forEach(function (fld) { const el = m.querySelector('#' + fld.id); if (!el) return; const v = el.value.trim(); if (v) reg[fld.label] = v; });
+          const reg = Object.assign({}, s.reg || {});   // שימור שדות מיובאים שאינם בטופס
+          regFields.forEach(function (fld) { const el = m.querySelector('#' + fld.id); if (!el) return; const v = el.value.trim(); if (v) reg[fld.label] = v; else delete reg[fld.label]; });
           const first = (reg['שם התלמיד'] || '').trim(), family = (reg['משפחה'] || '').trim();
           const fullName = first ? (family ? first + ' ' + family : first) : (s.name || '').trim();
           if (!fullName) { window.UI.toast('נא להזין שם התלמיד', 'err'); return false; }
