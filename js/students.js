@@ -5,6 +5,18 @@
   const DEMO = !window.sb;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+  // סכמת פרטי הרישום — מחולקת לקבוצות. משמשת גם להצגה בכרטיס וגם לעריכה. שדות שמורים ב-students.reg לפי התווית.
+  const LONG_FIELDS = ['האם הרשימה הבאה חלה על בנכם', 'במידה וסימנתם אחד מהסימנים או יותר נא לפרט', 'הערות / בקשות / הוספות'];
+  const REG_GROUPS = [
+    { title: 'פרטי התלמיד', icon: 'bi-person-vcard', fields: ['שם התלמיד', 'משפחה', 'תעודת זהות', 'תאריך לידה עברי - שנה', 'תאריך לידה עברי - חודש', 'תאריך לידה עברי - יום', 'תאריך לידה לועזי', 'מקום לימודים נוכחי', 'כיתה', 'מספר ילדים בבית', 'מיקום הילד במשפחה'] },
+    { title: 'כתובת', icon: 'bi-geo-alt', fields: ['עיר', 'רחוב', 'מספר', 'טלפון בבית'] },
+    { title: 'פרטי האב', icon: 'bi-person', fields: ['שם האב', 'תעודת זהות אב', 'נייד אב', 'אימייל אב', 'ארץ לידה אב', 'מקום לימודים אב - ישיבה גדולה', 'עיסוק אב'] },
+    { title: 'פרטי האם', icon: 'bi-person', fields: ['שם האם', 'שם משפחה קודם', 'תעודת זהות אם', 'נייד אם', 'אימייל אם', 'ארץ לידה אם', 'מקום לימודים אם - תיכון וסמינר', 'עיסוק אם'] },
+    { title: 'פרטים מוסדיים', icon: 'bi-building', fields: ['שם מנהל', 'נייד רבה', 'שם בית הכנסת בו מתפללים בשבת', 'שם הרב של המשפחה', 'קופת חולים'] },
+    { title: 'בריאות והערות', icon: 'bi-heart-pulse', fields: LONG_FIELDS },
+  ];
+  const regVal = (s, label) => (s && s.reg && s.reg[label] != null) ? String(s.reg[label]) : '';
+
   // כל הנתונים דרך המאגר המרכזי (store.js) — משותף עם שאר המודולים.
   async function getClasses() { return window.store.list('classes'); }
   async function getStudents() {
@@ -91,12 +103,16 @@
       const tasksSec = '<div class="det-sec"><h4><i class="bi bi-kanban"></i> משימות הקשורות <span class="det-badge">' + tsk.length + '</span></h4>' +
         (tsk.length ? tsk.slice(-4).reverse().map(t => li('<strong>' + esc(t.title) + '</strong> ' + taskChip(t.status), hebDate(t.due_date))).join('')
           : '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">אין משימות משויכות</div>') + '</div>';
-      // פרטי רישום (מתוך טופס הרישום שההורה מילא) — כל השדות שאינם ריקים
-      const regSec = (s.reg && typeof s.reg === 'object' && Object.keys(s.reg).length)
-        ? '<div class="det-sec"><h4><i class="bi bi-card-list"></i> פרטי רישום <span class="det-badge">' + Object.keys(s.reg).filter(k => { const v = s.reg[k]; return v != null && String(v).trim() !== '' && !/^data:image\//.test(String(v)); }).length + '</span></h4><div class="det-grid">' +
-          Object.keys(s.reg).map(k => { const v = s.reg[k]; if (v == null || String(v).trim() === '' || /^data:image\//.test(String(v))) return ''; return '<div class="det-row"><span class="det-lbl">' + esc(k) + '</span><span class="det-val">' + esc(v) + '</span></div>'; }).join('') +
-          '</div></div>'
-        : '';
+      // פרטי רישום — מחולקים יפה לקבוצות (תלמיד / כתובת / אב / אם / מוסדי / בריאות). כל קבוצה מוצגת רק אם יש בה נתונים.
+      const hasReg = s.reg && typeof s.reg === 'object' && Object.keys(s.reg).length;
+      const regSec = !hasReg ? '' : REG_GROUPS.map(g => {
+        const rows = g.fields.map(label => {
+          const v = regVal(s, label);
+          if (!v.trim() || /^data:image\//.test(v)) return '';
+          return '<div class="det-row"><span class="det-lbl">' + esc(label) + '</span><span class="det-val">' + esc(v) + '</span></div>';
+        }).filter(Boolean).join('');
+        return rows ? '<div class="det-sec"><h4><i class="bi ' + g.icon + '"></i> ' + esc(g.title) + '</h4><div class="det-grid">' + rows + '</div></div>' : '';
+      }).join('');
       m.el.querySelector('.modal-body').innerHTML =
         '<div class="det-head"><span class="ava lg">' + esc((s.name || '?').slice(0, 2)) + '</span>' +
         '<div><div class="det-name">' + esc(s.name) + '</div><span class="chip ' + (s.status === 'פעיל' ? 'ok' : 'off') + '">' + esc(s.status || '') + '</span></div></div>' +
@@ -134,27 +150,45 @@
     function openForm(existing) {
       const s = existing || {};
       const classOpts = classes.map(c => '<option value="' + c.id + '"' + (s.class_id === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+      const regFields = [];   // מיפוי id→תווית לאיסוף בשמירה
+      const fieldHTML = (label) => {
+        const id = 'rg_' + regFields.length; regFields.push({ id: id, label: label });
+        const val = esc(regVal(s, label));
+        const isLong = LONG_FIELDS.indexOf(label) >= 0;
+        const input = isLong
+          ? '<textarea class="inp mb0" id="' + id + '" rows="2">' + val + '</textarea>'
+          : '<input class="inp mb0" id="' + id + '" value="' + val + '">';
+        return '<label class="fld' + (isLong ? ' fld-wide' : '') + '"><span>' + esc(label) + (label === 'שם התלמיד' ? ' *' : '') + '</span>' + input + '</label>';
+      };
+      const groupsHTML = REG_GROUPS.map(g =>
+        '<div class="det-sec"><h4><i class="bi ' + g.icon + '"></i> ' + esc(g.title) + '</h4><div class="form-grid">' +
+        g.fields.map(fieldHTML).join('') + '</div></div>'
+      ).join('');
       const body =
-        '<div class="form-grid">' +
-        '<label class="fld"><span>שם התלמיד *</span><input class="inp mb0" id="f_name" value="' + esc(s.name) + '"></label>' +
-        '<label class="fld"><span>כיתה</span><select class="inp mb0" id="f_class"><option value="">—</option>' + classOpts + '</select></label>' +
-        '<label class="fld"><span>שם הורה</span><input class="inp mb0" id="f_pname" value="' + esc(s.parent_name) + '"></label>' +
-        '<label class="fld"><span>טלפון הורה</span><input class="inp mb0" id="f_phone" value="' + esc(s.parent_phone) + '"></label>' +
+        '<div class="det-sec"><h4><i class="bi bi-gear"></i> מערכת</h4><div class="form-grid">' +
+        '<label class="fld"><span>כיתה במערכת</span><select class="inp mb0" id="f_class"><option value="">—</option>' + classOpts + '</select></label>' +
         '<label class="fld"><span>סטטוס</span><select class="inp mb0" id="f_status"><option' + (s.status !== 'לא פעיל' ? ' selected' : '') + '>פעיל</option><option' + (s.status === 'לא פעיל' ? ' selected' : '') + '>לא פעיל</option></select></label>' +
-        '<label class="fld fld-wide"><span>הערות</span><textarea class="inp mb0" id="f_notes" rows="2">' + esc(s.notes) + '</textarea></label>' +
-        '</div>';
+        '<label class="fld fld-wide"><span>הערות פנימיות (צוות)</span><textarea class="inp mb0" id="f_notes" rows="2">' + esc(s.notes) + '</textarea></label>' +
+        '</div></div>' +
+        groupsHTML;
       window.UI.modal({
         title: existing ? 'עריכת תלמיד' : 'תלמיד חדש', bodyHTML: body, saveLabel: 'שמירה',
         onSave: async (m) => {
-          const name = m.querySelector('#f_name').value.trim();
-          if (!name) { window.UI.toast('נא להזין שם', 'err'); return false; }
+          const reg = {};
+          regFields.forEach(function (fld) { const el = m.querySelector('#' + fld.id); if (!el) return; const v = el.value.trim(); if (v) reg[fld.label] = v; });
+          const first = (reg['שם התלמיד'] || '').trim(), family = (reg['משפחה'] || '').trim();
+          const fullName = first ? (family ? first + ' ' + family : first) : (s.name || '').trim();
+          if (!fullName) { window.UI.toast('נא להזין שם התלמיד', 'err'); return false; }
           const row = {
-            name,
+            name: fullName,
+            family: family || null,
+            tz: (reg['תעודת זהות'] || '').trim() || null,
+            parent_name: (reg['שם האב'] || reg['שם האם'] || '').trim() || null,
+            parent_phone: (reg['נייד אב'] || reg['נייד אם'] || reg['טלפון בבית'] || '').trim() || null,
             class_id: m.querySelector('#f_class').value ? Number(m.querySelector('#f_class').value) : null,
-            parent_name: m.querySelector('#f_pname').value.trim(),
-            parent_phone: m.querySelector('#f_phone').value.trim(),
             status: m.querySelector('#f_status').value,
             notes: m.querySelector('#f_notes').value.trim(),
+            reg: reg,
           };
           if (existing) row.id = existing.id;
           const r = await saveStudent(row);
