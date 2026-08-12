@@ -3,111 +3,112 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>הדרכה — מערכת מעקב תלמידים</title>
+<title>מדריך למשתמש — מכינה בית התלמוד</title>
 <link href="../vendor/heebo.css" rel="stylesheet">
 <link rel="stylesheet" href="../vendor/bootstrap-icons.css">
 <style>
-  :root{--primary:#164e63;--primary-dark:#0e3546;--primary-light:#2b7c98;--accent:#c98a1a;--accent-soft:#f6e9cf;--line:#e4e9ef;--muted:#5f6f7e;--card:#fff;--bg:#f3f6f9}
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Heebo',sans-serif;background:var(--bg);color:#1c2733;line-height:1.6}
-  header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#eaf3f7;padding:28px 20px;text-align:center}
-  header h1{font-size:1.55rem;font-weight:800}
-  header p{color:#cfe2ea;font-size:.95rem;margin-top:4px}
-  main{max-width:960px;margin:0 auto;padding:22px 16px 60px}
-  a.back{display:inline-flex;align-items:center;gap:6px;color:var(--primary);font-weight:700;text-decoration:none;margin-bottom:16px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:20px;box-shadow:0 1px 2px rgba(16,40,56,.06),0 6px 20px rgba(16,40,56,.07)}
-  .card h2{font-size:1.2rem;color:var(--primary-dark);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-  .badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:700;padding:3px 11px;border-radius:999px}
-  .who{color:var(--muted);font-size:.9rem;margin:6px 0 14px}
-  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:#fff;padding:12px 24px;border-radius:11px;text-decoration:none;font-weight:700;border:none;cursor:pointer;font-family:inherit;font-size:1rem}
-  .btn:hover{background:var(--primary-dark)}
-  .btn-ghost{background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
-  .roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:6px}
-  .role{display:block;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center;text-decoration:none;color:inherit;transition:transform .12s,border-color .12s}
-  .role:hover{transform:translateY(-3px);border-color:var(--primary-light)}
-  .role .ic{font-size:1.6rem;color:var(--primary)}
-  .role b{display:block;margin-top:6px;font-size:1.05rem}
-  .role small{color:var(--muted);font-size:.82rem}
-  .screen{border-block-start:1px solid var(--line);padding:16px 0}
-  .screen:first-of-type{border:none}
-  .screen h3{font-size:1.08rem;color:var(--primary-dark);display:flex;align-items:center;gap:8px}
-  .screen .intro{color:var(--muted);font-size:.92rem;margin:4px 0 10px}
-  .screen ol{margin:0 0 10px;padding-inline-start:22px;line-height:1.9}
-  .screen .tips{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:.92rem}
-  .screen .tips ul{margin:4px 0 0;padding-inline-start:20px}
-  .role-note{background:var(--accent-soft);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:.95rem}
+  :root{--bg:#eef3f6;--card:#fff;--pri:#0f3a52;--pri2:#1b567a;--acc:#e8912f;--line:#dde6ea;--muted:#5c6f79;--txt:#1c2b33}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Heebo,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.7}
+  .hero{background:linear-gradient(135deg,var(--pri2),var(--pri));color:#fff;padding:46px 20px 40px;text-align:center}
+  .hero img{width:96px;height:96px}
+  .hero h1{margin:.4rem 0 .2rem;font-size:2rem;font-weight:800}
+  .hero p{margin:0;color:#cfe0ea}
+  .wrap{max-width:900px;margin:-24px auto 60px;padding:0 16px}
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 20px;box-shadow:0 8px 24px rgba(15,58,82,.08);margin-bottom:22px}
+  .toc h2{margin:.2rem 0 .6rem;font-size:1rem;color:var(--muted)}
+  .toc a{display:inline-block;margin:4px 8px 4px 0;padding:6px 12px;background:#eef3f6;border-radius:20px;color:var(--pri);text-decoration:none;font-size:.9rem;font-weight:600}
+  .toc a:hover{background:var(--pri);color:#fff}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;box-shadow:0 6px 18px rgba(15,58,82,.06);margin-bottom:18px}
+  .card h3{display:flex;align-items:center;gap:10px;margin:0 0 10px;color:var(--pri);font-size:1.25rem}
+  .card h3 .ic{width:38px;height:38px;flex:0 0 auto;display:grid;place-items:center;background:linear-gradient(135deg,var(--pri2),var(--pri));color:#fff;border-radius:10px;font-size:1.1rem}
+  .step{display:flex;gap:12px;margin:12px 0}
+  .step .n{flex:0 0 auto;width:28px;height:28px;display:grid;place-items:center;background:var(--acc);color:#fff;border-radius:50%;font-weight:800;font-size:.9rem}
+  .tip{background:#fff8ec;border-right:4px solid var(--acc);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:.94rem}
+  .warn{background:#fdeeee;border-right:4px solid #c0392b;border-radius:8px;padding:10px 14px;margin:12px 0;font-size:.94rem}
+  code{background:#eef3f6;padding:2px 7px;border-radius:6px;font-size:.9em;direction:ltr;display:inline-block}
+  .foot{text-align:center;color:var(--muted);font-size:.85rem;padding:20px}
+  ul{margin:.4rem 0}
 </style>
 </head>
 <body>
-<header>
-  <h1>הדרכה — מערכת מעקב תלמידים</h1>
-  <p>מכינה בית התלמוד</p>
-</header>
-<main>
-  <a class="back" href="../"><i class="bi bi-arrow-right"></i> חזרה למערכת</a>
-
-  <section class="card">
-    <h2><i class="bi bi-play-circle"></i> סרטוני הדרכה</h2>
-    <p class="who">הדרך המהירה ללמוד את המערכת. הסרטונים מוטמעים בעמוד ומתנגנים גם מאחורי סינון תוכן.</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <a class="btn" href="katzar.html"><i class="bi bi-play-fill"></i> קצר — כניסה ודיווח <span class="badge">1:12</span></a>
-      <a class="btn btn-ghost" href="maleh.html"><i class="bi bi-collection-play"></i> מלא — כל המערכת <span class="badge">4:21</span></a>
-      <a class="btn btn-ghost" href="shivuki.html"><i class="bi bi-stars"></i> תדמית — 40 שניות</a>
+  <div class="hero">
+    <img src="../img/logo.svg" alt="לוגו">
+    <h1>מדריך למשתמש</h1>
+    <p>מערכת מעקב תלמידים · מכינה בית התלמוד</p>
+  </div>
+  <div class="wrap">
+    <div class="toc">
+      <h2>במדריך הזה</h2>
+      <a href="#login">כניסה</a><a href="#students">תלמידים</a><a href="#card">כרטיס תלמיד</a>
+      <a href="#maildrive">מייל ודרייב</a><a href="#forms">טפסים ורישום</a><a href="#calendar">לוח שנה</a>
+      <a href="#staff">צוות והרשאות</a>
     </div>
-  </section>
 
-  <section class="card">
-    <h2><i class="bi bi-person-badge"></i> הדרכה מותאמת לתפקיד שלך</h2>
-    <p class="who">בחר את התפקיד שלך — ותראה רק את המסכים שמותר לך לראות, לפי הסדר.</p>
-    <div class="roles" id="roleGrid"></div>
-  </section>
+    <div class="card" id="login">
+      <h3><span class="ic"><i class="bi bi-box-arrow-in-left"></i></span> כניסה למערכת</h3>
+      <div class="step"><span class="n">1</span><div>נכנסים לכתובת האתר מכל טלפון או מחשב.</div></div>
+      <div class="step"><span class="n">2</span><div><b>שם המשתמש = מספר הטלפון</b> שלכם (כפי שהוגדר ע"י המנהל).</div></div>
+      <div class="step"><span class="n">3</span><div>מקלידים סיסמה ולוחצים כניסה. המערכת זוכרת אתכם.</div></div>
+      <div class="tip"><b>טיפ:</b> אפשר להוסיף את האתר למסך הבית של הטלפון — הוא עובד כמו אפליקציה (גם ללא רשת מלאה).</div>
+      <div class="warn"><b>אבטחה:</b> אם עדיין לא שיניתם — כדאי להחליף את סיסמת ברירת המחדל דרך המנהל.</div>
+    </div>
 
-  <div id="guideArea"></div>
-</main>
+    <div class="card" id="students">
+      <h3><span class="ic"><i class="bi bi-people-fill"></i></span> ניהול תלמידים</h3>
+      <p>במסך "תלמידים" רואים את כל התלמידים, עם חיפוש לפי שם / הורה / טלפון, וסינון לפי כיתה וסטטוס.</p>
+      <ul>
+        <li><b>תלמיד חדש</b> — כפתור למעלה. ממלאים את הפרטים המלאים (מחולקים לקבוצות: תלמיד, כתובת, אב, אם, מוסדי, בריאות).</li>
+        <li><b>עריכה</b> — אייקון העיפרון, או "עריכת פרטים" בתוך הכרטיס.</li>
+        <li><b>ייצוא CSV</b> — הורדת רשימת התלמידים לאקסל.</li>
+      </ul>
+    </div>
 
-<script src="../js/guide-data.js"></script>
-<script>
-(function () {
-  var G = window.CV3_GUIDE, esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
-  var ROLE_ICON = { 'מנהל': 'bi-person-gear', 'מפקח': 'bi-eye', 'מחנך': 'bi-person-workspace', 'מלמד': 'bi-pencil-square', 'מזכירה': 'bi-cash-coin' };
+    <div class="card" id="card">
+      <h3><span class="ic"><i class="bi bi-person-vcard"></i></span> כרטיס תלמיד — הכל במקום אחד</h3>
+      <p>לחיצה על אייקון העין פותחת כרטיס רחב שמרכז את כל המידע:</p>
+      <ul>
+        <li><b>פרטי רישום</b> — כל השדות שההורה מילא, מחולקים יפה לקבוצות.</li>
+        <li><b>מעקבים</b> — התנהגות, נוכחות, מבחנים, רפואי, שיחות, אסיפות, קריאה, כתיבה, שכר לימוד ומשימות.</li>
+        <li><b>מייל ודרייב</b> — ראו בסעיף הבא.</li>
+      </ul>
+      <div class="tip">קבוצה ריקה לא מוצגת בכרטיס (כדי שיהיה נקי), אבל ב<b>עריכה</b> כל השדות תמיד זמינים.</div>
+    </div>
 
-  function block(entry) {
-    var h = '<div class="screen"><h3><i class="bi ' + esc(entry.icon) + '"></i> ' + esc(entry.title) + '</h3>';
-    if (entry.intro) h += '<div class="intro">' + esc(entry.intro) + '</div>';
-    if (entry.steps) h += '<ol>' + entry.steps.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ol>';
-    if (entry.tips && entry.tips.length) h += '<div class="tips"><b><i class="bi bi-lightbulb"></i> חשוב לזכור:</b><ul>' + entry.tips.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
-    return h + '</div>';
-  }
+    <div class="card" id="maildrive">
+      <h3><span class="ic"><i class="bi bi-envelope-paper"></i></span> מיילים וקבצים של התלמיד</h3>
+      <p>בכרטיס יש שני פאנלים חכמים שמתעדכנים אוטומטית:</p>
+      <div class="step"><span class="n"><i class="bi bi-envelope"></i></span><div><b>מיילים עם ההורים</b> — כל ההתכתבויות מ/אל כתובת ההורה. <b>לחיצה על הודעה מרחיבה אותה</b> לקריאת התוכן המלא, וכפתור "פתח וענה בג׳ימייל".</div></div>
+      <div class="step"><span class="n"><i class="bi bi-folder2-open"></i></span><div><b>קבצים בדרייב</b> — כל הקבצים בשם התלמיד (Sheets, Docs, PDF, תמונות — הכל). לחיצה פותחת בדרייב.</div></div>
+      <div class="tip">המידע מתרענן אוטומטית כל חצי שעה. רק מי שמורשה לתלמיד רואה את המידע שלו.</div>
+    </div>
 
-  function showRole(key) {
-    var role = G.roles[key]; if (!role) return;
-    var ids = role.screens === 'all' ? Object.keys(G.screens) : role.screens;
-    var html = '<section class="card"><h2><i class="bi ' + (ROLE_ICON[key] || 'bi-person') + '"></i> הדרכה — ' + esc(role.label) + '</h2>';
-    if (role.note) html += '<div class="role-note"><i class="bi bi-info-circle"></i> ' + esc(role.note) + '</div>';
-    html += block(G.common);
-    html += ids.map(function (id) { return G.screens[id] ? block(G.screens[id]) : ''; }).join('');
-    html += '</section>';
-    var area = document.getElementById('guideArea');
-    area.innerHTML = html;
-    location.hash = encodeURIComponent(key);
-    area.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+    <div class="card" id="forms">
+      <h3><span class="ic"><i class="bi bi-file-earmark-check"></i></span> טפסים ורישום הורים</h3>
+      <p>במסך "טפסים" אפשר ליצור טופס ולשלוח להורים:</p>
+      <ul>
+        <li><b>טופס ציבורי</b> — קישור אחד לכל ההורים (כמו גוגל פורמס), עם קוד אקראי מאובטח, אפשרות לתאריך-סיום ולסגירה.</li>
+        <li><b>קישור אישי</b> — לכל תלמיד קישור משלו, עם מעקב מי חתם.</li>
+        <li><b>צור/עדכן כרטיסי תלמיד</b> — הופך את מילויי טופס הרישום לכרטיסי תלמיד אוטומטית (התאמה לפי ת"ז).</li>
+      </ul>
+    </div>
 
-  var grid = document.getElementById('roleGrid');
-  Object.keys(G.roles).forEach(function (key) {
-    var r = G.roles[key];
-    var n = r.screens === 'all' ? Object.keys(G.screens).length : r.screens.length;
-    var a = document.createElement('a');
-    a.className = 'role'; a.href = '#' + encodeURIComponent(key);
-    a.innerHTML = '<span class="ic"><i class="bi ' + (ROLE_ICON[key] || 'bi-person') + '"></i></span><b>' + esc(r.label) + '</b><small>' + n + ' מסכים</small>';
-    a.addEventListener('click', function (e) { e.preventDefault(); showRole(key); });
-    grid.appendChild(a);
-  });
+    <div class="card" id="calendar">
+      <h3><span class="ic"><i class="bi bi-calendar-week"></i></span> לוח שנה</h3>
+      <p>לוח שנה חודשי (עברי + לועזי) המרכז אירועים, אסיפות ומשימות. מסונכרן דו-כיוונית עם יומן הגוגל של המכינה — אירוע שמוסיפים כאן מופיע שם ולהפך.</p>
+    </div>
 
-  // קישור ישיר: /hadracha/#מלמד פותח ישר את ההדרכה של המלמד
-  var h = decodeURIComponent((location.hash || '').replace('#', ''));
-  if (h && G.roles[h]) showRole(h);
-})();
-</script>
+    <div class="card" id="staff">
+      <h3><span class="ic"><i class="bi bi-shield-lock"></i></span> צוות והרשאות</h3>
+      <p>המנהל מוסיף צוות דרך מסך ההגדרות, ומגדיר לכל אחד תפקיד והרשאות:</p>
+      <ul>
+        <li><b>מנהל / מזכירה / מפקח</b> — גישה רחבה (לפי תפקיד).</li>
+        <li><b>מחנך / מלמד</b> — רואה רק את הכיתות שהוקצו לו.</li>
+      </ul>
+      <div class="tip">כל המידע הרגיש (תלמידים, רפואי, מייל, דרייב) מוגן — כל אחד רואה רק את מה שמותר לו.</div>
+    </div>
+
+    <div class="foot">מכינה בית התלמוד · נבנה מאובטח מהיסוד · GitHub Pages + Supabase</div>
+  </div>
 </body>
 </html>

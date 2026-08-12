@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="מכינה בית התלמוד">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b567a"/>
+      <stop offset="1" stop-color="#0f3a52"/>
+    </linearGradient>
+    <linearGradient id="fl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="1" stop-color="#e8912f"/>
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="116" fill="url(#bg)"/>
+  <circle cx="120" cy="120" r="116" fill="none" stroke="#f2c879" stroke-width="4" opacity=".8"/>
+  <circle cx="120" cy="120" r="104" fill="none" stroke="#f2c879" stroke-width="1.5" opacity=".5"/>
+  <!-- open book -->
+  <g transform="translate(0,6)">
+    <path d="M120 156 C96 140 70 140 52 146 L52 96 C70 90 96 90 120 106 Z" fill="#f6f1e6"/>
+    <path d="M120 156 C144 140 170 140 188 146 L188 96 C170 90 144 90 120 106 Z" fill="#eae2d0"/>
+    <path d="M120 106 L120 156" stroke="#c9a24a" stroke-width="3"/>
+    <path d="M64 108 C80 104 100 106 114 116 M64 122 C80 118 100 120 114 130" stroke="#b9b09a" stroke-width="2.2" fill="none"/>
+    <path d="M176 108 C160 104 140 106 126 116 M176 122 C160 118 140 120 126 130" stroke="#b9b09a" stroke-width="2.2" fill="none"/>
+  </g>
+  <!-- flame of learning -->
+  <path d="M120 40 C132 58 132 70 120 82 C108 70 108 58 120 40 Z" fill="url(#fl)"/>
+  <path d="M120 52 C126 62 126 70 120 78 C114 70 114 62 120 52 Z" fill="#fff3cf" opacity=".9"/>
+  <!-- name -->
+  <text x="120" y="196" text-anchor="middle" font-family="Heebo, Arial, sans-serif" font-weight="800" font-size="26" fill="#f6f1e6">בית התלמוד</text>
+  <text x="120" y="216" text-anchor="middle" font-family="Heebo, Arial, sans-serif" font-weight="600" font-size="15" fill="#cfe0ea" letter-spacing="6">מכינה</text>
+</svg>
