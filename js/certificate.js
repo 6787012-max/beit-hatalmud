@@ -33,7 +33,7 @@
   }
 
   function certHtml(student, opts, st) {
-    const stampSrc = st.stamp_data || defaultStamp();
+    const stampImg = st.stamp_data ? '<img class="stamp" src="' + st.stamp_data + '" alt="חותמת">' : '';
     const full = [student.family, student.name].filter(Boolean).join(' ') || student.name || '';
     const bg = st.letterhead_data ? 'background-image:url(' + st.letterhead_data + ');background-size:100% 100%;background-repeat:no-repeat;' : '';
     const sym = st.moses_symbol ? '<div class="sym">סמל מוסד ' + esc(st.moses_symbol) + '</div>' : '';
@@ -60,7 +60,7 @@
       (student.tz ? ' &nbsp;&nbsp; ת.ז. <span class="nm">' + esc(student.tz) + '</span>' : '') + '<br>' +
       'לומד במוסדנו החל מתאריך <span class="nm">' + esc(opts.from) + '</span></div>' +
       '<div class="sign">בברכה,<br>מזכירות ' + esc(instName()) + sym + '</div>' +
-      '<img class="stamp" src="' + stampSrc + '" alt="חותמת">' +
+      stampImg +
       '</div></body></html>';
   }
 
