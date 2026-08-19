@@ -32,7 +32,7 @@
       (last ? '<div class="tl-note" style="font-size:.82rem;margin-top:6px">הערכה קודמת: ' + esc(last.assessed_on || '') + '</div>' : '') +
       '</div>';
     window.UI.modal({
-      title: 'מעקב קריאה — ' + esc([student.family, student.name].filter(Boolean).join(' ')),
+      title: 'מעקב קריאה — ' + esc(window.UI.fullName(student)),
       bodyHTML: body, saveLabel: 'אישור',
       onSave: async (m) => {
         const sc = {};
@@ -80,7 +80,7 @@
       const head = '<tr><th>תלמיד</th>' + cs.map(c => '<th>' + esc(c.name) + '</th>').join('') + '<th></th></tr>';
       const rows = all.map(({ s, a }) => {
         const sc = (a && a.scores) || {};
-        return '<tr><td>' + esc([s.family, s.name].filter(Boolean).join(' ')) + '</td>' +
+        return '<tr><td>' + esc(window.UI.fullName(s)) + '</td>' +
           cs.map(c => '<td>' + (sc[c.id] != null ? '<b>' + esc(sc[c.id]) + '</b>' : '<span style="color:var(--muted)">—</span>') + '</td>').join('') +
           '<td class="row-act"><button class="mini" data-add="' + s.id + '" title="הערכה חדשה"><i class="bi bi-plus-lg"></i></button></td></tr>';
       }).join('');

@@ -14,13 +14,7 @@
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
     return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso);
   };
-  const fullName = s => {
-    if (!s) return '';
-    const nm = (s.name || '').trim(), fam = (s.family || '').trim();
-    if (!fam) return nm;
-    if (!nm) return fam;
-    return nm.indexOf(fam) > -1 ? nm : fam + ' ' + nm;
-  };
+  const fullName = s => window.UI.fullName(s);
 
   const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
   const HEB_MONTHS = ['תשרי', 'חשון', 'כסלו', 'טבת', 'שבט', 'אדר', 'אדר א׳', 'אדר ב׳', 'ניסן', 'אייר', 'סיון', 'תמוז', 'אב', 'אלול'];

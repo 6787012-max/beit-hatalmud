@@ -34,7 +34,7 @@
 
   function certHtml(student, opts, st) {
     const stampImg = st.stamp_data ? '<img class="stamp" src="' + st.stamp_data + '" alt="חותמת">' : '';
-    const full = [student.family, student.name].filter(Boolean).join(' ') || student.name || '';
+    const full = window.UI.fullName(student);
     const bg = st.letterhead_data ? 'background-image:url(' + st.letterhead_data + ');background-size:100% 100%;background-repeat:no-repeat;' : '';
     const sym = st.moses_symbol ? '<div class="sym">סמל מוסד ' + esc(st.moses_symbol) + '</div>' : '';
     return '<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>אישור לימודים</title>' +
@@ -69,7 +69,7 @@
     const today = new Date();
     const iso = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
     const body = '<div class="form-grid">' +
-      '<label class="fld"><span>תלמיד</span><input class="inp mb0" value="' + esc([student.family, student.name].filter(Boolean).join(' ')) + '" readonly></label>' +
+      '<label class="fld"><span>תלמיד</span><input class="inp mb0" value="' + esc(window.UI.fullName(student)) + '" readonly></label>' +
       '<label class="fld"><span>תעודת זהות</span><input class="inp mb0" id="ct_tz" value="' + esc(student.tz || '') + '"></label>' +
       '<label class="fld"><span>תאריך האישור</span><input type="date" class="inp mb0" id="ct_issue" value="' + iso + '"></label>' +
       '<label class="fld"><span>לומד החל מתאריך</span><input class="inp mb0" id="ct_from" value="' + esc(st.cert_from || acadStart()) + '"></label>' +

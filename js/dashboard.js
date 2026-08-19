@@ -11,12 +11,7 @@
   const daysBack = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
   const pct = (a, b) => b ? Math.round((a / b) * 100) : 0;
   async function students() { return (window.cv3Students ? await window.cv3Students.getStudents() : []); }
-  const fullName = s => {
-    if (!s) return '—';
-    const nm = (s.name || '').trim(), fam = (s.family || '').trim();
-    if (!fam) return nm; if (!nm) return fam;
-    return nm.indexOf(fam) > -1 ? nm : fam + ' ' + nm;
-  };
+  const fullName = s => window.UI.fullName(s) || '—';
 
   // טווח ברירת-מחדל וסינון נשמרים בין כניסות למסך
   const F = { from: daysBack(30), to: iso(new Date()), classId: '' };

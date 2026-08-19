@@ -49,5 +49,15 @@
     });
   }
 
-  window.UI = { modal, toast, confirm, el: elc };
+  // שם מלא — ברשומות המיובאות name הוא כבר שם מלא ומכיל את family.
+  // שרשור עיוור יצר "גלזר מיכאל יעקב גלזר" באישור לימודים ובמעקב קריאה.
+  function fullName(s) {
+    if (!s) return '';
+    const nm = String(s.name || '').trim(), fam = String(s.family || '').trim();
+    if (!fam) return nm;
+    if (!nm) return fam;
+    return nm.indexOf(fam) > -1 ? nm : fam + ' ' + nm;
+  }
+
+  window.UI = { modal, toast, confirm, el: elc, fullName: fullName };
 })();

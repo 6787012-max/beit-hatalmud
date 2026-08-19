@@ -222,7 +222,15 @@
         '</div>';
       m.el.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => { m.close(); showPage(btn.dataset.go); }));
       const eb = m.el.querySelector('[data-edit2]'); if (eb) eb.addEventListener('click', () => { m.close(); openForm(s); });
-      const pb = m.el.querySelector('[data-print2]'); if (pb) pb.addEventListener('click', () => window.print());
+      // הדפסה של הכרטיס בלבד — קודם window.print() הדפיס את כל הדף שמאחורי המודאל
+      const pb = m.el.querySelector('[data-print2]');
+      if (pb) pb.addEventListener('click', () => {
+        document.body.classList.add('printing-card');
+        const done = () => document.body.classList.remove('printing-card');
+        window.addEventListener('afterprint', done, { once: true });
+        setTimeout(done, 8000);   // דפדפנים שלא יורים afterprint
+        window.print();
+      });
       const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
       const ctb = m.el.querySelector('[data-cert]'); if (ctb && window.cv3Cert) ctb.addEventListener('click', () => window.cv3Cert.openCertificate(s));
       const tlb = m.el.querySelector('[data-tla]'); if (tlb && window.cv3Tla) tlb.addEventListener('click', () => { m.close(); window.cv3Tla.openForStudent(s); });

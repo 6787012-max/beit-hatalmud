@@ -472,3 +472,18 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .rp-sec .det-grid{margin-top:6px}
 @media (max-width:1100px){ .rp-stats{grid-template-columns:repeat(3,1fr)} }
 @media (max-width:640px){ .rp-stats{grid-template-columns:1fr 1fr} .rp-bar{grid-template-columns:1fr 1fr} .rp-quick{grid-column:1/-1} }
+
+/* ===== הדפסת כרטיס התלמיד בלבד (לא כל הדף שמאחוריו) ===== */
+@media print{
+  body.printing-card>*:not(.modal-ov){display:none !important}
+  body.printing-card .modal-ov{position:static !important; inset:auto !important; background:none !important;
+    padding:0 !important; display:block !important; overflow:visible !important}
+  body.printing-card .modal-card{max-width:none !important; width:100% !important; max-height:none !important;
+    box-shadow:none !important; border:0 !important; border-radius:0 !important}
+  body.printing-card .modal-body{max-height:none !important; overflow:visible !important; padding:0 !important}
+  body.printing-card .modal-x,
+  body.printing-card .modal-foot,
+  body.printing-card .det-actions,
+  body.printing-card .stu-links .btn-ghost{display:none !important}
+  body.printing-card .det-sec{break-inside:avoid; page-break-inside:avoid}
+}
