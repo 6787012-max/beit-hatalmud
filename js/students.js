@@ -81,7 +81,7 @@
     async function openDetail(s) {
       if (!s) return;
       const m = window.UI.modal({ title: 'כרטיס תלמיד', bodyHTML: '<div style="padding:26px;text-align:center;color:var(--muted)"><i class="bi bi-hourglass-split"></i> טוען…</div>' });
-      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tui, tsk, raCats, raAssess, tlaData] = await Promise.all([
+      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tui, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice] = await Promise.all([
         window.store.list('categories'),
         window.store.byStudent('behavior_events', s.id), window.store.byStudent('attendance', s.id),
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
@@ -91,6 +91,8 @@
         (window.cv3ReadAssess ? window.cv3ReadAssess.cats() : Promise.resolve([])),
         (window.cv3ReadAssess ? window.cv3ReadAssess.forStudent(s.id) : Promise.resolve([])),
         (window.cv3Tla ? window.cv3Tla.forStudent(s.id) : Promise.resolve({ plans: [], goals: [] })),
+        window.store.byStudent('form_responses', s.id), window.store.list('forms'),
+        ((!window.Auth || window.Auth.canAccess('voicereports')) ? window.store.byStudent('voice_reports', s.id) : Promise.resolve([])),
       ]);
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
@@ -105,6 +107,47 @@
       const tasksSec = '<div class="det-sec"><h4><i class="bi bi-kanban"></i> משימות הקשורות <span class="det-badge">' + tsk.length + '</span></h4>' +
         (tsk.length ? tsk.slice(-4).reverse().map(t => li('<strong>' + esc(t.title) + '</strong> ' + taskChip(t.status), hebDate(t.due_date))).join('')
           : '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">אין משימות משויכות</div>') + '</div>';
+      // ── נוכחות: אחוזים + פירוט אחרון (היה: שורת ספירה בלבד, בלי תאריכים ובלי אחוז) ──
+      const attTot = attC.present + attC.late + attC.absent;
+      const attPct = (a, b) => b ? Math.round((a / b) * 100) : 0;
+      const attStatus = { present: ['נוכח', 'lo'], late: ['איחור', 'mid'], absent: ['נעדר', 'hi'] };
+      const gregDate = x => { const mm = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(x || '')); return mm ? mm[3] + '/' + mm[2] + '/' + mm[1] : (x || ''); };
+      const attSec = !attTot ? '' :
+        '<div class="det-sec"><h4><i class="bi bi-calendar-check"></i> נוכחות <span class="det-badge">' + attTot + '</span></h4>' +
+        '<div class="det-grid">' +
+          '<div class="det-row"><span class="det-lbl">אחוז הגעה</span><span class="det-val"><span class="chip ' +
+            (attPct(attC.present + attC.late, attTot) >= 90 ? 'ok' : 'off') + '">' + attPct(attC.present + attC.late, attTot) + '%</span></span></div>' +
+          '<div class="det-row"><span class="det-lbl">אחוז בזמן</span><span class="det-val"><span class="chip ' +
+            (attPct(attC.present, attTot) >= 90 ? 'ok' : 'off') + '">' + attPct(attC.present, attTot) + '%</span></span></div>' +
+          '<div class="det-row"><span class="det-lbl">נוכח</span><span class="det-val">' + attC.present + '</span></div>' +
+          '<div class="det-row"><span class="det-lbl">איחורים</span><span class="det-val">' + attC.late + '</span></div>' +
+          '<div class="det-row"><span class="det-lbl">היעדרויות</span><span class="det-val">' + attC.absent + '</span></div>' +
+        '</div>' +
+        att.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-5).reverse().map(a => {
+          const st = attStatus[a.status] || ['—', 'mid'];
+          return li('<strong>' + esc(st[0]) + '</strong>' + (a.note ? ' — ' + esc(a.note) : ''),
+            (hebDate(a.date) || '') + ' · ' + gregDate(a.date), st[1]);
+        }).join('') + '</div>';
+
+      // ── טפסים וחתימות ──
+      const formTitle = id => { const f = (frmAll || []).find(x => x.id == id); return f ? f.title : 'טופס'; };
+      const frmSec = !(frmRes && frmRes.length) ? '' :
+        '<div class="det-sec"><h4><i class="bi bi-file-earmark-check"></i> טפסים וחתימות <span class="det-badge">' + frmRes.length + '</span></h4>' +
+        frmRes.slice().reverse().slice(0, 5).map(r => li(
+          '<strong>' + esc(formTitle(r.form_id)) + '</strong> <span class="chip ' + (r.status === 'signed' ? 'ok' : 'off') + '">' +
+          (r.status === 'signed' ? 'נחתם' : 'ממתין') + '</span>' + (r.signer_name ? ' — ' + esc(r.signer_name) : ''),
+          r.signed_at ? (hebDate(String(r.signed_at).slice(0, 10)) || gregDate(r.signed_at)) : '', r.status === 'signed' ? 'lo' : 'mid'
+        )).join('') + '</div>';
+
+      // ── דיווחים קוליים (רק למי שרשאי למסך) ──
+      const vSec = !(voice && voice.length) ? '' :
+        '<div class="det-sec"><h4><i class="bi bi-mic-fill"></i> דיווחים קוליים <span class="det-badge">' + voice.length + '</span></h4>' +
+        voice.slice().reverse().slice(0, 4).map(v => li(
+          '<strong>' + esc(v.report_type || 'דיווח') + '</strong>' + (v.teacher_name ? ' · ' + esc(v.teacher_name) : '') +
+          (v.report_text ? ' — ' + esc(String(v.report_text).slice(0, 140)) : ''),
+          v.created_at ? gregDate(String(v.created_at).slice(0, 10)) : '', sevc(v.severity)
+        )).join('') + '</div>';
+
       // פרטי רישום — מחולקים יפה לקבוצות (תלמיד / כתובת / אב / אם / מוסדי / בריאות). כל קבוצה מוצגת רק אם יש בה נתונים.
       const hasReg = s.reg && typeof s.reg === 'object' && Object.keys(s.reg).length;
       const regSec = !hasReg ? '' : REG_GROUPS.map(g => {
@@ -166,7 +209,7 @@
         sec('כתיבה', 'bi-pencil-square', wrt, x => li('רמה: ' + esc(x.level), x.date)) +
         (window.cv3ReadAssess ? window.cv3ReadAssess.cardSection(raCats, raAssess) : '') +
         (window.cv3Tla ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
-        (att.length ? '<div class="det-sec"><h4><i class="bi bi-calendar-check"></i> נוכחות <span class="det-badge">' + att.length + '</span></h4><div class="det-item"><span class="di-main">נוכח ' + att.filter(a => a.status === 'present').length + ' · איחורים ' + att.filter(a => a.status === 'late').length + ' · נעדר ' + att.filter(a => a.status === 'absent').length + '</span></div></div>' : '') +
+        attSec + frmSec + vSec +
         sec('שכר לימוד', 'bi-cash-coin', tui, t => li((esc(t.month) || '') + (t.amount ? ' · ₪' + esc(t.amount) : ''), t.status === 'paid' ? 'שולם' : 'חוב', t.status === 'paid' ? 'lo' : 'hi')) +
         tasksSec +
         '<div class="det-actions" style="margin-top:14px">' +
