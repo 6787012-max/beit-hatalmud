@@ -460,3 +460,15 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .tla-sched td.cell .cnote{font-size:.72rem; color:#555}
 .slot-row{display:grid; grid-template-columns:1fr 1fr auto; gap:6px; margin-bottom:6px; align-items:center}
 @media (max-width:760px){ .tla-grid2{grid-template-columns:1fr} }
+
+/* ===== דשבורד ודוחות — סרגל סינון ומקטעי דוח ===== */
+.rp-bar{align-items:end}
+.rp-f{display:flex; flex-direction:column; gap:3px}
+.rp-f>span{font-size:.74rem; color:var(--muted)}
+.rp-quick{display:flex; gap:6px; align-items:center}
+.rp-stats{grid-template-columns:repeat(6,1fr)}
+.rp-sec{margin-top:14px}
+.rp-sec table.tbl{margin-top:6px}
+.rp-sec .det-grid{margin-top:6px}
+@media (max-width:1100px){ .rp-stats{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:640px){ .rp-stats{grid-template-columns:1fr 1fr} .rp-bar{grid-template-columns:1fr 1fr} .rp-quick{grid-column:1/-1} }
