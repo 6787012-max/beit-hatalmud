@@ -169,16 +169,22 @@
     // ---------- פעולות ----------
     async function move(t, status) {
       if (!status || status === t.status) return;
+      const prev = t.status;
       t.status = status;
-      await window.store.update('tasks', t.id, { status });
       redrawBoard(); redrawStats(); redrawProjects();
+      const r = await window.store.update('tasks', t.id, { status });
+      if (!r || r.ok === false) {
+        t.status = prev; redrawBoard(); redrawStats(); redrawProjects();
+        window.UI.toast('ההעברה נכשלה', 'err'); return;
+      }
       window.UI.toast('הועבר ל' + statusHeb(status));
     }
 
     async function delTask(t) {
       const ok = await window.UI.confirm('למחוק את המשימה "' + esc(t.title) + '"?');
       if (!ok) return;
-      await window.store.remove('tasks', t.id);
+      const r = await window.store.remove('tasks', t.id);
+      if (!r || r.ok === false) { window.UI.toast('המחיקה נכשלה', 'err'); return; }
       const i = tasks.indexOf(t); if (i >= 0) tasks.splice(i, 1);
       redrawBoard(); redrawStats(); redrawProjects();
       window.UI.toast('נמחקה');

@@ -344,12 +344,16 @@
       },
     });
     m.el.querySelector('#g_addrole').addEventListener('click', () => {
-      const nm = prompt('שם בעל התפקיד (למשל: מטפל רגשי, רב הכיתה):');
-      if (!nm) return;
+      const wrap = m.el.querySelector('#g_roles');
       const lab = document.createElement('label');
       lab.className = 'fld fld-wide';
-      lab.innerHTML = '<span>' + esc(nm) + '</span><textarea class="inp mb0" data-role="' + esc(nm) + '" rows="2"></textarea>';
-      m.el.querySelector('#g_roles').appendChild(lab);
+      lab.innerHTML = '<span><input class="inp mb0 role-name" placeholder="שם בעל התפקיד (מטפל רגשי, רב הכיתה…)"></span>' +
+        '<textarea class="inp mb0" rows="2"></textarea>';
+      wrap.appendChild(lab);
+      const nameInp = lab.querySelector('.role-name'), ta = lab.querySelector('textarea');
+      const sync = () => { const v = nameInp.value.trim(); if (v) ta.dataset.role = v; else delete ta.dataset.role; };
+      nameInp.addEventListener('input', sync);
+      nameInp.focus();
     });
   }
 

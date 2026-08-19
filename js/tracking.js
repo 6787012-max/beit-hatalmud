@@ -50,7 +50,9 @@
         page.querySelector('#recEmpty-' + uid).hidden = data.length > 0;
         page.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
           const ok = await window.UI.confirm('למחוק?'); if (!ok) return;
-          await del(cfg.table, Number(b.dataset.del)); data = data.filter(x => x.id != b.dataset.del); draw(); window.UI.toast('נמחק');
+          const dr = await del(cfg.table, Number(b.dataset.del));
+          if (!dr || dr.ok === false) { window.UI.toast('המחיקה נכשלה', 'err'); return; }
+          data = data.filter(x => x.id != b.dataset.del); draw(); window.UI.toast('נמחק');
         }));
       }
       page.querySelector('#recCsv-' + uid).addEventListener('click', () => {
@@ -82,7 +84,9 @@
     const classes = window.cv3Students ? await window.cv3Students.getClasses() : [];
     const has = new Set(studs.map(s => s.class_id));
     const clsOpts = classes.filter(c => has.has(c.id)).map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
-    const state = {};
+    const state = {};      // סטטוס מוצג לכל תלמיד ביום הנבחר
+    const rowIds = {};     // מזהה רשומת הנוכחות הקיימת — כדי לעדכן במקום למחוק+להוסיף
+    const busy = {};       // נעילה פר-תלמיד נגד לחיצות רצופות
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>נוכחות</h2></div>' +
       // entry-ui: במסך הנוכחות הטבלה והסרגל *הם* טופס ההזנה, ולא תצוגת נתונים.
@@ -109,17 +113,34 @@
       page.querySelector('#attSum').textContent = 'נוכחים ' + c.present + ' · איחורים ' + c.late + ' · נעדרים ' + c.absent;
       page.querySelectorAll('.att-btn').forEach(b => b.addEventListener('click', async () => {
         const sid = Number(b.dataset.sid), v = b.dataset.v, d = page.querySelector('#attDate').value;
+        if (busy[sid]) return;                 // לחיצות רצופות על אותו תלמיד יצרו כפילויות
+        busy[sid] = true;
+        const prev = state[sid];
         state[sid] = v; draw();
-        const all = await list('attendance');
-        for (const a of all) if (a.student_id == sid && a.date === d) await del('attendance', a.id);
-        await add('attendance', { student_id: sid, date: d, status: v });
-        window.UI.toast('נשמר');
+        try {
+          // קודם: טעינת כל טבלת הנוכחות בכל לחיצה, ואז מחיקה ואז הוספה. אם
+          // ההוספה נכשלה — הרישום הקודם כבר נמחק והתלמיד נשאר בלי נוכחות כלל.
+          const existing = rowIds[sid];
+          const r = existing
+            ? await window.store.update('attendance', existing, { status: v })
+            : await add('attendance', { student_id: sid, date: d, status: v });
+          if (!r.ok) {
+            state[sid] = prev; draw();
+            window.UI.toast('השמירה נכשלה — הסימון לא נשמר', 'err');
+            return;
+          }
+          if (!existing) { const nr = r.data && r.data[0]; if (nr && nr.id) rowIds[sid] = nr.id; }
+          window.UI.toast('נשמר');
+        } finally { busy[sid] = false; }
       }));
     }
     async function loadDate() {
       Object.keys(state).forEach(k => delete state[k]);
+      Object.keys(rowIds).forEach(k => delete rowIds[k]);
       const d = page.querySelector('#attDate').value;
-      (await list('attendance')).filter(a => a.date === d).forEach(a => { state[a.student_id] = a.status; });
+      (await list('attendance')).filter(a => a.date === d).forEach(a => {
+        state[a.student_id] = a.status; rowIds[a.student_id] = a.id;
+      });
       draw();
     }
     page.querySelector('#attDate').addEventListener('change', loadDate);

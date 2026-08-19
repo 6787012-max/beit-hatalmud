@@ -114,7 +114,8 @@
           const active = el.querySelector('.rc-active').checked;
           if (!name) continue;
           if (String(id).startsWith('new')) await window.store.add('reading_categories', { name, active, sort_order: order });
-          else await window.store.update('reading_categories', Number(id), { name, active, sort_order: order });
+          else { const ur = await window.store.update('reading_categories', Number(id), { name, active, sort_order: order });
+                 if (ur && ur.ok === false) { window.UI.toast('עדכון קטגוריה נכשל: ' + (ur.error || ''), 'err'); return false; } }
           order++;
         }
         window.UI.toast('קטגוריות עודכנו'); return true;

@@ -72,7 +72,11 @@
         if (u.role === 'מנהל' && users.filter(x => x.role === 'מנהל').length <= 1) { window.UI.toast('חייב להישאר מנהל אחד לפחות', 'err'); return; }
         const LIVE = !!window.sb;
         if (!(await window.UI.confirm(LIVE ? ('להשבית את המשתמש "' + esc(u.name) + '"? (לא ניתן למחוק לגמרי משתמש מאומת — הוא יושבת ולא יוכל להיכנס)') : ('למחוק את המשתמש "' + esc(u.name) + '"?')))) return;
-        if (LIVE) { await window.store.update('profiles', u.id, { active: false }); const i = users.indexOf(u); if (i >= 0) users.splice(i, 1); }
+        if (LIVE) {
+          const r = await window.store.update('profiles', u.id, { active: false });
+          if (!r || r.ok === false) { window.UI.toast('ההשבתה נכשלה — המשתמש עדיין פעיל', 'err'); return; }
+          const i = users.indexOf(u); if (i >= 0) users.splice(i, 1);
+        }
         else { await window.store.remove('users', u.id); const i = users.indexOf(u); if (i >= 0) users.splice(i, 1); }
         drawUsers(); window.UI.toast(LIVE ? 'המשתמש הושבת' : 'נמחק');
       }));
@@ -124,7 +128,8 @@
             else { const r = await window.store.add('users', row); const nu = (r.data && r.data[0]) || Object.assign({ id: Date.now() }, row); uid = nu.id; users.push(nu); }
           } else if (existing) {
             // ── חי: עדכון פרופיל קיים (שם/תפקיד/הרשאות) ──
-            await window.store.update('profiles', u.id, { name, role, tz: phone, perms, access_mode });
+            const ur = await window.store.update('profiles', u.id, { name, role, tz: phone, perms, access_mode });
+            if (!ur || ur.ok === false) { window.UI.toast('עדכון המשתמש נכשל: ' + ((ur && ur.error) || ''), 'err'); return false; }
             Object.assign(u, { name, role, tz: phone, perms, access_mode }); uid = u.id;
           } else {
             // ── חי: יצירת משתמש אמיתי דרך Supabase Auth (client זמני שלא נוגע בסשן המנהל) ──
@@ -138,7 +143,7 @@
             uid = data && data.user && data.user.id;
             if (!uid) { window.UI.toast('המשתמש לא נוצר (אולי המספר כבר קיים)', 'err'); return false; }
             await new Promise(r => setTimeout(r, 500));   // המתנה לטריגר שיוצר את הפרופיל
-            const upd = await window.store.update('profiles', uid, { name, role, tz: phone, perms, access_mode });
+            const upd = await window.store.update('profiles', uid, { name, role, tz: phone, perms, access_mode, active: true });
             if (upd && upd.ok === false) { window.UI.toast('המשתמש נוצר אך עדכון הפרופיל נכשל: ' + (upd.error || ''), 'err'); }
             users.push({ id: uid, name, phone, tz: phone, role, perms, access_mode });
           }

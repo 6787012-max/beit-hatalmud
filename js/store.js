@@ -134,8 +134,14 @@
     if (window.UI && window.UI.toast) window.UI.toast('טעינת הנתונים נכשלה — ייתכן שהמסך אינו מעודכן. רענן.', 'err');
   }
 
+  // 'users' קיימת רק במאגר הדמו; במוסד חי המקבילה היא profiles. כמה מודולים
+  // עדיין מנסים אותה כ-fallback, וכל ניסיון כזה הדליק טוסט אדום "טעינת הנתונים
+  // נכשלה" בכניסה למסך ההגדרות ולמסך המשימות — כשהכול תקין.
+  const DEMO_ONLY = { users: 1 };
+
   async function list(table, opts) {
     if (DEMO) { let r = (mem[table] || []).slice(); if (opts && opts.eq) for (const k in opts.eq) r = r.filter(x => x[k] == opts.eq[k]); return r; }
+    if (DEMO_ONLY[table]) return [];
     const res = await window.db.list(table, opts);
     if (!res.ok) reportReadFailure(table, res.error);
     return res.data || [];

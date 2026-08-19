@@ -339,7 +339,9 @@
       // ודא שיש קוד אקראי והקישור פעיל
       if (!f.link_token || !f.is_public) {
         const patch = { link_token: f.link_token || gTok(), is_public: true };
-        await window.store.update('forms', f.id, patch); Object.assign(f, patch);
+        const r = await window.store.update('forms', f.id, patch);
+        if (!r || r.ok === false) { window.UI.toast('יצירת הקישור נכשלה', 'err'); return; }
+        Object.assign(f, patch);
       }
       const url = signBase() + '?g=' + f.link_token;
       const pubCount = resp.filter(r => r.form_id == f.id && r.student_id == null).length;
@@ -360,12 +362,18 @@
       $('#pl_wa').addEventListener('click', () => window.open('https://wa.me/?text=' + encodeURIComponent('קישור למילוי טופס: ' + url), '_blank'));
       $('#pl_save').addEventListener('click', async () => {
         const v = $('#pl_until').value || null;
-        await window.store.update('forms', f.id, { open_until: v }); f.open_until = v;
+        const r = await window.store.update('forms', f.id, { open_until: v });
+        if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה — התאריך לא נשמר', 'err'); return; }
+        f.open_until = v;
         window.UI.toast('התאריך נשמר');
       });
       $('#pl_toggle').addEventListener('click', async () => {
         const nc = !f.closed;
-        await window.store.update('forms', f.id, { closed: nc }); f.closed = nc;
+        // קריטי: אם השמירה נכשלת והמסך מדווח "נסגר", המנהל מניח שהטופס סגור
+        // בעוד הוא ממשיך לקבל מילויים מהציבור.
+        const r = await window.store.update('forms', f.id, { closed: nc });
+        if (!r || r.ok === false) { window.UI.toast((nc ? 'הסגירה' : 'הפתיחה') + ' נכשלה — הטופס לא השתנה', 'err'); return; }
+        f.closed = nc;
         $('#pl_toggle').innerHTML = nc ? '<i class="bi bi-unlock"></i> פתח מחדש' : '<i class="bi bi-lock"></i> סגור עכשיו';
         $('#pl_toggle').classList.toggle('danger', !nc);
         $('#pl_stat').innerHTML = 'התקבלו עד כה: <b>' + pubCount + '</b> מילויים' + (nc ? ' · <b style="color:#c0392b">הטופס סגור</b>' : '');

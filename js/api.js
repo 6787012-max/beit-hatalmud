@@ -5,13 +5,42 @@
   'use strict';
   const DEMO = !window.sb;
 
+  // PostgREST של הפרויקט מוגדר max_rows=1000: קריאה בלי range נחתכת בשקט,
+  // בלי שגיאה. עם 37 תלמידים, טבלת attendance חוצה 1000 שורות תוך כחודש
+  // לימודים — ומאז הדוחות, הכרטיס והייצוא היו מחשבים על תת-קבוצה שרירותית.
+  // לכן כל קריאה מדפדפת עד שהעמוד חוזר חלקי.
+  const PAGE = 1000;
+  const noIdCol = {};   // טבלאות שאין בהן עמודת id (student_links, user_class_access) — נלמד בזמן ריצה
+
   async function list(table, opts) {
     if (DEMO) return { ok: true, data: [], demo: true };
-    let q = window.sb.from(table).select(opts && opts.select || '*');
-    if (opts && opts.eq) for (const k in opts.eq) q = q.eq(k, opts.eq[k]);
-    if (opts && opts.order) q = q.order(opts.order, { ascending: opts.asc !== false });
-    const { data, error } = await q;
-    return { ok: !error, data: data || [], error: error && error.message };
+    const explicitOrder = opts && opts.order;
+    const asc = explicitOrder ? opts.asc !== false : true;
+    let orderCol = explicitOrder || (noIdCol[table] ? null : 'id');
+    let out = [], from = 0;
+    for (;;) {
+      let q = window.sb.from(table).select(opts && opts.select || '*');
+      if (opts && opts.eq) for (const k in opts.eq) q = q.eq(k, opts.eq[k]);
+      if (orderCol) q = q.order(orderCol, { ascending: asc });
+      const { data, error } = await q.range(from, from + PAGE - 1);
+      if (error) {
+        // 42703 = העמודה לא קיימת. קורה בטבלאות ללא id; מנסים שוב בלי מיון
+        // במקום להחזיר שגיאה (בגרסה קודמת זה שבר את user_class_access,
+        // ומחנכים נשארו בלי הרשאות כיתה).
+        if (!explicitOrder && orderCol && (error.code === '42703' || /column .* does not exist/i.test(error.message || ''))) {
+          noIdCol[table] = 1; orderCol = null; continue;
+        }
+        return { ok: false, data: out, error: error.message };
+      }
+      out = out.concat(data || []);
+      if (!data || data.length < PAGE) break;
+      from += PAGE;
+      if (from >= 100000) {   // בלם ביטחון — טבלה בסדר גודל כזה צריכה סינון בצד-שרת
+        console.warn('[cv3] ' + table + ': נעצר ב-100k שורות; צריך סינון בצד-שרת');
+        break;
+      }
+    }
+    return { ok: true, data: out };
   }
   async function insert(table, row) {
     if (DEMO) return { ok: true, demo: true };
