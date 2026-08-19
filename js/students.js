@@ -20,9 +20,8 @@
   // כל הנתונים דרך המאגר המרכזי (store.js) — משותף עם שאר המודולים.
   async function getClasses() { return window.store.list('classes'); }
   async function getStudents() {
-    let list = await window.store.list('students');
-    if (window.Auth && window.Auth.scopeClasses) { const sc = window.Auth.scopeClasses(); if (sc) list = list.filter(s => sc.includes(s.class_id)); }
-    return list;
+    // מודל עמנואל: כל צוות רואה את כל התלמידים; היקף הנתונים נאכף ב-RLS בשרת.
+    return window.store.list('students');
   }
   async function saveStudent(row) { return row.id ? window.store.update('students', row.id, row) : window.store.add('students', row); }
   async function removeStudent(id) { return window.store.remove('students', id); }
@@ -255,6 +254,10 @@
             tz: (reg['תעודת זהות'] || '').trim() || null,
             parent_name: (reg['שם האב'] || reg['שם האם'] || '').trim() || null,
             parent_phone: (reg['נייד אב'] || reg['נייד אם'] || reg['טלפון בבית'] || '').trim() || null,
+            mother_name: (reg['שם האם'] || '').trim() || null,
+            mother_phone: (reg['נייד אם'] || '').trim() || null,
+            mother_email: (reg['אימייל אם'] || '').trim() || null,
+            birthdate_heb: [reg['תאריך לידה עברי - יום'], reg['תאריך לידה עברי - חודש'], reg['תאריך לידה עברי - שנה']].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' ') || null,
             class_id: m.querySelector('#f_class').value ? Number(m.querySelector('#f_class').value) : null,
             status: m.querySelector('#f_status').value,
             notes: m.querySelector('#f_notes').value.trim(),
@@ -296,13 +299,8 @@
   }
 
   async function addClass(name) { const r = await window.store.add('classes', { name }); return { ok: r.ok, id: r.data && r.data[0] && r.data[0].id }; }
-  // מזהי התלמידים שהמשתמש הנוכחי מורשה לראות (null = הכל). לסינון רשומות בכל המודולים.
-  async function accessibleIds() {
-    const sc = (window.Auth && window.Auth.scopeClasses) ? window.Auth.scopeClasses() : null;
-    if (!sc) return null;
-    const studs = await window.store.list('students');
-    return studs.filter(s => sc.includes(s.class_id)).map(s => s.id);
-  }
+  // מודל עמנואל: כל צוות רואה את כל התלמידים; היקף הנתונים נאכף ב-RLS. null = הכל.
+  async function accessibleIds() { return null; }
   window.cv3Students = { getStudents: getStudents, getClasses: getClasses, addClass: addClass, accessibleIds: accessibleIds };
   window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
   window.PAGE_RENDERERS.students = render;
