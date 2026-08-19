@@ -65,7 +65,7 @@
   function roleCaps(role) {
     const money = ['tuition', 'cashbox'];
     const entry = ['behavior', 'attendance', 'tests'];  // מסכי הזנה (מלמד)
-    const nonMoney = ['behavior', 'attendance', 'tests', 'students', 'medical', 'forms', 'calendar', 'reports'];
+    const nonMoney = ['behavior', 'attendance', 'tests', 'readassess', 'tla', 'students', 'medical', 'forms', 'calendar', 'reports'];
     switch (role) {
       case 'מנהל':  return { perms: null, mode: 'full', scoped: false };          // הכל + שינויים + כספים
       case 'מפקח':  return { perms: null, mode: 'readonly', scoped: false };       // הכל, ללא שינויים

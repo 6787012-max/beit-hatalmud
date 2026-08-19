@@ -436,3 +436,27 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 /* סימן-מים עדין של הלוגו במסך הבית */
 .home-hero{position:relative; overflow:hidden}
 .home-hero::after{content:""; position:absolute; inset-inline-end:-24px; bottom:-34px; width:210px; height:210px; background:url(../img/logo.png) center/contain no-repeat; opacity:.07; pointer-events:none}
+
+/* ===== תל"א — תכנית לימודים אישית ===== */
+.tla-tabs{display:flex; gap:6px; flex-wrap:wrap; margin:12px 0 10px; border-bottom:2px solid var(--line)}
+.tla-tab{background:none; border:0; border-bottom:3px solid transparent; padding:8px 14px; cursor:pointer;
+  font:inherit; color:var(--muted); border-radius:8px 8px 0 0}
+.tla-tab:hover{background:rgba(0,0,0,.04)}
+.tla-tab.on{color:var(--primary,#003048); border-bottom-color:var(--accent,#a87830); font-weight:600}
+.tla-bar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px}
+.tla-grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.tla-grid2 textarea{width:100%; resize:vertical}
+.tla-save{margin-top:12px; text-align:left}
+.tla-sub{margin:14px 0 6px; color:var(--primary,#003048); font-size:.95rem}
+.tla-goal h3{display:flex; justify-content:space-between; align-items:center; gap:8px}
+.tla-roles{border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); margin:6px 0; padding:4px 0}
+.tla-legend{display:flex; gap:12px; flex-wrap:wrap; font-size:.78rem; color:var(--muted); margin-inline-start:auto}
+.tla-legend i{display:inline-block; width:12px; height:12px; border-radius:3px; margin-inline-end:4px; vertical-align:-2px; border:1px solid rgba(0,0,0,.15)}
+.tla-schedwrap{overflow-x:auto}
+.tla-sched{min-width:720px; table-layout:fixed}
+.tla-sched th.slot{width:78px; font-size:.76rem; color:var(--muted); white-space:nowrap}
+.tla-sched td.cell{height:56px; cursor:pointer; text-align:center; font-size:.85rem; vertical-align:middle}
+.tla-sched td.cell:hover{outline:2px solid var(--accent,#a87830); outline-offset:-2px}
+.tla-sched td.cell .cnote{font-size:.72rem; color:#555}
+.slot-row{display:grid; grid-template-columns:1fr 1fr auto; gap:6px; margin-bottom:6px; align-items:center}
+@media (max-width:760px){ .tla-grid2{grid-template-columns:1fr} }
