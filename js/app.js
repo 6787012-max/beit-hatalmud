@@ -12,6 +12,7 @@
     { id: 'behavior',      label: 'מעקב',             icon: 'bi-clipboard-check', group: G1, color: '#c0392b' },
     { id: 'attendance',    label: 'נוכחות',           icon: 'bi-calendar-check',  group: G1, color: '#1f8a5b' },
     { id: 'tests',         label: 'מבחנים',           icon: 'bi-card-checklist',  group: G1, color: '#d68910' },
+    { id: 'readassess',    label: 'מעקב קריאה',       icon: 'bi-book-half',       group: G1, color: '#7d3c98' },
     { id: 'students',      label: 'תלמידים',          icon: 'bi-people-fill',     group: G2, color: '#2b7c98' },
     { id: 'medical',       label: 'רפואי',            icon: 'bi-capsule',         group: G2, color: '#d35400' },
     { id: 'forms',         label: 'טפסים וחתימות',    icon: 'bi-file-earmark-check', group: G2, color: '#c0398a' },

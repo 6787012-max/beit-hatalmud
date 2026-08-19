@@ -82,13 +82,15 @@
     async function openDetail(s) {
       if (!s) return;
       const m = window.UI.modal({ title: 'כרטיס תלמיד', bodyHTML: '<div style="padding:26px;text-align:center;color:var(--muted)"><i class="bi bi-hourglass-split"></i> טוען…</div>' });
-      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tui, tsk] = await Promise.all([
+      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tui, tsk, raCats, raAssess] = await Promise.all([
         window.store.list('categories'),
         window.store.byStudent('behavior_events', s.id), window.store.byStudent('attendance', s.id),
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
         window.store.byStudent('medications', s.id), window.store.byStudent('conversations', s.id),
         window.store.byStudent('meetings', s.id), window.store.byStudent('reading', s.id), window.store.byStudent('writing', s.id),
         window.store.byStudent('tuition', s.id), window.store.byStudent('tasks', s.id),
+        (window.cv3ReadAssess ? window.cv3ReadAssess.cats() : Promise.resolve([])),
+        (window.cv3ReadAssess ? window.cv3ReadAssess.forStudent(s.id) : Promise.resolve([])),
       ]);
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
@@ -162,17 +164,22 @@
         sec('אסיפות הורים', 'bi-people', mtg, x => li(esc(x.summary), x.date)) +
         sec('קריאה', 'bi-book', rdg, x => li('רמה: ' + esc(x.level) + (x.note ? ' — ' + esc(x.note) : ''), x.date)) +
         sec('כתיבה', 'bi-pencil-square', wrt, x => li('רמה: ' + esc(x.level), x.date)) +
+        (window.cv3ReadAssess ? window.cv3ReadAssess.cardSection(raCats, raAssess) : '') +
         (att.length ? '<div class="det-sec"><h4><i class="bi bi-calendar-check"></i> נוכחות <span class="det-badge">' + att.length + '</span></h4><div class="det-item"><span class="di-main">נוכח ' + att.filter(a => a.status === 'present').length + ' · איחורים ' + att.filter(a => a.status === 'late').length + ' · נעדר ' + att.filter(a => a.status === 'absent').length + '</span></div></div>' : '') +
         sec('שכר לימוד', 'bi-cash-coin', tui, t => li((esc(t.month) || '') + (t.amount ? ' · ₪' + esc(t.amount) : ''), t.status === 'paid' ? 'שולם' : 'חוב', t.status === 'paid' ? 'lo' : 'hi')) +
         tasksSec +
         '<div class="det-actions" style="margin-top:14px">' +
           '<button class="btn-primary sm" data-edit2><i class="bi bi-pencil"></i> עריכת פרטים</button>' +
+          '<button class="btn-ghost sm" data-reading><i class="bi bi-book-half"></i> מעקב קריאה</button>' +
+          '<button class="btn-ghost sm" data-cert><i class="bi bi-award"></i> אישור לימודים</button>' +
           '<button class="btn-ghost sm" data-print2><i class="bi bi-printer"></i> הדפסה</button>' +
           '<button class="btn-ghost sm" data-go="behavior"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' +
         '</div>';
       m.el.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => { m.close(); showPage(btn.dataset.go); }));
       const eb = m.el.querySelector('[data-edit2]'); if (eb) eb.addEventListener('click', () => { m.close(); openForm(s); });
       const pb = m.el.querySelector('[data-print2]'); if (pb) pb.addEventListener('click', () => window.print());
+      const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
+      const ctb = m.el.querySelector('[data-cert]'); if (ctb && window.cv3Cert) ctb.addEventListener('click', () => window.cv3Cert.openCertificate(s));
 
       // ---------- מייל+דרייב מתוך Supabase (אונדקסו ע"י Apps Script בענן — עוקף חסימת NetFree) ----------
       m.el.classList.add('modal-wide');
