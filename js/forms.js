@@ -4,7 +4,11 @@
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const today = () => new Date().toISOString().slice(0, 10);
-  const tok = () => Math.random().toString(36).slice(2, 10);
+  // טוקן חתימה פר-תלמיד — get_signing מחזיר לפיו תשובות וחתימה, לכן חייב
+  // להיות בלתי-ניתן-לניחוש. קודם: Math.random 8 תווים (~41 ביט, ניתן לחיזוי).
+  const tok = () => (window.crypto && crypto.getRandomValues)
+    ? Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('')
+    : (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
   // קוד קישור ציבורי חזק ובלתי-נחיש (24 תווי hex = 96 ביט אקראיות)
   const gTok = () => (window.crypto && crypto.getRandomValues)
     ? Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('')
