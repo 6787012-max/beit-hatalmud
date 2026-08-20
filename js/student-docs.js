@@ -30,7 +30,18 @@
     return 'bi-file-earmark';
   }
   const kb = n => !n ? '' : (n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
-  const safeName = n => String(n || 'file').replace(/[^\w.֐-׿ -]/g, '_').slice(-90);
+  // מפתח האובייקט ב-Supabase Storage מוגבל ל-ASCII — שם קובץ בעברית מוחזר עם
+  // "Invalid key". לכן הנתיב מנוקה ל-ASCII בלבד, והשם המקורי (עברית וכל השאר)
+  // נשמר בעמודה title — זה מה שמוצג למשתמש וזה שם הקובץ בהורדה.
+  function safeKey(n) {
+    const name = String(n || 'file');
+    const dot = name.lastIndexOf('.');
+    const ext = dot > 0 ? name.slice(dot + 1).replace(/[^A-Za-z0-9]/g, '').slice(0, 8) : '';
+    let base = (dot > 0 ? name.slice(0, dot) : name).replace(/[^A-Za-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '').slice(0, 60);
+    if (!base) base = 'file';
+    return base + (ext ? '.' + ext : '');
+  }
 
   async function forStudent(sid) {
     const rows = await window.store.byStudent('student_docs', sid);
@@ -204,7 +215,7 @@
         if (f.size > MAX_MB * 1048576) { bad.push(f.name + ' (גדול מ-' + MAX_MB + 'MB)'); continue; }
         const rand = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID().slice(0, 8)
           : Math.floor(Math.random() * 1e9).toString(36);
-        const path = student.id + '/' + rand + '-' + safeName(f.name);
+        const path = student.id + '/' + rand + '-' + safeKey(f.name);
         const up = await sb().storage.from(BUCKET).upload(path, f, { upsert: false, contentType: f.type || undefined });
         if (up.error) { bad.push(f.name + ' — ' + up.error.message); continue; }
         const ins = await sb().from('student_docs').insert({
