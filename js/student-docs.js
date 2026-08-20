@@ -87,15 +87,27 @@
   }
 
   // ── חלון הניהול ──
-  async function openManager(student, onChange) {
+  // owner = {kind:'staff', id, name, folders:[{drive_id,title,drive_url}]} — לתיק אישי של צוות.
+  // אותו מנגנון בדיוק; רק פרמטר ההרשאה משתנה (staffId במקום studentId), וההרשאה
+  // בצד-שרת נבדקת מול טבלת staff שמוגבלת למנהל.
+  async function openManager(student, onChange, owner) {
     if (!window.sb) { window.UI.toast('ניהול קבצים זמין רק במערכת החיה', 'err'); return; }
-    const folderRows = await forStudent(student.id);
-    const name = window.UI && window.UI.fullName ? window.UI.fullName(student) : (student.name || '');
+    const isStaff = !!(owner && owner.kind === 'staff');
+    const idParam = isStaff ? 'staffId' : 'studentId';
+    const ownerId = isStaff ? owner.id : student.id;
+    const idArg = () => { const o = {}; o[idParam] = ownerId; return o; };
+    const folderRows = isStaff ? (owner.folders || []) : await forStudent(student.id);
+    const name = isStaff ? (owner.name || '')
+      : (window.UI && window.UI.fullName ? window.UI.fullName(student) : (student.name || ''));
 
     const body =
       '<div id="sdWrap">' +
-        '<div class="tl-note" style="font-size:.82rem;margin-bottom:8px">' +
-          '<i class="bi bi-google"></i> הקבצים נשמרים ישירות בתיקיית התלמיד ב<b>גוגל דרייב</b>.</div>' +
+        '<div class="tl-note" style="font-size:.82rem;margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
+          '<span><i class="bi bi-google"></i> הקבצים נשמרים ישירות ב' + (isStaff ? 'תיק האישי' : 'תיקיית התלמיד') + ' ב<b>גוגל דרייב</b>.</span>' +
+          folderRows.filter(f => f.drive_url).map(f =>
+            '<a href="' + esc(f.drive_url) + '" target="_blank" rel="noopener">' +
+            '<i class="bi bi-box-arrow-up-left"></i> פתח את ' + esc(f.title) + ' בדרייב</a>').join('') +
+        '</div>' +
         '<div id="sdChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>' +
         '<div class="qr-grid" style="grid-template-columns:1fr 1fr auto;gap:6px;margin:6px 0;align-items:end">' +
           '<label class="fld"><span>קטגוריה</span><select class="inp mb0" id="sdKind">' +
@@ -110,7 +122,7 @@
         '<div id="sdList"><div class="ld"><i class="bi bi-hourglass-split"></i> טוען מהדרייב…</div></div>' +
       '</div>';
 
-    const m = window.UI.modal({ title: 'תיק מסמכים — ' + esc(name), bodyHTML: body });
+    const m = window.UI.modal({ title: (isStaff ? 'תיק אישי — ' : 'תיק מסמכים — ') + esc(name), bodyHTML: body });
     m.el.classList.add('modal-wide');
     const el = m.el;
     const msg = t => { const e = el.querySelector('#sdMsg'); if (e) e.innerHTML = t || ''; };
@@ -125,7 +137,7 @@
 
     async function load() {
       try {
-        const d = await callJson('list', { studentId: student.id });
+        const d = await callJson('list', idArg());
         files = (d.files || []).filter(f => f.mimeType !== FOLDER_MIME);
         folders = d.folders || [];
         const subs = (d.files || []).filter(f => f.mimeType === FOLDER_MIME);
@@ -140,7 +152,7 @@
     }
 
     function draw(subs) {
-      el.querySelector('#sdChips').innerHTML = NEED.map(k => {
+      el.querySelector('#sdChips').innerHTML = isStaff ? '' : NEED.map(k => {
         const has = files.some(f => classify(f.name) === k);
         return '<span class="det-badge" style="background:' + (has ? '#dcfce7' : '#fee2e2') + ';color:' + (has ? '#166534' : '#991b1b') + '">' +
           (has ? '✓ ' : '✗ ') + esc(k) + '</span>';
@@ -181,7 +193,7 @@
     // הקובץ חוזר כ-base64 בתוך JSON (נטפרי חוסם גוף בינארי — ראה הערה ב-Edge Function),
     // ולכן מרכיבים אותו כאן בחזרה ל-Blob עם ה-mime המקורי.
     async function grab(id, forPreview) {
-      const d = await callJson(forPreview ? 'preview' : 'download', { studentId: student.id, fileId: id });
+      const d = await callJson(forPreview ? 'preview' : 'download', Object.assign(idArg(), { fileId: id }));
       const bin = atob(d.dataB64 || '');
       const buf = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
@@ -247,7 +259,7 @@
         if (!await window.UI.confirm('להעביר את "' + esc(b.dataset.name) + '" לפח האשפה של הדרייב?')) return;
         try {
           msg('מוחק…');
-          await callJson('delete', { studentId: student.id, fileId: b.dataset.del });
+          await callJson('delete', Object.assign(idArg(), { fileId: b.dataset.del }));
           msg('נמחק (נמצא בפח האשפה של הדרייב).');
           await load(); if (onChange) onChange();
         } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
@@ -274,7 +286,7 @@
         // אם השם לא מסגיר את הקטגוריה, מקדימים אותה — כך גם בדרייב עצמו רואים מה זה
         const nm = (rule && !rule[1].test(f.name)) ? (kind + ' - ' + f.name) : f.name;
         try {
-          await callJson('upload', { studentId: student.id, folderId: target, name: nm }, f, f.type || 'application/octet-stream');
+          await callJson('upload', Object.assign(idArg(), { folderId: target, name: nm }), f, f.type || 'application/octet-stream');
           ok++;
         } catch (e) { bad.push(f.name + ' — ' + (e.message || e)); }
       }
@@ -287,7 +299,7 @@
       if (!nm || !nm.trim()) return;
       try {
         msg('יוצר תיקייה…');
-        await callJson('mkdir', { studentId: student.id, folderId: folderRows[0] && folderRows[0].drive_id, name: nm.trim() });
+        await callJson('mkdir', Object.assign(idArg(), { folderId: folderRows[0] && folderRows[0].drive_id, name: nm.trim() }));
         msg('נוצרה תיקייה.');
         await load();
       } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }

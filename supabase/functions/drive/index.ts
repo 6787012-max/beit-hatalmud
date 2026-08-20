@@ -112,9 +112,14 @@ Content-Type: ${mime}
   }
 }
 
-// אילו תיקיות דרייב מותרות למשתמש הזה עבור התלמיד הזה — לפי RLS, לא לפי הדפדפן
-async function allowedFolders(userJwt: string, studentId: string): Promise<string[]> {
-  const url = `${SB_URL}/rest/v1/student_docs?select=drive_id&source=eq.drive&student_id=eq.${encodeURIComponent(studentId)}`;
+// אילו תיקיות דרייב מותרות למשתמש הזה — לפי RLS, לא לפי הדפדפן.
+// שני נושאים: תלמיד (student_docs, לפי can_read_student) ואיש צוות (staff, מנהל בלבד).
+// בשני המקרים השאילתה נשלחת **עם ה-JWT של המשתמש**, ולכן ה-RLS הוא שמחליט:
+// אם אין לו גישה הוא מקבל רשימה ריקה, ואין מה להמשיך.
+async function allowedFolders(userJwt: string, studentId: string, staffId: string): Promise<string[]> {
+  const url = staffId
+    ? `${SB_URL}/rest/v1/staff?select=drive_id&id=eq.${encodeURIComponent(staffId)}`
+    : `${SB_URL}/rest/v1/student_docs?select=drive_id&source=eq.drive&student_id=eq.${encodeURIComponent(studentId)}`;
   const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: 'Bearer ' + userJwt } });
   if (!r.ok) return [];
   const rows = await r.json();
@@ -151,10 +156,15 @@ Deno.serve(async (req) => {
     const u = new URL(req.url);
     const action = u.searchParams.get('action') || '';
     const studentId = u.searchParams.get('studentId') || '';
-    if (!studentId) return fail('חסר מזהה תלמיד');
+    const staffId = u.searchParams.get('staffId') || '';
+    if (!studentId && !staffId) return fail('חסר מזהה תלמיד או איש צוות');
 
-    const folders = await allowedFolders(jwt, studentId);
-    if (!folders.length) return fail('אין לך הרשאה לתלמיד הזה, או שאין לו תיקייה בדרייב', 403);
+    const folders = await allowedFolders(jwt, studentId, staffId);
+    if (!folders.length) {
+      return fail(staffId
+        ? 'אין לך הרשאה לתיק הזה (מנהל בלבד), או שאין לאיש הצוות תיקייה בדרייב'
+        : 'אין לך הרשאה לתלמיד הזה, או שאין לו תיקייה בדרייב', 403);
+    }
 
     // ── רשימת הקבצים בכל התיקיות של התלמיד ──
     if (action === 'list') {
