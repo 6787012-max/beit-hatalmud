@@ -46,17 +46,22 @@
       msg.textContent = '';
       await setUser({ id: u.id, name: u.name, role: u.role, tz: u.tz, perms: u.perms });
     } else {
-      // Supabase: המזהה ממופה למייל סינתטי; הסיסמה מאומתת בצד-שרת (hashed)
-      // כניסה גמישה: מייל מלא / מספר טלפון / שם (השם נפתר לכתובת דרך RPC email_by_name)
-      let email;
+      // Supabase: המזהה ממופה למייל סינתטי; הסיסמה מאומתת בצד-שרת (hashed).
+      // כניסה לפי **מספר טלפון** (או מייל מלא). כניסה-לפי-שם בוטלה בכוונה:
+      // ה-RPC email_by_name היה פתוח לאנונימי והחזיר את כתובת הכניסה (= הטלפון)
+      // לפי שם איש צוות — ומאחר שסיסמת ברירת המחדל היא הטלפון, זו היתה
+      // השתלטות על חשבון בשתי בקשות. אל תחזיר את ההרשאה ל-anon.
+      let email, usedName = false;
       if (id.includes('@')) email = id;
       else if (/^[0-9()+\-\s]+$/.test(id)) email = id.replace(/[^0-9]/g, '') + '@bht.co.il';
-      else {
-        try { const { data } = await window.sb.rpc('email_by_name', { p_name: id }); email = data || (id + '@bht.co.il'); }
-        catch (_) { email = id + '@bht.co.il'; }
-      }
+      else { usedName = true; email = id + '@bht.co.il'; }
       const { error } = await window.sb.auth.signInWithPassword({ email, password: pw });
-      if (error) { msg.textContent = 'שם או סיסמה שגויים.'; return; }
+      if (error) {
+        msg.textContent = usedName
+          ? 'כניסה עם שם אינה נתמכת — נא להזין את מספר הטלפון שלך.'
+          : 'מספר טלפון או סיסמה שגויים.';
+        return;
+      }
       msg.textContent = '';   // onAuthStateChange יטען את הפרופיל
     }
   }

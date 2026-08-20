@@ -10,7 +10,9 @@
   // לימודים — ומאז הדוחות, הכרטיס והייצוא היו מחשבים על תת-קבוצה שרירותית.
   // לכן כל קריאה מדפדפת עד שהעמוד חוזר חלקי.
   const PAGE = 1000;
-  const noIdCol = {};   // טבלאות שאין בהן עמודת id (student_links, user_class_access) — נלמד בזמן ריצה
+  // טבלאות ללא עמודת id (מפתח מורכב). נלמד גם בזמן ריצה, אבל מזריעים את הידועות
+  // מראש כדי לא לשרוף בקשה שנכשלת ב-400 בכל טעינה של מסך ההגדרות.
+  const noIdCol = { user_class_access: 1, student_links: 1 };
 
   async function list(table, opts) {
     if (DEMO) return { ok: true, data: [], demo: true };
