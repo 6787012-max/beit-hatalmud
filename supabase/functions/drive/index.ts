@@ -20,6 +20,7 @@ const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY')!;
 const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!;
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
 const REFRESH_TOKEN = Deno.env.get('GOOGLE_REFRESH_TOKEN')!;
+const GAS_URL = Deno.env.get('GAS_URL') || '';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -148,11 +149,20 @@ Deno.serve(async (req) => {
         : `${DRIVE}/files/${fileId}?alt=media`;
       const r = await gFetch(url);
       if (!r.ok) {
+        // 403 = קובץ ישן שלא הועלה דרך המערכת (היקף drive.file מכסה רק מה שהיא יצרה).
+        // נופלים לגשר ה-Apps Script, שרץ בחשבון המכינה עם drive.readonly ולכן מגיע גם אליו.
+        if (r.status === 403 && GAS_URL) {
+          const g = await fetch(`${GAS_URL}?type=fileget&sid=${encodeURIComponent(studentId)}` +
+            `&fid=${encodeURIComponent(fileId)}&token=${encodeURIComponent(jwt)}&callback=cb`, { redirect: 'follow' });
+          const txt = await g.text();
+          const mm = txt.match(/^[^(]*\(([\s\S]*)\)\s*;?\s*$/);
+          let d: Record<string, unknown> | null = null;
+          try { d = mm ? JSON.parse(mm[1]) : JSON.parse(txt); } catch (_) { d = null; }
+          if (d && d.ok) return json(d);
+          return fail(String((d && d.error) || 'אין הרשאת הורדה לקובץ הזה — פתח אותו בדרייב'), 403);
+        }
         const t = await r.text();
-        // 403 כאן = קובץ ישן שלא הועלה דרך המערכת; ההרשאה שלנו מכסה רק את מה שהיא יצרה
-        return fail(r.status === 403
-          ? 'אין הרשאת הורדה לקובץ הזה — פתח אותו ישירות בדרייב'
-          : 'ההורדה נכשלה: ' + t.slice(0, 150), r.status);
+        return fail('ההורדה נכשלה: ' + t.slice(0, 150), r.status);
       }
       // ⚠️ נטפרי סורק את גוף התגובה וחוסם קבצים בינאריים (PDF חזר עם 418
       // "Error in NetFree", והדפדפן ראה את זה כשגיאת CORS). לכן מחזירים את
