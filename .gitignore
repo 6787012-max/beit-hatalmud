@@ -15,3 +15,4 @@ _drive_*.json
 _qa_*
 node_modules/
 _shots/
+*.pdf
