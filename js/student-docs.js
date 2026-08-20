@@ -1,242 +1,267 @@
-// student-docs.js — "תיק המסמכים" של התלמיד (2026-08-20, בקשת יוסף מתוך אפיון "תיק תל"א").
+// student-docs.js — "תיק המסמכים" של התלמיד, **ישירות בגוגל דרייב** (2026-08-20).
 //
-// עד היום לא היתה שום דרך לצרף קובץ לתלמיד. כאן: העלאה / צפייה / הורדה / מחיקה,
-// חלוקה לקטגוריות האפיון ולתיקיות משנה, ולצידן קישור לתיקיות שכבר קיימות בגוגל דרייב.
+// הקבצים לא נשמרים במערכת אלא בתיקייה של התלמיד בדרייב ("תיקי תלמידים - בית התלמוד"),
+// כך שמה שמעלים כאן נמצא גם בדרייב, ומה שכבר קיים בדרייב נראה כאן.
 //
-// אחסון: bucket **פרטי** `student-docs` ב-Supabase (לא דרייב) — עובר נטפרי, ומוגן
-// באותו RLS של הכרטיס (מנהל, או מי שיש לו גישה לכיתת התלמיד). מוסכמת נתיב:
-// `{student_id}/{אקראי}-{שם הקובץ}` — התיקייה הראשונה היא מזהה התלמיד, וכך ה-policy
-// על storage.objects יכול לאכוף הרשאה גם על הקובץ עצמו ולא רק על שורת המטא-דאטה.
-// ההורדה תמיד דרך ה-API של Supabase (blob) ולא בקישור חיצוני — נטפרי חוסם את השני.
+// הדפדפן לא מדבר עם גוגל בכלל: אין לו טוקן (ואסור שיהיה לו), ונטפרי חוסם את
+// google/script APIs. כל פעולה עוברת דרך Edge Function של Supabase בשם `drive`,
+// שמחזיקה את הטוקן בצד-שרת ומאמתת הרשאה מול ה-RLS לפני כל פעולה.
+//
+// מגבלה ידועה: ההרשאה של האפליקציה בדרייב היא `drive.file` — כלומר היא יכולה
+// *לראות* את כל הקבצים בתיקייה, אבל להוריד/למחוק רק את מה שהיא עצמה העלתה.
+// לקבצים הישנים מוצג "פתח בדרייב" במקום הורדה, וזה מסומן למשתמש.
 (function () {
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const BUCKET = 'student-docs';
   const MAX_MB = 25;
-  const DRIVE_KIND = 'תיקיית דרייב';
-  // ארבע הקטגוריות מהאפיון + כללי
-  const KINDS = ['ויתור סודיות', 'מסמך קביל', 'שאלון הפניה', 'אבחונים ורקע קודם', 'תעודות ומסמכי זהות', 'אחר'];
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
-  const isAdmin = () => !!(window.currentUser && window.currentUser.role === 'מנהל');
-  const sb = () => window.sb;
+  // סיווג לפי שם הקובץ — כך גם מאות הקבצים הישנים שבדרייב מקבלים קטגוריה בלי הזנה ידנית
+  const KIND_RULES = [
+    ['ויתור סודיות', /ויתור/],
+    ['שאלון הפניה', /שאלון/],
+    ['אבחונים ורקע קודם', /אבחון|אבחונים|פסיכו|דידקטי|מוקסו|פסיכיאטר/],
+    ['מסמך קביל', /קביל|ועד[הת]|זכאות|אפיון|זימון/],
+    ['תעודות ומסמכי זהות', /תעודת זהות|ת"ז|תז |ספח/],
+  ];
+  const KINDS = KIND_RULES.map(r => r[0]).concat(['אחר']);
+  const NEED = KIND_RULES.slice(0, 4).map(r => r[0]);   // ארבעת המסמכים שהאפיון דורש
+  function classify(name) {
+    const n = String(name || '');
+    for (const [kind, re] of KIND_RULES) if (re.test(n)) return kind;
+    return 'אחר';
+  }
 
-  function icon(mime, title) {
-    const t = String(title || '').toLowerCase(), m = String(mime || '');
-    if (m.indexOf('folder') > -1) return 'bi-folder2-open';
+  function icon(mime, name) {
+    const t = String(name || '').toLowerCase(), m = String(mime || '');
+    if (m === FOLDER_MIME) return 'bi-folder2-open';
     if (m.indexOf('pdf') > -1 || /\.pdf$/.test(t)) return 'bi-file-earmark-pdf';
     if (m.indexOf('image') > -1 || /\.(png|jpe?g|gif|webp|heic)$/.test(t)) return 'bi-file-earmark-image';
-    if (m.indexOf('word') > -1 || /\.docx?$/.test(t)) return 'bi-file-earmark-word';
+    if (m.indexOf('word') > -1 || m.indexOf('document') > -1 || /\.docx?$/.test(t)) return 'bi-file-earmark-word';
     if (m.indexOf('sheet') > -1 || /\.xlsx?$/.test(t)) return 'bi-file-earmark-spreadsheet';
     return 'bi-file-earmark';
   }
-  const kb = n => !n ? '' : (n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
-  // מפתח האובייקט ב-Supabase Storage מוגבל ל-ASCII — שם קובץ בעברית מוחזר עם
-  // "Invalid key". לכן הנתיב מנוקה ל-ASCII בלבד, והשם המקורי (עברית וכל השאר)
-  // נשמר בעמודה title — זה מה שמוצג למשתמש וזה שם הקובץ בהורדה.
-  function safeKey(n) {
-    const name = String(n || 'file');
-    const dot = name.lastIndexOf('.');
-    const ext = dot > 0 ? name.slice(dot + 1).replace(/[^A-Za-z0-9]/g, '').slice(0, 8) : '';
-    let base = (dot > 0 ? name.slice(0, dot) : name).replace(/[^A-Za-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '').slice(0, 60);
-    if (!base) base = 'file';
-    return base + (ext ? '.' + ext : '');
+  const kb = n => { n = Number(n || 0); return !n ? '' : (n < 1048576 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB'); };
+
+  // ── קריאה ל-Edge Function ──
+  async function fnUrl() { return ((window.CV3 || {}).SUPABASE_URL || '') + '/functions/v1/drive'; }
+  async function authHeaders() {
+    const { data } = await window.sb.auth.getSession();
+    const tok = data && data.session && data.session.access_token;
+    if (!tok) throw new Error('אין חיבור פעיל — יש להיכנס מחדש');
+    return { apikey: (window.CV3 || {}).SUPABASE_ANON_KEY, Authorization: 'Bearer ' + tok };
+  }
+  async function call(action, params, body, contentType) {
+    const qs = new URLSearchParams(Object.assign({ action }, params || {})).toString();
+    const h = await authHeaders();
+    if (contentType) h['Content-Type'] = contentType;
+    const res = await fetch((await fnUrl()) + '?' + qs, { method: 'POST', headers: h, body: body || undefined });
+    return res;
+  }
+  async function callJson(action, params, body, contentType) {
+    const res = await call(action, params, body, contentType);
+    let d = null;
+    try { d = await res.json(); } catch (_) { d = null; }
+    if (!res.ok) throw new Error((d && d.error) || ('שגיאה ' + res.status));
+    return d;
   }
 
+  // ── רשומות התיקיות מהמסד (מקור ההרשאה, וגם הקישור לדרייב) ──
   async function forStudent(sid) {
     const rows = await window.store.byStudent('student_docs', sid);
-    return (rows || []).slice().sort((a, b) => String(a.kind).localeCompare(String(b.kind)) || a.id - b.id);
+    return (rows || []).filter(r => r.source === 'drive');
   }
 
-  // ── סקשן בכרטיס התלמיד: מה יש ומה חסר מתוך רשימת האפיון ──
-  function cardSection(docs) {
-    docs = docs || [];
-    const files = docs.filter(d => d.source !== 'drive');
-    const drive = docs.filter(d => d.source === 'drive');
-    const need = KINDS.slice(0, 4);
-    const chips = need.map(k => {
-      const has = files.some(d => d.kind === k);
-      return '<span class="det-badge" style="background:' + (has ? '#dcfce7' : '#fee2e2') + ';color:' + (has ? '#166534' : '#991b1b') + '">' +
-        (has ? '✓ ' : '✗ ') + esc(k) + '</span>';
-    }).join(' ');
+  // ── סקשן קצר בכרטיס: כמה תיקיות יש, וכפתור. הרשימה עצמה נטענת בפתיחת התיק ──
+  function cardSection(folders) {
+    folders = folders || [];
+    if (!folders.length) {
+      return '<div class="det-sec"><h4><i class="bi bi-folder2-open"></i> תיק מסמכים</h4>' +
+        '<div class="tl-note" style="padding:4px 2px">אין לתלמיד תיקייה בדרייב. אפשר לפתוח אחת מתוך "תיק מסמכים".</div></div>';
+    }
     return '<div class="det-sec"><h4><i class="bi bi-folder2-open"></i> תיק מסמכים ' +
-      '<span class="det-badge">' + files.length + ' קבצים</span>' +
-      (drive.length ? '<span class="det-badge">' + drive.length + ' בדרייב</span>' : '') + '</h4>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 6px">' + chips + '</div>' +
-      (files.length ? files.slice(0, 4).map(d =>
-        '<div class="det-item"><span class="di-main"><i class="bi ' + icon(d.mime, d.title) + '"></i> ' + esc(d.title) + '</span>' +
-        '<span class="di-meta">' + esc(d.kind) + '</span></div>').join('') : '') +
+      '<span class="det-badge">' + folders.length + ' תיקיות בדרייב</span></h4>' +
+      folders.map(d => '<div class="det-item"><span class="di-main"><i class="bi bi-folder2-open"></i> ' + esc(d.title) + '</span>' +
+        '<span class="di-meta"><a href="' + esc(d.drive_url) + '" target="_blank" rel="noopener">פתח בדרייב ↗</a></span></div>').join('') +
       '</div>';
   }
 
-  // ── חלון הניהול המלא ──
+  // ── חלון הניהול ──
   async function openManager(student, onChange) {
-    if (!sb()) { window.UI.toast('ניהול קבצים זמין רק במערכת החיה', 'err'); return; }
-    let docs = await forStudent(student.id);
+    if (!window.sb) { window.UI.toast('ניהול קבצים זמין רק במערכת החיה', 'err'); return; }
+    const folderRows = await forStudent(student.id);
     const name = window.UI && window.UI.fullName ? window.UI.fullName(student) : (student.name || '');
 
     const body =
       '<div id="sdWrap">' +
-        '<div id="sdDrive"></div>' +
-        '<div class="qr-grid" style="grid-template-columns:1fr 1fr auto;gap:6px;margin:10px 0 4px;align-items:end">' +
+        '<div class="tl-note" style="font-size:.82rem;margin-bottom:8px">' +
+          '<i class="bi bi-google"></i> הקבצים נשמרים ישירות בתיקיית התלמיד ב<b>גוגל דרייב</b>.</div>' +
+        '<div id="sdChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>' +
+        '<div class="qr-grid" style="grid-template-columns:1fr 1fr auto;gap:6px;margin:6px 0;align-items:end">' +
           '<label class="fld"><span>קטגוריה</span><select class="inp mb0" id="sdKind">' +
             KINDS.map(k => '<option>' + esc(k) + '</option>').join('') + '</select></label>' +
-          '<label class="fld"><span>תיקייה (רשות)</span><input class="inp mb0" id="sdFolder" list="sdFolders" placeholder="ללא"></label>' +
-          '<button class="btn-primary sm" id="sdPick"><i class="bi bi-upload"></i> העלאת קבצים</button>' +
+          '<label class="fld"><span>לאיזו תיקייה</span><select class="inp mb0" id="sdTarget"></select></label>' +
+          '<button class="btn-primary sm" id="sdPick"><i class="bi bi-upload"></i> העלאה לדרייב</button>' +
         '</div>' +
-        '<datalist id="sdFolders"></datalist>' +
+        '<div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn-ghost sm" id="sdMkdir"><i class="bi bi-folder-plus"></i> תיקייה חדשה</button>' +
+          '<button class="btn-ghost sm" id="sdReload"><i class="bi bi-arrow-clockwise"></i> רענון</button></div>' +
         '<input type="file" id="sdFile" multiple style="display:none">' +
         '<div id="sdMsg" class="tl-note" style="min-height:1.1em;font-size:.82rem"></div>' +
-        '<div id="sdList"></div>' +
+        '<div id="sdList"><div class="ld"><i class="bi bi-hourglass-split"></i> טוען מהדרייב…</div></div>' +
       '</div>';
 
-    const m = window.UI.modal({ title: 'תיק מסמכים — ' + esc(name), bodyHTML: body, saveLabel: null });
+    const m = window.UI.modal({ title: 'תיק מסמכים — ' + esc(name), bodyHTML: body });
     m.el.classList.add('modal-wide');
     const el = m.el;
-    const msg = t => { el.querySelector('#sdMsg').innerHTML = t || ''; };
+    const msg = t => { const e = el.querySelector('#sdMsg'); if (e) e.innerHTML = t || ''; };
+    let files = [], folders = [];
 
-    function draw() {
-      const drive = docs.filter(d => d.source === 'drive');
-      const files = docs.filter(d => d.source !== 'drive');
-      el.querySelector('#sdDrive').innerHTML = drive.length
-        ? '<div class="det-sec" style="margin:0"><h4><i class="bi bi-google"></i> תיקיות בדרייב על שם התלמיד</h4>' +
-          drive.map(d => '<div class="det-item"><span class="di-main"><i class="bi bi-folder2-open"></i> ' + esc(d.title) + '</span>' +
-            '<span class="di-meta"><a href="' + esc(d.drive_url) + '" target="_blank" rel="noopener">פתח בדרייב ↗</a></span></div>').join('') +
-          '</div>'
-        : '';
-      const folders = [...new Set(files.map(d => d.folder).filter(Boolean))];
-      el.querySelector('#sdFolders').innerHTML = folders.map(f => '<option value="' + esc(f) + '">').join('');
+    const folderTitle = id => {
+      const r = folderRows.find(x => x.drive_id === id);
+      if (r) return r.title;
+      const f = files.find(x => x.id === id);
+      return f ? f.name : 'תיקייה';
+    };
 
-      if (!files.length) {
-        el.querySelector('#sdList').innerHTML = '<div class="empty-state"><i class="bi bi-folder2-open"></i><div>אין עדיין קבצים בתיק</div></div>';
+    async function load() {
+      try {
+        const d = await callJson('list', { studentId: student.id });
+        files = (d.files || []).filter(f => f.mimeType !== FOLDER_MIME);
+        folders = d.folders || [];
+        const subs = (d.files || []).filter(f => f.mimeType === FOLDER_MIME);
+        // בורר יעד ההעלאה: התיקיות הראשיות + תיקיות המשנה שנוצרו בתוכן
+        el.querySelector('#sdTarget').innerHTML =
+          folderRows.map(r => '<option value="' + esc(r.drive_id) + '">' + esc(r.title) + '</option>').join('') +
+          subs.map(f => '<option value="' + esc(f.id) + '">↳ ' + esc(f.name) + '</option>').join('');
+        draw(subs);
+      } catch (e) {
+        el.querySelector('#sdList').innerHTML = '<div class="tl-note" style="color:#b91c1c;padding:10px">' + esc(e.message || e) + '</div>';
+      }
+    }
+
+    function draw(subs) {
+      el.querySelector('#sdChips').innerHTML = NEED.map(k => {
+        const has = files.some(f => classify(f.name) === k);
+        return '<span class="det-badge" style="background:' + (has ? '#dcfce7' : '#fee2e2') + ';color:' + (has ? '#166534' : '#991b1b') + '">' +
+          (has ? '✓ ' : '✗ ') + esc(k) + '</span>';
+      }).join('');
+
+      if (!files.length && !(subs || []).length) {
+        el.querySelector('#sdList').innerHTML = '<div class="empty-state"><i class="bi bi-folder2-open"></i><div>אין קבצים בתיקיות הדרייב של התלמיד</div></div>';
         return;
       }
-      // קיבוץ: תיקייה ← קטגוריה
-      const groups = {};
-      files.forEach(d => { const g = d.folder || ''; (groups[g] = groups[g] || []).push(d); });
-      el.querySelector('#sdList').innerHTML = Object.keys(groups).sort().map(g => {
-        const rows = groups[g].map(d =>
-          '<div class="tl-item" data-doc="' + d.id + '">' +
-            '<i class="bi ' + icon(d.mime, d.title) + '" style="font-size:1.05rem;color:var(--muted)"></i>' +
-            '<div class="tl-main">' + esc(d.title) +
-              '<div class="tl-note" style="font-size:.76rem">' + esc(d.kind) + (d.size_bytes ? ' · ' + kb(d.size_bytes) : '') +
-              (d.created_at ? ' · ' + esc(String(d.created_at).slice(0, 10)) : '') + '</div></div>' +
-            '<button class="mini" data-view="' + d.id + '" title="צפייה"><i class="bi bi-eye"></i></button>' +
-            '<button class="mini" data-dl="' + d.id + '" title="הורדה"><i class="bi bi-download"></i></button>' +
-            '<button class="mini danger" data-del="' + d.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>' +
+      const byFolder = {};
+      (subs || []).forEach(f => { (byFolder[f.folderId] = byFolder[f.folderId] || { subs: [], files: [] }).subs.push(f); });
+      files.forEach(f => { (byFolder[f.folderId] = byFolder[f.folderId] || { subs: [], files: [] }).files.push(f); });
+
+      el.querySelector('#sdList').innerHTML = Object.keys(byFolder).map(fid => {
+        const g = byFolder[fid];
+        const subRows = g.subs.map(f =>
+          '<div class="tl-item"><i class="bi bi-folder" style="color:var(--muted)"></i>' +
+          '<div class="tl-main">' + esc(f.name) + '<div class="tl-note" style="font-size:.76rem">תיקייה</div></div>' +
+          '<a class="mini" href="' + esc(f.webViewLink || '#') + '" target="_blank" rel="noopener" title="פתח בדרייב"><i class="bi bi-box-arrow-up-left"></i></a>' +
+          '<button class="mini danger" data-del="' + esc(f.id) + '" data-name="' + esc(f.name) + '" title="מחיקה"><i class="bi bi-trash"></i></button></div>').join('');
+        const rows = g.files.map(f =>
+          '<div class="tl-item">' +
+            '<i class="bi ' + icon(f.mimeType, f.name) + '" style="font-size:1.05rem;color:var(--muted)"></i>' +
+            '<div class="tl-main">' + esc(f.name) +
+              '<div class="tl-note" style="font-size:.76rem">' + esc(classify(f.name)) + (f.size ? ' · ' + kb(f.size) : '') +
+              (f.modifiedTime ? ' · ' + esc(String(f.modifiedTime).slice(0, 10)) : '') + '</div></div>' +
+            '<button class="mini" data-view="' + esc(f.id) + '" data-name="' + esc(f.name) + '" title="צפייה"><i class="bi bi-eye"></i></button>' +
+            '<button class="mini" data-dl="' + esc(f.id) + '" data-name="' + esc(f.name) + '" title="הורדה"><i class="bi bi-download"></i></button>' +
+            '<a class="mini" href="' + esc(f.webViewLink || '#') + '" target="_blank" rel="noopener" title="פתח בדרייב"><i class="bi bi-box-arrow-up-left"></i></a>' +
+            '<button class="mini danger" data-del="' + esc(f.id) + '" data-name="' + esc(f.name) + '" title="מחיקה"><i class="bi bi-trash"></i></button>' +
           '</div>').join('');
-        const head = g
-          ? '<h4><i class="bi bi-folder"></i> ' + esc(g) + ' <span class="det-badge">' + groups[g].length + '</span>' +
-            '<button class="mini danger" data-delfolder="' + esc(g) + '" title="מחיקת התיקייה וכל הקבצים שבה" style="margin-inline-start:6px"><i class="bi bi-trash"></i></button></h4>'
-          : '<h4><i class="bi bi-files"></i> כללי <span class="det-badge">' + groups[g].length + '</span></h4>';
-        return '<div class="det-sec">' + head + rows + '</div>';
+        return '<div class="det-sec"><h4><i class="bi bi-folder2-open"></i> ' + esc(folderTitle(fid)) +
+          ' <span class="det-badge">' + g.files.length + '</span></h4>' + subRows + rows + '</div>';
       }).join('');
-      wireRows();
+      wire();
     }
 
-    async function refresh() { docs = await forStudent(student.id); draw(); if (onChange) onChange(); }
-
-    // ── הורדה/צפייה: תמיד blob דרך ה-API (קישור חיצוני נחסם ע"י נטפרי) ──
-    async function fetchBlob(d) {
-      const { data, error } = await sb().storage.from(BUCKET).download(d.path);
-      if (error) throw error;
-      return data;
+    // הקובץ חוזר כ-base64 בתוך JSON (נטפרי חוסם גוף בינארי — ראה הערה ב-Edge Function),
+    // ולכן מרכיבים אותו כאן בחזרה ל-Blob עם ה-mime המקורי.
+    async function grab(id) {
+      const d = await callJson('download', { studentId: student.id, fileId: id });
+      const bin = atob(d.dataB64 || '');
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      return { blob: new Blob([buf], { type: d.mimeType || 'application/octet-stream' }), name: d.name };
     }
-    async function view(d) {
-      try {
-        msg('פותח…');
-        const blob = await fetchBlob(d);
-        const url = URL.createObjectURL(blob);
-        const w = window.open(url, '_blank');
-        if (!w) {   // חוסם חלונות קופצים — נופלים להורדה במקום להשאיר את המשתמש בלי כלום
-          const a = document.createElement('a'); a.href = url; a.download = d.title; a.click();
-          msg('הדפדפן חסם חלון חדש — הקובץ ירד למחשב.');
-        } else { msg(''); }
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-      } catch (e) { msg('<span style="color:#b91c1c">שגיאה בפתיחה: ' + esc(e.message || e) + '</span>'); }
-    }
-    async function download(d) {
-      try {
-        msg('מוריד…');
-        const blob = await fetchBlob(d);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = d.title; a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-        msg('');
-      } catch (e) { msg('<span style="color:#b91c1c">שגיאה בהורדה: ' + esc(e.message || e) + '</span>'); }
-    }
-    // מוחקים קודם את שורת המטא-דאטה (עם אימות שה-RLS לא חסם בשקט) ורק אז את הקובץ:
-    // ההפך היה משאיר שורה שמצביעה על קובץ שכבר לא קיים.
-    async function removeDoc(d, silent) {
-      const { data, error } = await sb().from('student_docs').delete().eq('id', d.id).select('id');
-      if (error) throw error;
-      if (!data || !data.length) throw new Error('אין הרשאה למחוק מסמך זה (מנהל או מי שהעלה אותו)');
-      if (d.path) { try { await sb().storage.from(BUCKET).remove([d.path]); } catch (_) { /* השורה כבר ירדה */ } }
-      if (!silent) msg('נמחק.');
-    }
-
-    function wireRows() {
-      el.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
-        const d = docs.find(x => String(x.id) === b.dataset.view); if (d) view(d);
+    function wire() {
+      el.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', async () => {
+        try {
+          msg('פותח…');
+          const got = await grab(b.dataset.view);
+          const url = URL.createObjectURL(got.blob);
+          const w = window.open(url, '_blank');
+          if (!w) { const a = document.createElement('a'); a.href = url; a.download = got.name || b.dataset.name; a.click(); msg('הדפדפן חסם חלון — הקובץ ירד למחשב.'); }
+          else msg('');
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
       }));
-      el.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', () => {
-        const d = docs.find(x => String(x.id) === b.dataset.dl); if (d) download(d);
+      el.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', async () => {
+        try {
+          msg('מוריד…');
+          const got = await grab(b.dataset.dl);
+          const url = URL.createObjectURL(got.blob);
+          const a = document.createElement('a'); a.href = url; a.download = got.name || b.dataset.name; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 30000);
+          msg('');
+        } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
       }));
       el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
-        const d = docs.find(x => String(x.id) === b.dataset.del); if (!d) return;
-        if (!await window.UI.confirm('למחוק לצמיתות את "' + esc(d.title) + '"?')) return;
-        try { await removeDoc(d); await refresh(); }
-        catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
-      }));
-      el.querySelectorAll('[data-delfolder]').forEach(b => b.addEventListener('click', async () => {
-        const g = b.dataset.delfolder;
-        const inFolder = docs.filter(d => d.source !== 'drive' && (d.folder || '') === g);
-        if (!await window.UI.confirm('למחוק את התיקייה "' + esc(g) + '" ואת ' + inFolder.length + ' הקבצים שבה? הפעולה אינה הפיכה.')) return;
-        let failed = 0;
-        for (const d of inFolder) { try { await removeDoc(d, true); } catch (_) { failed++; } }
-        await refresh();
-        msg(failed ? '<span style="color:#b91c1c">' + failed + ' קבצים לא נמחקו (אין הרשאה)</span>' : 'התיקייה נמחקה.');
+        if (!await window.UI.confirm('להעביר את "' + esc(b.dataset.name) + '" לפח האשפה של הדרייב?')) return;
+        try {
+          msg('מוחק…');
+          await callJson('delete', { studentId: student.id, fileId: b.dataset.del });
+          msg('נמחק (נמצא בפח האשפה של הדרייב).');
+          await load(); if (onChange) onChange();
+        } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
       }));
     }
 
     // ── העלאה ──
     const fileInput = el.querySelector('#sdFile');
-    el.querySelector('#sdPick').addEventListener('click', () => fileInput.click());
+    el.querySelector('#sdPick').addEventListener('click', () => {
+      if (!folderRows.length) { msg('<span style="color:#b91c1c">אין לתלמיד תיקייה בדרייב</span>'); return; }
+      fileInput.click();
+    });
     fileInput.addEventListener('change', async () => {
-      const list = [...fileInput.files];
-      fileInput.value = '';
+      const list = [...fileInput.files]; fileInput.value = '';
       if (!list.length) return;
       const kind = el.querySelector('#sdKind').value;
-      const folder = (el.querySelector('#sdFolder').value || '').trim();
-      let ok = 0, bad = [];
+      const target = el.querySelector('#sdTarget').value;
+      const rule = KIND_RULES.find(r => r[0] === kind);
+      let ok = 0; const bad = [];
       for (let i = 0; i < list.length; i++) {
         const f = list[i];
-        msg('מעלה ' + (i + 1) + ' מתוך ' + list.length + '…');
-        if (f.size > MAX_MB * 1048576) { bad.push(f.name + ' (גדול מ-' + MAX_MB + 'MB)'); continue; }
-        const rand = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID().slice(0, 8)
-          : Math.floor(Math.random() * 1e9).toString(36);
-        const path = student.id + '/' + rand + '-' + safeKey(f.name);
-        const up = await sb().storage.from(BUCKET).upload(path, f, { upsert: false, contentType: f.type || undefined });
-        if (up.error) { bad.push(f.name + ' — ' + up.error.message); continue; }
-        const ins = await sb().from('student_docs').insert({
-          student_id: student.id, kind: kind, folder: folder, title: f.name,
-          source: 'upload', path: path, mime: f.type || null, size_bytes: f.size,
-        }).select('id');
-        if (ins.error || !ins.data || !ins.data.length) {
-          // הקובץ עלה אבל הרישום נכשל — מנקים כדי לא להשאיר קובץ יתום ב-bucket
-          try { await sb().storage.from(BUCKET).remove([path]); } catch (_) {}
-          bad.push(f.name + ' — ' + ((ins.error && ins.error.message) || 'הרישום נכשל'));
-          continue;
-        }
-        ok++;
+        msg('מעלה לדרייב ' + (i + 1) + ' מתוך ' + list.length + '…');
+        if (f.size > MAX_MB * 1048576) { bad.push(f.name + ' (מעל ' + MAX_MB + 'MB)'); continue; }
+        // אם השם לא מסגיר את הקטגוריה, מקדימים אותה — כך גם בדרייב עצמו רואים מה זה
+        const nm = (rule && !rule[1].test(f.name)) ? (kind + ' - ' + f.name) : f.name;
+        try {
+          await callJson('upload', { studentId: student.id, folderId: target, name: nm }, f, f.type || 'application/octet-stream');
+          ok++;
+        } catch (e) { bad.push(f.name + ' — ' + (e.message || e)); }
       }
-      await refresh();
-      msg((ok ? '✓ הועלו ' + ok + ' קבצים. ' : '') +
-          (bad.length ? '<span style="color:#b91c1c">נכשלו: ' + esc(bad.join(' | ')) + '</span>' : ''));
+      await load(); if (onChange) onChange();
+      msg((ok ? '✓ הועלו ' + ok + ' לדרייב. ' : '') + (bad.length ? '<span style="color:#b91c1c">נכשלו: ' + esc(bad.join(' | ')) + '</span>' : ''));
     });
 
-    draw();
+    el.querySelector('#sdMkdir').addEventListener('click', async () => {
+      const nm = prompt('שם התיקייה החדשה בתוך תיקיית התלמיד:');
+      if (!nm || !nm.trim()) return;
+      try {
+        msg('יוצר תיקייה…');
+        await callJson('mkdir', { studentId: student.id, folderId: folderRows[0] && folderRows[0].drive_id, name: nm.trim() });
+        msg('נוצרה תיקייה.');
+        await load();
+      } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
+    });
+    el.querySelector('#sdReload').addEventListener('click', () => { msg(''); load(); });
+
+    load();
   }
 
-  window.cv3StudentDocs = { forStudent, cardSection, openManager, KINDS };
+  window.cv3StudentDocs = { forStudent, cardSection, openManager, KINDS, classify };
 })();
