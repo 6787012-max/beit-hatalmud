@@ -48,8 +48,9 @@
       '.body{font-size:17pt;line-height:2.5;text-align:center}.body .nm{font-weight:bold}' +
       '.sign{margin-top:20mm;text-align:center;font-size:14pt;line-height:1.9}.sym{margin-top:3mm;font-size:12pt;color:#333}' +
       '.stamp{position:absolute;left:' + (st.stamp_x || 30) + '%;top:' + (st.stamp_y || 74) + '%;transform:translate(-50%,-50%);width:' + (st.stamp_size || 120) + 'px;height:auto}' +
-      '@media print{.noprint{display:none}}.noprint{position:fixed;top:8px;left:8px;background:#1a4d8f;color:#fff;border:0;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer}' +
+      '@media print{.noprint{display:none}}.pdfbtn{left:112px !important;background:#a87830 !important}.noprint{position:fixed;top:8px;left:8px;background:#1a4d8f;color:#fff;border:0;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer}' +
       '</style></head><body>' +
+      '<button class=\"noprint pdfbtn\" id=\"pdfBtn\">⬇ הורד PDF</button>' +
       '<button class="noprint" onclick="window.print()">🖨️ הדפסה</button>' +
       '<div class="page">' +
       (st.letterhead_data ? '' : '<div class="hdr"><h1>' + esc(instName()) + '</h1></div>') +
@@ -61,7 +62,7 @@
       'לומד במוסדנו החל מתאריך <span class="nm">' + esc(opts.from) + '</span></div>' +
       '<div class="sign">בברכה,<br>מזכירות ' + esc(instName()) + sym + '</div>' +
       stampImg +
-      '</div></body></html>';
+      '</div>' + "<script>(function(){var b=document.getElementById('pdfBtn');if(!b)return;b.onclick=function(){var o=window.opener;if(!o||!o.cv3Pdf){alert('צריך שהמערכת תישאר פתוחה ברקע');return;}b.disabled=true;var t=b.textContent;b.textContent='מכין…';o.cv3Pdf.save(document.querySelector('.page')||document.body,document.title,{margin:0})['finally'](function(){b.disabled=false;b.textContent=t;});};})();<\/script>" + '</body></html>';
   }
 
   async function openCertificate(student) {

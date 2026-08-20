@@ -40,7 +40,8 @@
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>דשבורד ודוחות</h2>' +
       '<div class="head-actions"><button class="btn-ghost sm" id="rpExport"><i class="bi bi-download"></i> ייצוא דוח מלא (CSV)</button>' +
-      '<button class="btn-ghost sm" id="rpPrint"><i class="bi bi-printer"></i> הדפסה / PDF</button></div></div>' +
+      '<button class="btn-ghost sm" id="rpPdf"><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
+      '<button class="btn-ghost sm" id="rpPrint"><i class="bi bi-printer"></i> הדפסה</button></div></div>' +
       '<div class="toolbar rp-bar" style="grid-template-columns:auto auto auto 1fr auto">' +
         '<label class="rp-f"><span>מתאריך</span><input type="date" class="inp mb0" id="rpFrom" value="' + F.from + '"></label>' +
         '<label class="rp-f"><span>עד תאריך</span><input type="date" class="inp mb0" id="rpTo" value="' + F.to + '"></label>' +
@@ -284,6 +285,12 @@
       draw();
     }));
     page.querySelector('#rpPrint').addEventListener('click', () => window.print());
+    // הורדת הדוח כ-PDF (כל תוכן העמוד, בלי הסרגלים)
+    const pdfBtn = page.querySelector('#rpPdf');
+    if (pdfBtn && window.cv3Pdf) window.cv3Pdf.wire(pdfBtn,
+      () => page.querySelector('#rpBody') || page,
+      () => 'דוח - ' + new Date().toLocaleDateString('he-IL'),
+      { orientation: 'portrait', margin: 8 });
 
     // ── ייצוא CSV של כל הדוחות, לא רק התנהגות ──
     page.querySelector('#rpExport').addEventListener('click', () => {

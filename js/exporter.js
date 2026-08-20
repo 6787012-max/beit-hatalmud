@@ -153,6 +153,7 @@
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>יצוא והדפסה</h2>' +
         '<div class="head-actions">' +
           '<button class="btn-ghost sm" id="exCsv"><i class="bi bi-file-earmark-spreadsheet"></i> יצוא לאקסל</button>' +
+          '<button class="btn-ghost sm" id="exPdf"><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
           '<button class="btn-primary sm" id="exPrint"><i class="bi bi-printer"></i> הדפסה</button>' +
         '</div></div>' +
       '<div class="qr-card"><div class="qr-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">' +
@@ -389,6 +390,12 @@
       setTimeout(done, 8000);
       window.print();
     });
+
+    // הורדת PDF ישירה — הגיליון עצמו, בכיוון הדף שנבחר
+    if (window.cv3Pdf) window.cv3Pdf.wire($('#exPdf'),
+      () => page.querySelector('.ex-sheet'),
+      () => page._title || 'יצוא',
+      () => ({ orientation: $('#exOrient').value === 'landscape' ? 'landscape' : 'portrait', margin: 6 }));
 
     $('#exCsv').addEventListener('click', () => {
       // מייצאים מה-DOM ולא מהנתונים המקוריים — כך העריכות הידניות (שורות/עמודות

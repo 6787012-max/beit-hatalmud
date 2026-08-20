@@ -220,12 +220,17 @@
           '<button class="btn-ghost sm" data-cert><i class="bi bi-award"></i> אישור לימודים</button>' +
           '<button class="btn-ghost sm" data-tla><i class="bi bi-journal-bookmark"></i> תל"א</button>' +
           '<button class="btn-ghost sm" data-docs><i class="bi bi-folder2-open"></i> תיק מסמכים</button>' +
+          '<button class="btn-ghost sm" data-pdf2><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
           '<button class="btn-ghost sm" data-print2><i class="bi bi-printer"></i> הדפסה</button>' +
           '<button class="btn-ghost sm" data-go="behavior"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' +
         '</div>';
       m.el.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => { m.close(); showPage(btn.dataset.go); }));
       const eb = m.el.querySelector('[data-edit2]'); if (eb) eb.addEventListener('click', () => { m.close(); openForm(s); });
       // הדפסה של הכרטיס בלבד — קודם window.print() הדפיס את כל הדף שמאחורי המודאל
+      // הורדת הכרטיס כ-PDF — אותו תוכן שמודפס, בלי לעבור דרך חלון ההדפסה
+      if (window.cv3Pdf) window.cv3Pdf.wire(m.el.querySelector('[data-pdf2]'),
+        () => m.el.querySelector('.modal-body') || m.el,
+        () => 'כרטיס תלמיד - ' + (window.UI.fullName ? window.UI.fullName(s) : s.name));
       const pb = m.el.querySelector('[data-print2]');
       if (pb) pb.addEventListener('click', () => {
         document.body.classList.add('printing-card');

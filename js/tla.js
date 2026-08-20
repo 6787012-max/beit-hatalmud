@@ -651,14 +651,15 @@
       '.cover h1{font-size:34pt;color:#003048;margin:0 0 4mm}.cover h2{font-size:20pt;color:#a87830;font-weight:normal;margin:0 0 20mm}' +
       '.cv-fields{font-size:15pt;line-height:2.2;display:inline-block;text-align:right}' +
       '@media print{.noprint{display:none}}' +
-      '.noprint{position:fixed;top:8px;left:8px;background:#003048;color:#fff;border:0;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer;z-index:9}';
+      '.pdfbtn{left:112px !important;background:#a87830 !important}.noprint{position:fixed;top:8px;left:8px;background:#003048;color:#fff;border:0;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer;z-index:9}';
 
     const w = window.open('', '_blank');
     if (!w) { window.UI.toast('חלון קופץ נחסם — אפשר חלונות קופצים לאתר', 'err'); return; }
     w.document.open();
     w.document.write('<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>תל"א — ' +
       esc(fullName(stud)) + '</title><style>' + css + '</style></head><body>' +
-      '<button class="noprint" onclick="window.print()">🖨️ הדפסה</button>' + h + '</body></html>');
+      '<button class=\"noprint pdfbtn\" id=\"pdfBtn\">⬇ הורד PDF</button>' +
+      '<button class="noprint" onclick="window.print()">🖨️ הדפסה</button>' + h + "<script>(function(){var b=document.getElementById('pdfBtn');if(!b)return;b.onclick=function(){var o=window.opener;if(!o||!o.cv3Pdf){alert('צריך שהמערכת תישאר פתוחה ברקע');return;}b.disabled=true;var t=b.textContent;b.textContent='מכין…';o.cv3Pdf.save(document.querySelector('.page')||document.body,document.title,{margin:0})['finally'](function(){b.disabled=false;b.textContent=t;});};})();<\/script>" + '</body></html>');
     w.document.close();
   }
 
