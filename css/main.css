@@ -537,3 +537,6 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 
 .ex-table th.wk{background:#4a5a66}
 .ex-table td.wk{background:#eef1f4}
+
+.ex-cell-sel{outline:2px solid #f0b429; outline-offset:-2px}
+@media print{.ex-cell-sel{outline:none !important}}

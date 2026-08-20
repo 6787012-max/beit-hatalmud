@@ -198,6 +198,15 @@
         '</div></div>' +
       '<p class="login-hint" style="margin:10px 0 0"><i class="bi bi-pencil"></i> אפשר לערוך את הגיליון למטה ישירות — לתקן כותרת, למחוק שורה או להוסיף הערה — ואז להדפיס.</p>' +
       '</div>' +
+      '<div id="exEdit" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 0">' +
+        '<span class="tl-note" style="font-size:.8rem">עריכת הטבלה:</span>' +
+        '<button class="btn-ghost sm" data-ed="rowAfter"><i class="bi bi-plus-lg"></i> שורה</button>' +
+        '<button class="btn-ghost sm" data-ed="colAfter"><i class="bi bi-plus-lg"></i> עמודה</button>' +
+        '<button class="btn-ghost sm" data-ed="rowDel"><i class="bi bi-dash-lg"></i> מחק שורה</button>' +
+        '<button class="btn-ghost sm" data-ed="colDel"><i class="bi bi-dash-lg"></i> מחק עמודה</button>' +
+        '<span class="tl-note" id="exSel" style="font-size:.78rem">לחץ על תא כדי לבחור מיקום</span>' +
+        '<span class="tl-note" style="font-size:.75rem;color:#92400e;margin-inline-start:auto"><i class="bi bi-exclamation-triangle"></i> שינוי ההגדרות למעלה בונה את הטבלה מחדש ומאפס עריכות</span>' +
+      '</div>' +
       '<div id="exHint" class="login-hint" style="margin:6px 0 0;color:#92400e"></div>' +
       '<div id="exSheetWrap" class="table-wrap" style="background:#e9edf2;padding:18px;border-radius:12px;overflow:auto"></div>';
 
@@ -304,6 +313,61 @@
         ? '<i class="bi bi-lightbulb"></i> נבחרו ' + picked.length + ' עמודות — כדאי לעבור ל"דף לרוחב" כדי שיהיה מרווח.' : '';
     }
 
+    // ── עריכה מבנית של הטבלה: הוספה/מחיקה של שורות ועמודות בכל מקור נתונים ──
+    // הגיליון כבר contenteditable (טקסט), אבל הוספת שורה/עמודה דורשת שינוי DOM אמיתי.
+    // המיקום נקבע לפי התא האחרון שנלחץ; בלי בחירה — הפעולה מתבצעת בסוף הטבלה.
+    let sel = null;   // {r, c} — r=-1 מסמן שורת הכותרת
+    function tbl() { return page.querySelector('.ex-table'); }
+    function markSel() {
+      page.querySelectorAll('.ex-cell-sel').forEach(e => e.classList.remove('ex-cell-sel'));
+      const t = tbl(); if (!t || !sel) return;
+      const row = sel.r < 0 ? t.tHead.rows[0] : t.tBodies[0].rows[sel.r];
+      const cell = row && row.cells[sel.c];
+      if (cell) cell.classList.add('ex-cell-sel');
+      const lbl = page.querySelector('#exSel');
+      if (lbl) lbl.textContent = sel.r < 0 ? ('כותרת · עמודה ' + (sel.c + 1)) : ('שורה ' + (sel.r + 1) + ' · עמודה ' + (sel.c + 1));
+    }
+    page.addEventListener('click', e => {
+      const cell = e.target.closest('.ex-table td, .ex-table th');
+      if (!cell) return;
+      const row = cell.parentElement;
+      sel = { r: row.parentElement.tagName === 'THEAD' ? -1 : row.rowIndex - (tbl().tHead ? 1 : 0), c: cell.cellIndex };
+      markSel();
+    });
+    page.querySelectorAll('#exEdit [data-ed]').forEach(btn => btn.addEventListener('click', () => {
+      const t = tbl(); if (!t) return;
+      const body = t.tBodies[0], head = t.tHead.rows[0];
+      const nCols = head.cells.length;
+      const act = btn.dataset.ed;
+      if (act === 'rowAfter') {
+        const at = sel && sel.r >= 0 ? sel.r + 1 : body.rows.length;
+        const tr = body.insertRow(at);
+        // שומרים על גובה השורה שמעל, כדי שטבלה למילוי-יד תישאר אחידה
+        const ref = body.rows[at - 1] || body.rows[at + 1];
+        if (ref && ref.style.height) tr.style.height = ref.style.height;
+        for (let i = 0; i < nCols; i++) tr.insertCell(i);
+        sel = { r: at, c: sel ? sel.c : 0 };
+      } else if (act === 'colAfter') {
+        const at = sel ? sel.c + 1 : nCols;
+        const th = document.createElement('th');
+        th.textContent = 'עמודה חדשה';
+        head.insertBefore(th, head.cells[at] || null);
+        [...body.rows].forEach(r => r.insertCell(at > r.cells.length ? r.cells.length : at));
+        sel = { r: sel ? sel.r : -1, c: at };
+      } else if (act === 'rowDel') {
+        if (!sel || sel.r < 0) { window.UI.toast('בחר תא בשורה שברצונך למחוק', 'err'); return; }
+        if (body.rows.length <= 1) { window.UI.toast('חייבת להישאר שורה אחת', 'err'); return; }
+        body.deleteRow(sel.r); sel = null;
+      } else if (act === 'colDel') {
+        if (!sel) { window.UI.toast('בחר תא בעמודה שברצונך למחוק', 'err'); return; }
+        if (nCols <= 1) { window.UI.toast('חייבת להישאר עמודה אחת', 'err'); return; }
+        head.deleteCell(sel.c);
+        [...body.rows].forEach(r => { if (r.cells[sel.c]) r.deleteCell(sel.c); });
+        sel = null;
+      }
+      markSel();
+    }));
+
     ['#exSrc'].forEach(s => $(s).addEventListener('change', async () => { await buildCols(); draw(); }));
     ['#exSort', '#exOrient', '#exFont', '#exTitle'].forEach(s => {
       $(s).addEventListener('input', draw);
@@ -327,12 +391,14 @@
     });
 
     $('#exCsv').addEventListener('click', () => {
-      const picked = page._picked || [], rows = page._rows || [];
-      if (!rows.length) { window.UI.toast('אין נתונים ליצוא', 'err'); return; }
-      const cell = v => { v = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
-      const lines = [picked.map(c => cell(c.t)).join(',')].concat(
-        rows.map((r, i) => picked.map(c => cell(c.k === 'idx' ? (i + 1) : (c.blank ? '' : r[c.k]))).join(',')));
-      const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      // מייצאים מה-DOM ולא מהנתונים המקוריים — כך העריכות הידניות (שורות/עמודות
+      // שנוספו, טקסט שתוקן) נכנסות גם לקובץ, ולא רק להדפסה.
+      const t = page.querySelector('.ex-table');
+      if (!t) { window.UI.toast('אין נתונים ליצוא', 'err'); return; }
+      const cell = v => { v = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
+      const lines = [];
+      [...t.tHead.rows, ...t.tBodies[0].rows].forEach(r => lines.push([...r.cells].map(c => cell(c.innerText)).join(',')));
+      const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(10))], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = (page._title || 'יצוא') + '.csv';
