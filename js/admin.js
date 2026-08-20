@@ -149,7 +149,9 @@
             users.push({ id: uid, name, phone, tz: phone, role, perms, access_mode });
           }
           const chosen = [...mel.querySelectorAll('#classGrid input:checked')].map(c => Number(c.value));
-          for (const a of access.filter(a => a.user_id == uid)) await window.store.remove('user_class_access', a.id);
+          // user_class_access הוא מפתח מורכב ללא עמודת id — remove לפי id לא מוחק כלום,
+          // וכיתות ישנות נשארו מוצמדות למשתמש לנצח (זחילת הרשאות). מוחקים לפי user_id.
+          await window.store.removeBy('user_class_access', { user_id: uid });
           for (let i = access.length - 1; i >= 0; i--) if (access[i].user_id == uid) access.splice(i, 1);
           for (const cid of chosen) { const r = await window.store.add('user_class_access', { user_id: uid, class_id: cid }); access.push((r.data && r.data[0]) || { user_id: uid, class_id: cid }); }
           drawUsers();
