@@ -487,3 +487,37 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
   body.printing-card .stu-links .btn-ghost{display:none !important}
   body.printing-card .det-sec{break-inside:avoid; page-break-inside:avoid}
 }
+
+/* ===== יצוא והדפסה — גיליון A4 שניתן לעריכה ===== */
+.ex-sheet{background:#fff; width:210mm; min-height:297mm; margin:0 auto; padding:14mm 12mm;
+  box-shadow:0 6px 26px rgba(0,0,0,.16); border-radius:4px; color:#111; line-height:1.5; outline:none}
+.ex-sheet.land{width:297mm; min-height:210mm}
+.ex-head{display:flex; align-items:center; gap:14px; border-bottom:2px solid var(--primary,#003048); padding-bottom:10px; margin-bottom:14px}
+.ex-logo{height:62px; width:auto}
+.ex-titles{flex:1}
+.ex-inst{font-size:.9em; color:#555; font-weight:600}
+.ex-sheet h1{font-size:1.7em; font-weight:800; color:var(--primary,#003048); margin:2px 0}
+.ex-sheet h1.ex-plain{text-align:center; margin-bottom:14px}
+.ex-date{font-size:.82em; color:#666}
+.ex-table{width:100%; border-collapse:collapse}
+.ex-table th{background:var(--primary,#003048); color:#fff; font-weight:700; padding:7px 8px; text-align:start; font-size:.95em}
+.ex-table td{padding:6px 8px; text-align:start}
+.ex-table.grid th,.ex-table.grid td{border:1px solid #b9c4cd}
+.ex-table.zebra tbody tr:nth-child(even){background:#f2f5f8}
+.ex-sign{display:flex; justify-content:space-between; margin-top:28px; font-size:.95em; color:#333}
+
+@media print{
+  body.printing-sheet>*:not(#pages){display:none !important}
+  body.printing-sheet #pages>*:not(.page.active){display:none !important}
+  body.printing-sheet .page-head,
+  body.printing-sheet .qr-card,
+  body.printing-sheet .login-hint{display:none !important}
+  body.printing-sheet #exSheetWrap{background:none !important; padding:0 !important; overflow:visible !important}
+  body.printing-sheet .ex-sheet{width:auto !important; min-height:0 !important; box-shadow:none !important;
+    margin:0 !important; padding:0 !important; border-radius:0 !important}
+  body.printing-sheet .ex-table{break-inside:auto}
+  body.printing-sheet .ex-table thead{display:table-header-group}   /* כותרת הטבלה חוזרת בכל עמוד */
+  body.printing-sheet .ex-table tr{break-inside:avoid; page-break-inside:avoid}
+  body.printing-sheet .ex-table th{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  body.printing-sheet .ex-table.zebra tbody tr:nth-child(even){-webkit-print-color-adjust:exact; print-color-adjust:exact}
+}
