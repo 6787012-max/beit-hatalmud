@@ -111,6 +111,12 @@
         });
       },
     },
+    blank: {
+      label: 'טבלה ריקה למילוי', icon: 'bi-grid-3x3', blankMode: true,
+      // העמודות והשורות נבנות דינמית מהסרגל (blankCols/blankRows) — ראה buildCols/draw
+      async cols() { return []; },
+      async rows() { return []; },
+    },
     docs: {
       label: 'תיק מסמכים — מה חסר', icon: 'bi-folder2-open',
       cols: [
@@ -157,9 +163,8 @@
           SORTS.map(s => '<option value="' + s[0] + '">' + esc(s[1]) + '</option>').join('') + '</select></label>' +
         '<label class="fld"><span>כיוון הדף</span><select class="inp mb0" id="exOrient">' +
           '<option value="portrait">לאורך</option><option value="landscape">לרוחב</option></select></label>' +
-        '<label class="fld"><span>גודל טקסט</span><select class="inp mb0" id="exFont">' +
-          '<option value="11">קטן</option><option value="13" selected>רגיל</option><option value="15">גדול</option>' +
-          '<option value="18">גדול מאוד</option></select></label>' +
+        '<label class="fld"><span>גודל טקסט <b id="exFontVal">13</b></span>' +
+          '<input class="inp mb0" id="exFont" type="range" min="8" max="24" step="1" value="13" style="padding:6px 0"></label>' +
       '</div>' +
       '<div class="qr-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">' +
         '<div class="fld"><span>כיתות</span><div class="cb-grid" id="exCls">' +
@@ -175,8 +180,25 @@
         '<label class="cb"><input type="checkbox" id="exSign"> שורת חתימה בתחתית</label>' +
         '<label class="fld" style="min-width:220px"><span>כותרת</span><input class="inp mb0" id="exTitle" placeholder="לדוגמה: רשימת תלמידים תשפ״ז"></label>' +
       '</div>' +
+      '<div id="exBlankBar" style="display:none;border-top:1px dashed var(--line);margin-top:10px;padding-top:10px">' +
+        '<div class="qr-grid" style="grid-template-columns:2fr 1fr 1fr 1fr;gap:10px">' +
+          '<label class="fld"><span>כותרות העמודות <small style="font-weight:400;color:var(--muted)">— מופרדות בפסיק</small></span>' +
+            '<input class="inp mb0" id="exBcols" value="שם התלמיד, נוכחות, הערות"></label>' +
+          '<label class="fld"><span>שורות</span><select class="inp mb0" id="exBrowsMode">' +
+            '<option value="students">שמות התלמידים</option><option value="empty">שורות ריקות</option></select></label>' +
+          '<label class="fld"><span>כמה שורות ריקות</span><input class="inp mb0" id="exBrows" type="number" min="1" max="60" value="20"></label>' +
+          '<label class="fld"><span>גובה שורה</span><select class="inp mb0" id="exBh">' +
+            '<option value="26">רגיל</option><option value="34" selected>נוח לכתיבה</option><option value="46">גבוה</option></select></label>' +
+        '</div>' +
+        '<div class="qr-grid" style="grid-template-columns:1fr 1fr 2fr;gap:10px;margin-top:8px">' +
+          '<label class="fld"><span>עמודות תאריכים מ־</span><input class="inp mb0" id="exBdate" type="date"></label>' +
+          '<label class="fld"><span>כמה ימים</span><input class="inp mb0" id="exBdays" type="number" min="0" max="31" value="0"></label>' +
+          '<div class="fld"><span>&nbsp;</span><div class="tl-note" style="font-size:.8rem">מלאו "כמה ימים" כדי לייצר עמודה לכל יום (דף נוכחות). ' +
+            'ימי שישי־שבת מסומנים באפור.</div></div>' +
+        '</div></div>' +
       '<p class="login-hint" style="margin:10px 0 0"><i class="bi bi-pencil"></i> אפשר לערוך את הגיליון למטה ישירות — לתקן כותרת, למחוק שורה או להוסיף הערה — ואז להדפיס.</p>' +
       '</div>' +
+      '<div id="exHint" class="login-hint" style="margin:6px 0 0;color:#92400e"></div>' +
       '<div id="exSheetWrap" class="table-wrap" style="background:#e9edf2;padding:18px;border-radius:12px;overflow:auto"></div>';
 
     const $ = s => page.querySelector(s);
@@ -184,6 +206,9 @@
 
     async function buildCols() {
       const src = SOURCES[$('#exSrc').value];
+      const blank = !!src.blankMode;
+      $('#exBlankBar').style.display = blank ? '' : 'none';
+      $('#exCols').closest('.fld').style.display = blank ? 'none' : '';
       cols = typeof src.cols === 'function' ? await src.cols({ }) : src.cols.slice();
       $('#exCols').innerHTML = cols.map((c, i) =>
         '<label class="cb"><input type="checkbox" data-col="' + i + '"' + (c.def ? ' checked' : '') + '> ' + esc(c.t) + '</label>').join('');
@@ -194,11 +219,46 @@
       return [...$('#exCls').querySelectorAll('input:checked')].map(x => Number(x.value));
     }
 
+    // בונה את הטבלה הריקה: כותרות מהמשתמש + עמודות תאריך אופציונליות,
+    // ושורות שהן או שמות התלמידים מהכיתות שנבחרו או שורות ריקות לגמרי.
+    function blankPlan(list) {
+      const titles = ($('#exBcols').value || '').split(',').map(x => x.trim()).filter(Boolean);
+      const picked = titles.map((t, i) => ({ k: 'b' + i, t: t, blank: i > 0 }));
+      const days = Math.max(0, Math.min(31, Number($('#exBdays').value) || 0));
+      const from = $('#exBdate').value;
+      const dateCols = [];
+      if (days && from) {
+        const base = new Date(from + 'T12:00:00');
+        for (let i = 0; i < days; i++) {
+          const d = new Date(base.getTime() + i * 86400000);
+          const dow = d.getDay();   // 5=שישי 6=שבת
+          dateCols.push({ k: 'd' + i, t: d.getDate() + '/' + (d.getMonth() + 1), blank: true, w: 34,
+            weekend: dow === 5 || dow === 6 });
+        }
+      }
+      const all = picked.concat(dateCols);
+      const useStudents = $('#exBrowsMode').value === 'students';
+      const n = useStudents ? list.length : Math.max(1, Math.min(60, Number($('#exBrows').value) || 20));
+      const rows = [];
+      for (let i = 0; i < n; i++) {
+        const r = {};
+        if (useStudents && all.length) r[all[0].k] = nm(list[i]);
+        rows.push(r);
+      }
+      return { picked: all, rows: rows };
+    }
+
     async function draw() {
       const srcKey = $('#exSrc').value, src = SOURCES[srcKey];
       const clsIds = chosenClasses();
       const list = students.filter(s => clsIds.includes(Number(s.class_id)));
       const ctx = { students: list, clsName };
+      if (src.blankMode) {
+        const sortB = $('#exSort').value;
+        if (sortB !== 'none') list.sort((a, b) => String(nm(a)).localeCompare(String(nm(b)), 'he'));
+        const plan = blankPlan(list);
+        return paint(plan.rows, plan.picked, src, true);
+      }
       let rows = await src.rows(ctx);
 
       const sort = $('#exSort').value;
@@ -206,15 +266,22 @@
       else if (sort === 'cls') rows.sort((a, b) => String(a.cls).localeCompare(String(b.cls), 'he') || String(a.name).localeCompare(String(b.name), 'he'));
 
       const picked = [...$('#exCols').querySelectorAll('input:checked')].map(x => cols[Number(x.dataset.col)]);
+      return paint(rows, picked, src, false);
+    }
+
+    function paint(rows, picked, src, isBlank) {
       const title = ($('#exTitle').value || '').trim() || src.label;
       const land = $('#exOrient').value === 'landscape';
       const fs = $('#exFont').value;
+      const fv = $('#exFontVal'); if (fv) fv.textContent = fs;
       const zebra = $('#exZebra').checked, grid = $('#exGrid').checked;
 
+      const rowH = isBlank ? Number($('#exBh').value || 34) : 0;
       const head = '<tr>' + picked.map(c =>
-        '<th style="' + (c.w ? 'width:' + c.w + 'px;' : '') + '">' + esc(c.t) + '</th>').join('') + '</tr>';
-      const body = rows.map((r, i) => '<tr>' + picked.map(c =>
-        '<td>' + (c.k === 'idx' ? (i + 1) : (c.blank ? '' : esc(r[c.k] == null ? '' : r[c.k]))) + '</td>').join('') + '</tr>').join('');
+        '<th' + (c.weekend ? ' class="wk"' : '') + ' style="' + (c.w ? 'width:' + c.w + 'px;' : '') + '">' + esc(c.t) + '</th>').join('') + '</tr>';
+      const body = rows.map((r, i) => '<tr' + (rowH ? ' style="height:' + rowH + 'px"' : '') + '>' + picked.map(c =>
+        '<td' + (c.weekend ? ' class="wk"' : '') + '>' +
+        (c.k === 'idx' ? (i + 1) : (c.blank ? '' : esc(r[c.k] == null ? '' : r[c.k]))) + '</td>').join('') + '</tr>').join('');
 
       const today = new Date().toLocaleDateString('he-IL');
       $('#exSheetWrap').innerHTML =
@@ -224,13 +291,17 @@
             '<img src="img/logo.png" alt="" class="ex-logo">' +
             '<div class="ex-titles"><div class="ex-inst">' + esc(inst) + '</div>' +
             '<h1>' + esc(title) + '</h1>' +
-            ($('#exDate').checked ? '<div class="ex-date">' + esc(today) + ' · ' + rows.length + ' רשומות</div>' : '') +
+            ($('#exDate').checked ? '<div class="ex-date">' + esc(today) + (isBlank ? '' : ' · ' + rows.length + ' רשומות') + '</div>' : '') +
             '</div></div>' : '<h1 class="ex-plain">' + esc(title) + '</h1>') +
           '<table class="ex-table' + (zebra ? ' zebra' : '') + (grid ? ' grid' : '') + '">' +
             '<thead>' + head + '</thead><tbody>' + body + '</tbody></table>' +
           ($('#exSign').checked ? '<div class="ex-sign"><div>חתימה: ____________________</div><div>תאריך: ____________</div></div>' : '') +
         '</div>';
       page._rows = rows; page._picked = picked; page._title = title;
+      // עצה קטנה במקום שהמשתמש יגלה לבד שהדף צר מדי
+      const hint = page.querySelector('#exHint');
+      if (hint) hint.innerHTML = (picked.length > 7 && !land)
+        ? '<i class="bi bi-lightbulb"></i> נבחרו ' + picked.length + ' עמודות — כדאי לעבור ל"דף לרוחב" כדי שיהיה מרווח.' : '';
     }
 
     ['#exSrc'].forEach(s => $(s).addEventListener('change', async () => { await buildCols(); draw(); }));
@@ -240,6 +311,8 @@
     });
     ['#exLogo', '#exZebra', '#exGrid', '#exDate', '#exSign'].forEach(s => $(s).addEventListener('change', draw));
     $('#exCls').querySelectorAll('input').forEach(x => x.addEventListener('change', draw));
+    ['#exBcols', '#exBrows', '#exBdate', '#exBdays'].forEach(k => $(k).addEventListener('input', draw));
+    ['#exBrowsMode', '#exBh'].forEach(k => $(k).addEventListener('change', draw));
 
     $('#exPrint').addEventListener('click', () => {
       const land = $('#exOrient').value === 'landscape';

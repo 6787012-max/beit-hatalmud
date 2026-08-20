@@ -226,8 +226,10 @@ table.tbl tbody tr:hover{background:var(--bg)}
 
 /* ===== print (student card) ===== */
 @media print {
-  body * { visibility: hidden !important; }
-  .modal-ov, .modal-ov * { visibility: visible !important; }
+  /* הכלל הזה נועד להדפסת מודאל בלבד. בלי הסייג הוא הפך גם את גיליון היצוא
+     ל-visibility:hidden — כלומר "הדפסה" שיצאה דף ריק לגמרי. */
+  body:not(.printing-sheet):not(.printing-card) * { visibility: hidden !important; }
+  body:not(.printing-sheet) .modal-ov, body:not(.printing-sheet) .modal-ov * { visibility: visible !important; }
   .modal-ov { position: absolute !important; inset: 0 !important; background: #fff !important; padding: 0 !important; display: block !important; }
   .modal-card { max-height: none !important; box-shadow: none !important; max-width: 100% !important; border: none !important; }
   .modal-x, .modal-foot, .det-actions { display: none !important; }
@@ -499,7 +501,9 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .ex-sheet h1{font-size:1.7em; font-weight:800; color:var(--primary,#003048); margin:2px 0}
 .ex-sheet h1.ex-plain{text-align:center; margin-bottom:14px}
 .ex-date{font-size:.82em; color:#666}
-.ex-table{width:100%; border-collapse:collapse}
+.ex-table{width:100%; max-width:100%; border-collapse:collapse; table-layout:fixed}
+/* table-layout:fixed + שבירת מילים — אחרת בחירה של הרבה עמודות גולשת מחוץ לדף והעמודה השמאלית נחתכת בהדפסה */
+.ex-table th,.ex-table td{overflow-wrap:anywhere; word-break:break-word}
 .ex-table th{background:var(--primary,#003048); color:#fff; font-weight:700; padding:7px 8px; text-align:start; font-size:.95em}
 .ex-table td{padding:6px 8px; text-align:start}
 .ex-table.grid th,.ex-table.grid td{border:1px solid #b9c4cd}
@@ -507,17 +511,29 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .ex-sign{display:flex; justify-content:space-between; margin-top:28px; font-size:.95em; color:#333}
 
 @media print{
-  body.printing-sheet>*:not(#pages){display:none !important}
+  /* ⚠️ #pages אינו ילד ישיר של body (body > main#main > #pages), ולכן הכלל הישן
+     `body.printing-sheet>*:not(#pages)` הסתיר את main עצמו — והדפסה יצאה דף ריק.
+     במקום להסתמך על המבנה, מסתירים במפורש את מה שלא שייך לנייר. */
+  body.printing-sheet header,
+  body.printing-sheet footer,
+  body.printing-sheet #helpFab,
+  body.printing-sheet .toast-host,
+  body.printing-sheet .modal-ov{display:none !important}
   body.printing-sheet #pages>*:not(.page.active){display:none !important}
-  body.printing-sheet .page-head,
-  body.printing-sheet .qr-card,
-  body.printing-sheet .login-hint{display:none !important}
-  body.printing-sheet #exSheetWrap{background:none !important; padding:0 !important; overflow:visible !important}
+  body.printing-sheet .page.active>*:not(#exSheetWrap){display:none !important}
+  body.printing-sheet #main{padding:0 !important; margin:0 !important; max-width:none !important}
+  body.printing-sheet #exSheetWrap{background:none !important; padding:0 !important; overflow:visible !important; border-radius:0 !important}
   body.printing-sheet .ex-sheet{width:auto !important; min-height:0 !important; box-shadow:none !important;
     margin:0 !important; padding:0 !important; border-radius:0 !important}
   body.printing-sheet .ex-table{break-inside:auto}
   body.printing-sheet .ex-table thead{display:table-header-group}   /* כותרת הטבלה חוזרת בכל עמוד */
   body.printing-sheet .ex-table tr{break-inside:avoid; page-break-inside:avoid}
-  body.printing-sheet .ex-table th{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  body.printing-sheet .ex-table th,
+  body.printing-sheet .ex-table th.wk,
+  body.printing-sheet .ex-table td.wk,
   body.printing-sheet .ex-table.zebra tbody tr:nth-child(even){-webkit-print-color-adjust:exact; print-color-adjust:exact}
 }
+
+
+.ex-table th.wk{background:#4a5a66}
+.ex-table td.wk{background:#eef1f4}
