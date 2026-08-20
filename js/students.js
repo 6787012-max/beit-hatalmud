@@ -81,7 +81,7 @@
     async function openDetail(s) {
       if (!s) return;
       const m = window.UI.modal({ title: 'כרטיס תלמיד', bodyHTML: '<div style="padding:26px;text-align:center;color:var(--muted)"><i class="bi bi-hourglass-split"></i> טוען…</div>' });
-      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tui, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice] = await Promise.all([
+      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tui, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs] = await Promise.all([
         window.store.list('categories'),
         window.store.byStudent('behavior_events', s.id), window.store.byStudent('attendance', s.id),
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
@@ -93,6 +93,7 @@
         (window.cv3Tla ? window.cv3Tla.forStudent(s.id) : Promise.resolve({ plans: [], goals: [] })),
         window.store.byStudent('form_responses', s.id), window.store.list('forms'),
         ((!window.Auth || window.Auth.canAccess('voicereports')) ? window.store.byStudent('voice_reports', s.id) : Promise.resolve([])),
+        (window.cv3StudentDocs ? window.cv3StudentDocs.forStudent(s.id) : Promise.resolve([])),
       ]);
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
@@ -209,6 +210,7 @@
         sec('כתיבה', 'bi-pencil-square', wrt, x => li('רמה: ' + esc(x.level), x.date)) +
         (window.cv3ReadAssess ? window.cv3ReadAssess.cardSection(raCats, raAssess) : '') +
         (window.cv3Tla ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
+        (window.cv3StudentDocs ? window.cv3StudentDocs.cardSection(sdocs) : '') +
         attSec + frmSec + vSec +
         sec('שכר לימוד', 'bi-cash-coin', tui, t => li((esc(t.month) || '') + (t.amount ? ' · ₪' + esc(t.amount) : ''), t.status === 'paid' ? 'שולם' : 'חוב', t.status === 'paid' ? 'lo' : 'hi')) +
         tasksSec +
@@ -217,6 +219,7 @@
           '<button class="btn-ghost sm" data-reading><i class="bi bi-book-half"></i> מעקב קריאה</button>' +
           '<button class="btn-ghost sm" data-cert><i class="bi bi-award"></i> אישור לימודים</button>' +
           '<button class="btn-ghost sm" data-tla><i class="bi bi-journal-bookmark"></i> תל"א</button>' +
+          '<button class="btn-ghost sm" data-docs><i class="bi bi-folder2-open"></i> תיק מסמכים</button>' +
           '<button class="btn-ghost sm" data-print2><i class="bi bi-printer"></i> הדפסה</button>' +
           '<button class="btn-ghost sm" data-go="behavior"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' +
         '</div>';
@@ -234,6 +237,8 @@
       const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
       const ctb = m.el.querySelector('[data-cert]'); if (ctb && window.cv3Cert) ctb.addEventListener('click', () => window.cv3Cert.openCertificate(s));
       const tlb = m.el.querySelector('[data-tla]'); if (tlb && window.cv3Tla) tlb.addEventListener('click', () => { m.close(); window.cv3Tla.openForStudent(s); });
+      const dcb = m.el.querySelector('[data-docs]');
+      if (dcb && window.cv3StudentDocs) dcb.addEventListener('click', () => { m.close(); window.cv3StudentDocs.openManager(s, () => {}); });
 
       // ---------- מייל+דרייב מתוך Supabase (אונדקסו ע"י Apps Script בענן — עוקף חסימת NetFree) ----------
       m.el.classList.add('modal-wide');

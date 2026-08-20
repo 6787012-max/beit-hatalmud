@@ -8,3 +8,9 @@ _video/
 _demo/
 shots/
 .claude/
+
+# קבצי עבודה מקומיים (שמות תלמידים/מיפוי דרייב) — לא לריפו הציבורי
+_students.json
+_drive_*.json
+_qa_*
+node_modules/
