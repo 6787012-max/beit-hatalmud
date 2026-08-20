@@ -55,6 +55,63 @@ const gFetch = async (url: string, init: RequestInit = {}) => {
   return fetch(url, { ...init, headers: h });
 };
 
+
+const b64 = (buf: Uint8Array) => {
+  let bin = '';
+  const CH = 0x8000;
+  for (let i = 0; i < buf.length; i += CH) bin += String.fromCharCode(...buf.subarray(i, i + CH));
+  return btoa(bin);
+};
+
+// המרת Word/Excel/PowerPoint ל-PDF, כדי שתהיה תצוגה מקדימה גם להם.
+// הטריק: העלאה חוזרת לדרייב **עם המרה** ליצירת מסמך גוגל זמני (יצירה מותרת גם
+// בהיקף drive.file, גם כשהמקור הוא קובץ ישן שאסור לנו לגעת בו), ייצוא ל-PDF,
+// ומיד מחיקה. הקובץ הזמני נוצר בשורש הדרייב של חשבון המכינה ולא בתיקיית התלמיד.
+const OFFICE: Record<string, string> = {
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'application/vnd.google-apps.document',
+  'application/msword': 'application/vnd.google-apps.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'application/vnd.google-apps.spreadsheet',
+  'application/vnd.ms-excel': 'application/vnd.google-apps.spreadsheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'application/vnd.google-apps.presentation',
+  'application/vnd.ms-powerpoint': 'application/vnd.google-apps.presentation',
+};
+async function toPdfIfOffice(buf: Uint8Array, mime: string, name: string) {
+  const target = OFFICE[mime];
+  if (!target) return null;
+  let tmpId = '';
+  try {
+    const boundary = 'cv' + crypto.randomUUID().replace(/-/g, '');
+    const enc = new TextEncoder();
+    const meta = JSON.stringify({ name: 'tmp-preview', mimeType: target });
+    const head = enc.encode(`--${boundary}
+Content-Type: application/json; charset=UTF-8
+
+${meta}
+--${boundary}
+Content-Type: ${mime}
+
+`);
+    const tail = enc.encode(`
+--${boundary}--
+`);
+    const body = new Uint8Array(head.length + buf.length + tail.length);
+    body.set(head, 0); body.set(buf, head.length); body.set(tail, head.length + buf.length);
+    const up = await gFetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+      method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body,
+    });
+    if (!up.ok) return null;
+    tmpId = (await up.json()).id;
+    const ex = await gFetch(`${DRIVE}/files/${tmpId}/export?mimeType=application/pdf`);
+    if (!ex.ok) return null;
+    const pdf = new Uint8Array(await ex.arrayBuffer());
+    return { buf: pdf, name: name.replace(/\.[^.]+$/, '') + '.pdf' };
+  } catch (_) {
+    return null;
+  } finally {
+    if (tmpId) { try { await gFetch(`${DRIVE}/files/${tmpId}`, { method: 'DELETE' }); } catch (_) { /* ignore */ } }
+  }
+}
+
 // אילו תיקיות דרייב מותרות למשתמש הזה עבור התלמיד הזה — לפי RLS, לא לפי הדפדפן
 async function allowedFolders(userJwt: string, studentId: string): Promise<string[]> {
   const url = `${SB_URL}/rest/v1/student_docs?select=drive_id&source=eq.drive&student_id=eq.${encodeURIComponent(studentId)}`;
@@ -138,7 +195,7 @@ Deno.serve(async (req) => {
     }
 
     // ── הורדה/צפייה: מחזירים את הבייטים דרך Supabase, כדי שהדפדפן לא ייגע בגוגל ──
-    if (action === 'download') {
+    if (action === 'download' || action === 'preview') {
       const fileId = u.searchParams.get('fileId') || '';
       const f = await fileInAllowed(fileId, folders);
       if (!f) return fail('הקובץ אינו בתיקיית התלמיד', 403);
@@ -158,7 +215,14 @@ Deno.serve(async (req) => {
           const mm = txt.match(/^[^(]*\(([\s\S]*)\)\s*;?\s*$/);
           let d: Record<string, unknown> | null = null;
           try { d = mm ? JSON.parse(mm[1]) : JSON.parse(txt); } catch (_) { d = null; }
-          if (d && d.ok) return json(d);
+          if (d && d.ok) {
+            if (action === 'preview') {
+              const raw = Uint8Array.from(atob(String(d.dataB64 || '')), c => c.charCodeAt(0));
+              const conv = await toPdfIfOffice(raw, String(d.mimeType || ''), String(d.name || 'file'));
+              if (conv) return json({ ok: true, name: conv.name, mimeType: 'application/pdf', size: conv.buf.length, dataB64: b64(conv.buf) });
+            }
+            return json(d);
+          }
           return fail(String((d && d.error) || 'אין הרשאת הורדה לקובץ הזה — פתח אותו בדרייב'), 403);
         }
         const t = await r.text();
@@ -168,17 +232,14 @@ Deno.serve(async (req) => {
       // "Error in NetFree", והדפדפן ראה את זה כשגיאת CORS). לכן מחזירים את
       // הקובץ כ-base64 בתוך JSON — תוכן טקסטואלי שעובר — והדפדפן מרכיב אותו
       // בחזרה ל-Blob עם ה-mime הנכון. עלות: כשליש נפח, וזה שווה את זה.
-      const buf = new Uint8Array(await r.arrayBuffer());
-      let bin = '';
-      const CH = 0x8000;
-      for (let i = 0; i < buf.length; i += CH) bin += String.fromCharCode(...buf.subarray(i, i + CH));
-      return json({
-        ok: true,
-        name: String(f.name || 'file') + (isGoogleDoc ? '.pdf' : ''),
-        mimeType: isGoogleDoc ? 'application/pdf' : (r.headers.get('content-type') || 'application/octet-stream'),
-        size: buf.length,
-        dataB64: btoa(bin),
-      });
+      let buf = new Uint8Array(await r.arrayBuffer());
+      let outMime = isGoogleDoc ? 'application/pdf' : (r.headers.get('content-type') || 'application/octet-stream');
+      let outName = String(f.name || 'file') + (isGoogleDoc ? '.pdf' : '');
+      if (action === 'preview') {
+        const conv = await toPdfIfOffice(buf, outMime, outName);
+        if (conv) { buf = conv.buf; outMime = 'application/pdf'; outName = conv.name; }
+      }
+      return json({ ok: true, name: outName, mimeType: outMime, size: buf.length, dataB64: b64(buf) });
     }
 
     // ── מחיקה (לפח האשפה של דרייב, לא לצמיתות — ניתן לשחזור) ──

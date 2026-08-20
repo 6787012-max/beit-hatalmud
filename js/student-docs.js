@@ -167,7 +167,7 @@
             '<div class="tl-main">' + esc(f.name) +
               '<div class="tl-note" style="font-size:.76rem">' + esc(classify(f.name)) + (f.size ? ' · ' + kb(f.size) : '') +
               (f.modifiedTime ? ' · ' + esc(String(f.modifiedTime).slice(0, 10)) : '') + '</div></div>' +
-            '<button class="mini" data-view="' + esc(f.id) + '" data-name="' + esc(f.name) + '" title="צפייה"><i class="bi bi-eye"></i></button>' +
+            '<button class="mini" data-view="' + esc(f.id) + '" data-name="' + esc(f.name) + '" data-link="' + esc(f.webViewLink || '') + '" title="תצוגה מקדימה"><i class="bi bi-eye"></i></button>' +
             '<button class="mini" data-dl="' + esc(f.id) + '" data-name="' + esc(f.name) + '" title="הורדה"><i class="bi bi-download"></i></button>' +
             '<a class="mini" href="' + esc(f.webViewLink || '#') + '" target="_blank" rel="noopener" title="פתח בדרייב"><i class="bi bi-box-arrow-up-left"></i></a>' +
             '<button class="mini danger" data-del="' + esc(f.id) + '" data-name="' + esc(f.name) + '" title="מחיקה"><i class="bi bi-trash"></i></button>' +
@@ -180,25 +180,59 @@
 
     // הקובץ חוזר כ-base64 בתוך JSON (נטפרי חוסם גוף בינארי — ראה הערה ב-Edge Function),
     // ולכן מרכיבים אותו כאן בחזרה ל-Blob עם ה-mime המקורי.
-    async function grab(id) {
-      const d = await callJson('download', { studentId: student.id, fileId: id });
+    async function grab(id, forPreview) {
+      const d = await callJson(forPreview ? 'preview' : 'download', { studentId: student.id, fileId: id });
       const bin = atob(d.dataB64 || '');
       const buf = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
       return { blob: new Blob([buf], { type: d.mimeType || 'application/octet-stream' }), name: d.name };
     }
+    // ── תצוגה מקדימה בתוך המערכת ──
+    // PDF/תמונה/טקסט מוצגים כמו שהם; Word/Excel/PowerPoint מומרים ל-PDF בצד-שרת
+    // (ראה toPdfIfOffice ב-Edge Function), כדי שלא יהיה צריך לצאת לדרייב בשביל להציץ.
+    async function preview(id, nm, link) {
+      const pm = window.UI.modal({
+        title: 'תצוגה מקדימה — ' + esc(nm),
+        bodyHTML: '<div id="pvBody" style="min-height:320px;display:flex;align-items:center;justify-content:center">' +
+          '<div class="ld"><i class="bi bi-hourglass-split"></i> טוען…</div></div>' +
+          '<div style="display:flex;gap:8px;margin-top:10px">' +
+            '<button class="btn-primary sm" id="pvDl"><i class="bi bi-download"></i> הורדה</button>' +
+            (link ? '<a class="btn-ghost sm" href="' + esc(link) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-left"></i> פתח בדרייב</a>' : '') +
+          '</div>',
+      });
+      pm.el.classList.add('modal-wide');
+      const host = pm.el.querySelector('#pvBody');
+      let url = null;
+      try {
+        const got = await grab(id, true);
+        url = URL.createObjectURL(got.blob);
+        const t = String(got.blob.type || '');
+        if (t.indexOf('pdf') > -1) {
+          host.innerHTML = '<iframe src="' + url + '" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:10px"></iframe>';
+        } else if (t.indexOf('image') > -1) {
+          host.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:70vh;border-radius:10px">';
+        } else if (t.indexOf('text') > -1 || t.indexOf('json') > -1 || t.indexOf('csv') > -1) {
+          const txt = await got.blob.text();
+          host.innerHTML = '<pre style="white-space:pre-wrap;max-height:70vh;overflow:auto;width:100%;text-align:start;direction:rtl;font-size:.85rem">' + esc(txt.slice(0, 20000)) + '</pre>';
+        } else {
+          host.innerHTML = '<div class="empty-state"><i class="bi bi-file-earmark"></i>' +
+            '<div>אין תצוגה מקדימה לפורמט הזה — אפשר להוריד או לפתוח בדרייב</div></div>';
+        }
+        const dl = pm.el.querySelector('#pvDl');
+        dl.addEventListener('click', () => {
+          const a = document.createElement('a'); a.href = url; a.download = got.name || nm; a.click();
+        });
+      } catch (e) {
+        host.innerHTML = '<div class="tl-note" style="color:#b91c1c">' + esc(e.message || e) + '</div>';
+      }
+      // משחררים את ה-blob כשסוגרים, כדי לא לצבור זיכרון בכרטיסים ארוכים
+      const origClose = pm.close;
+      pm.el.querySelector('.modal-x').addEventListener('click', () => { if (url) URL.revokeObjectURL(url); });
+    }
+
     function wire() {
-      el.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', async () => {
-        try {
-          msg('פותח…');
-          const got = await grab(b.dataset.view);
-          const url = URL.createObjectURL(got.blob);
-          const w = window.open(url, '_blank');
-          if (!w) { const a = document.createElement('a'); a.href = url; a.download = got.name || b.dataset.name; a.click(); msg('הדפדפן חסם חלון — הקובץ ירד למחשב.'); }
-          else msg('');
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
-        } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
-      }));
+      el.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () =>
+        preview(b.dataset.view, b.dataset.name, b.dataset.link || '')));
       el.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', async () => {
         try {
           msg('מוריד…');
