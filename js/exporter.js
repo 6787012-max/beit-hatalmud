@@ -120,7 +120,7 @@
     docs: {
       // נעמי לוי ביקשה "לבדוק מה קיים בחומרים ומה לא" לפני בניית התל"אות.
       // לכן זו מטריצה אמיתית: עמודה לכל מסמך חובה, ולא רק "יש תיקייה".
-      label: 'תיק מסמכים — מה קיים ומה חסר', icon: 'bi-folder2-open',
+      label: 'תיק מסמכים — מה קיים ומה חסר', icon: 'bi-folder2-open', slow: true,
       cols: [
         { k: 'idx', t: '#', def: true, w: 40 },
         { k: 'name', t: 'שם התלמיד', def: true },
@@ -292,6 +292,12 @@
 
     async function draw() {
       const srcKey = $('#exSrc').value, src = SOURCES[srcKey];
+      // דוח מצב התיקים פונה לדרייב לכל תלמיד — זה לוקח כמה עשרות שניות,
+      // ובלי חיווי זה נראה כאילו נתקע (או גרוע מכך — כאילו הדוח הקודם הוא התוצאה).
+      if (src.slow) $('#exSheetWrap').innerHTML =
+        '<div class="ld" style="padding:40px;text-align:center">' +
+        '<i class="bi bi-hourglass-split"></i> סורק את תיקי הדרייב של כל התלמידים… ' +
+        'זה עשוי לקחת עד דקה.</div>';
       const clsIds = chosenClasses();
       const list = students.filter(s => clsIds.includes(Number(s.class_id)));
       const ctx = { students: list, clsName };
