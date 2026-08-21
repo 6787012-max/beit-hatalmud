@@ -32,6 +32,18 @@
   ];
   const hlColor = v => (HL.find(h => h.v === v) || HL[0]).color;
   const DEFAULT_ROLES = ['מנהל חינוכי', 'מורה פרטי', 'מחנך'];
+  // רשימת אנשי הצוות לבחירה בעמודות "הזדמנויות עבודה". מגיעה מ-RPC שמחזיר
+  // שמות ותפקיד בלבד — טבלת staff עצמה נעולה למנהל (ת"ז ופרטי בנק).
+  let _staffCache = null;
+  async function staffNames() {
+    if (_staffCache) return _staffCache;
+    try {
+      const { data, error } = await window.sb.rpc('staff_names');
+      _staffCache = error ? [] : (data || []);
+    } catch (_) { _staffCache = []; }
+    return _staffCache;
+  }
+  const goalsArr = g => Array.isArray(g && g.goals_list) ? g.goals_list.filter(x => String(x || '').trim()) : [];
   const STATUSES = ['טיוטה', 'פעילה', 'הסתיימה'];
 
   // Intl מחזיר את השנה העברית כמספר (5786) — ממירים לגימטריה (תשפ"ו)
@@ -287,55 +299,86 @@
     const roleRows = roleKeysOf(roles).map(k =>
       '<div class="det-row"><span class="det-lbl">' + esc(k) + '</span><span class="det-val">' + esc(roles[k]) + '</span></div>').join('');
     const line = (lbl, v) => v ? '<div class="det-row"><span class="det-lbl">' + esc(lbl) + '</span><span class="det-val">' + esc(v) + '</span></div>' : '';
+    const gl = goalsArr(g);
     return '<div class="qr-card tla-goal"><h3><i class="bi bi-bullseye"></i> ' + esc(g.domain || 'תחום') +
       '<span class="head-actions"><button class="btn-ghost sm" data-ged="' + g.id + '"><i class="bi bi-pencil"></i></button>' +
       '<button class="btn-ghost sm danger" data-gdel="' + g.id + '"><i class="bi bi-trash"></i></button></span></h3>' +
       line('קו בסיס', g.baseline) + line('מטרת על', g.top_goal) +
-      line('מטרה מסכמת', g.goal_sum) + line('מטרה מבצעת', g.goal_exec) +
-      (roleRows ? '<div class="tla-roles">' + roleRows + '</div>' : '') +
-      line('אמצעים והתאמות', g.means) + line('הישגים', g.achievements) + line('הערות ושינויים', g.notes) +
+      (gl.length ? '<div class="det-row"><span class="det-lbl">יעדים</span><span class="det-val">' +
+        '<ol style="margin:0;padding-inline-start:18px">' + gl.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol></span></div>' : '') +
+      (roleRows ? '<div class="tla-roles"><div class="det-lbl" style="margin:6px 0 2px">הזדמנויות עבודה ואמצעים להשגתם</div>' + roleRows + '</div>' : '') +
+      line('הערכה מעצבת', g.eval_form) + line('הערכה מסכמת', g.eval_sum) +
+      line('המלצות', g.recommendations) +
+      line('הערות ושינויים משמעותיים במהלך השנה', g.notes) +
       '</div>';
   }
-  function editGoal(plan, g, onDone) {
+
+  // עורך התחום — לפי הטבלה הרשמית: יעדים (רשימה) → הזדמנויות עבודה לפי איש
+  // צוות נבחר → מעקב והערכה (מעצבת/מסכמת) → המלצות והערות.
+  async function editGoal(plan, g, onDone) {
     g = g || {};
     const roles = (g.roles && typeof g.roles === 'object') ? g.roles : {};
-    const roleKeys = Array.from(new Set(DEFAULT_ROLES.concat(Object.keys(roles))));
-    const ta = (id, lbl, v, ph) => '<label class="fld fld-wide"><span>' + esc(lbl) + '</span>' +
-      '<textarea class="inp mb0" id="' + id + '" rows="2" placeholder="' + esc(ph || '') + '">' + esc(v || '') + '</textarea></label>';
-    const body = '<div class="form-grid">' +
-      '<label class="fld"><span>תחום</span><input class="inp mb0" id="g_dom" list="tlaDomains" value="' + esc(g.domain || '') + '" placeholder="לימודי / רגשי / חברתי…">' +
-        '<datalist id="tlaDomains"><option>לימודי</option><option>רגשי</option><option>חברתי</option><option>התנהגותי</option><option>תפקודי</option></datalist></label>' +
-      '<label class="fld"><span>סדר תצוגה</span><input type="number" class="inp mb0" id="g_ord" value="' + (g.sort_order || 0) + '"></label>' +
-      ta('g_base', 'קו בסיס (מצב קיים)', g.baseline, 'תיאור המצב היום — נקודת הפתיחה') +
-      ta('g_top', 'מטרת על', g.top_goal) +
-      ta('g_sum', 'מטרה מסכמת', g.goal_sum) +
-      ta('g_exec', 'מטרה מבצעת', g.goal_exec) +
+    const staff = await staffNames();
+    const staffOpts = staff.map(x => '<option value="' + esc(x.name) + '">' +
+      (x.role_label ? ' — ' + esc(x.role_label) : '') + '</option>').join('');
+    const ta = (id, lbl, v, ph, rows) => '<label class="fld fld-wide"><span>' + esc(lbl) + '</span>' +
+      '<textarea class="inp mb0" id="' + id + '" rows="' + (rows || 2) + '" placeholder="' + esc(ph || '') + '">' + esc(v || '') + '</textarea></label>';
+
+    const goalRow = v => '<div class="g-goal" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">' +
+      '<textarea class="inp mb0 g-goal-t" rows="2" placeholder="יעד…" style="flex:1">' + esc(v || '') + '</textarea>' +
+      '<button type="button" class="mini danger g-goal-del" title="הסר"><i class="bi bi-trash"></i></button></div>';
+    const oppRow = (who, what) => '<div class="g-opp" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">' +
+      '<input class="inp mb0 g-opp-who" list="tlaStaff" placeholder="איש צוות" value="' + esc(who || '') + '" style="max-width:190px">' +
+      '<textarea class="inp mb0 g-opp-what" rows="2" placeholder="מה הוא עושה — הזדמנויות עבודה ואמצעים" style="flex:1">' + esc(what || '') + '</textarea>' +
+      '<button type="button" class="mini danger g-opp-del" title="הסר"><i class="bi bi-trash"></i></button></div>';
+
+    const gl = goalsArr(g);
+    const body =
+      '<datalist id="tlaStaff">' + staffOpts + DEFAULT_ROLES.map(r => '<option value="' + esc(r) + '"></option>').join('') + '</datalist>' +
+      '<div class="form-grid">' +
+        '<label class="fld"><span>תחום</span><input class="inp mb0" id="g_dom" list="tlaDomains" value="' + esc(g.domain || '') + '" placeholder="לימודי / רגשי / חברתי…">' +
+          '<datalist id="tlaDomains"><option>לימודי</option><option>רגשי</option><option>חברתי</option><option>התנהגותי</option><option>תפקודי</option></datalist></label>' +
+        '<label class="fld"><span>סדר תצוגה</span><input type="number" class="inp mb0" id="g_ord" value="' + (g.sort_order || 0) + '"></label>' +
+        ta('g_base', 'קו בסיס (מצב קיים)', g.baseline, 'תיאור המצב היום — נקודת הפתיחה') +
+        ta('g_top', 'מטרת על', g.top_goal) +
       '</div>' +
-      '<h4 class="tla-sub">התנהגויות, אמצעים והתאמות — לפי בעל תפקיד</h4><div class="form-grid" id="g_roles">' +
-      roleKeys.map(k => '<label class="fld fld-wide"><span>' + esc(k) +
-        '</span><textarea class="inp mb0" data-role="' + esc(k) + '" rows="2">' + esc(roles[k] || '') + '</textarea></label>').join('') +
-      '</div><button class="btn-ghost sm" id="g_addrole" type="button"><i class="bi bi-plus-lg"></i> בעל תפקיד נוסף</button>' +
+      '<h4 class="tla-sub">יעדים</h4>' +
+      '<div id="g_goals">' + (gl.length ? gl.map(goalRow).join('') : goalRow('')) + '</div>' +
+      '<button class="btn-ghost sm" id="g_addgoal" type="button"><i class="bi bi-plus-lg"></i> יעד נוסף</button>' +
+      '<h4 class="tla-sub">הזדמנויות עבודה ואמצעים להשגתם</h4>' +
+      '<p class="login-hint" style="margin:0 0 6px">כל שורה = איש צוות שותף ביישום, ומה שהוא עושה. אפשר לבחור מהרשימה או לכתוב חופשי.</p>' +
+      '<div id="g_opps">' + (Object.keys(roles).length ? Object.keys(roles).map(k => oppRow(k, roles[k])).join('') : oppRow('', '')) + '</div>' +
+      '<button class="btn-ghost sm" id="g_addopp" type="button"><i class="bi bi-plus-lg"></i> איש צוות נוסף</button>' +
+      '<h4 class="tla-sub">מעקב והערכה</h4><div class="form-grid">' +
+        ta('g_evf', 'הערכה מעצבת', g.eval_form, 'הערכה במהלך השנה') +
+        ta('g_evs', 'הערכה מסכמת', g.eval_sum, 'הערכה בסוף התקופה') +
+      '</div>' +
       '<div class="form-grid" style="margin-top:10px">' +
-      ta('g_means', 'אמצעים / יעדים נוספים', g.means) +
-      ta('g_ach', 'הישגים', g.achievements) +
-      ta('g_notes', 'הערות ושינויים משמעותיים במהלך השנה', g.notes) +
+        ta('g_rec', 'המלצות', g.recommendations) +
+        ta('g_notes', 'הערות ושינויים משמעותיים במהלך השנה', g.notes) +
       '</div>';
+
     const m = window.UI.modal({
       title: g.id ? 'עריכת תחום' : 'תחום חדש', bodyHTML: body, saveLabel: 'שמירה',
       onSave: async (card) => {
+        const list = [...card.querySelectorAll('.g-goal-t')].map(t => t.value.trim()).filter(Boolean);
         const rl = {};
-        card.querySelectorAll('[data-role]').forEach(t => { const v = t.value.trim(); if (v) rl[t.dataset.role] = v; });
+        card.querySelectorAll('.g-opp').forEach(row => {
+          const who = row.querySelector('.g-opp-who').value.trim();
+          const what = row.querySelector('.g-opp-what').value.trim();
+          if (who && what) rl[who] = what;
+        });
         const row = {
           plan_id: plan.id,
           domain: card.querySelector('#g_dom').value.trim() || null,
           sort_order: +card.querySelector('#g_ord').value || 0,
           baseline: card.querySelector('#g_base').value.trim() || null,
           top_goal: card.querySelector('#g_top').value.trim() || null,
-          goal_sum: card.querySelector('#g_sum').value.trim() || null,
-          goal_exec: card.querySelector('#g_exec').value.trim() || null,
+          goals_list: list,
           roles: rl,
-          means: card.querySelector('#g_means').value.trim() || null,
-          achievements: card.querySelector('#g_ach').value.trim() || null,
+          eval_form: card.querySelector('#g_evf').value.trim() || null,
+          eval_sum: card.querySelector('#g_evs').value.trim() || null,
+          recommendations: card.querySelector('#g_rec').value.trim() || null,
           notes: card.querySelector('#g_notes').value.trim() || null,
         };
         const r = g.id ? await S.update('tla_goals', g.id, row) : await S.add('tla_goals', row);
@@ -343,18 +386,21 @@
         window.UI.toast('נשמר'); if (onDone) onDone(); return true;
       },
     });
-    m.el.querySelector('#g_addrole').addEventListener('click', () => {
-      const wrap = m.el.querySelector('#g_roles');
-      const lab = document.createElement('label');
-      lab.className = 'fld fld-wide';
-      lab.innerHTML = '<span><input class="inp mb0 role-name" placeholder="שם בעל התפקיד (מטפל רגשי, רב הכיתה…)"></span>' +
-        '<textarea class="inp mb0" rows="2"></textarea>';
-      wrap.appendChild(lab);
-      const nameInp = lab.querySelector('.role-name'), ta = lab.querySelector('textarea');
-      const sync = () => { const v = nameInp.value.trim(); if (v) ta.dataset.role = v; else delete ta.dataset.role; };
-      nameInp.addEventListener('input', sync);
-      nameInp.focus();
+    const el = m.el;
+    const wireDel = (sel, cls) => el.querySelectorAll(sel).forEach(b => b.addEventListener('click', () => {
+      const wrap = b.closest(cls), host = wrap.parentElement;
+      if (host.children.length > 1) wrap.remove(); else host.querySelectorAll('input,textarea').forEach(x => { x.value = ''; });
+    }));
+    const rewire = () => { wireDel('.g-goal-del', '.g-goal'); wireDel('.g-opp-del', '.g-opp'); };
+    el.querySelector('#g_addgoal').addEventListener('click', () => {
+      el.querySelector('#g_goals').insertAdjacentHTML('beforeend', goalRow(''));
+      rewire();
     });
+    el.querySelector('#g_addopp').addEventListener('click', () => {
+      el.querySelector('#g_opps').insertAdjacentHTML('beforeend', oppRow('', ''));
+      rewire();
+    });
+    rewire();
   }
 
   // ── לשונית 3: מערכת שעות אישית ──
@@ -600,21 +646,37 @@
       '<tr><th>מוקדים לחיזוק</th><th>מוקדי כח</th></tr>' +
       '<tr><td class="tall">' + esc(pr.focus || '') + '</td><td class="tall">' + esc(pr.strengths || '') + '</td></tr></table></section>';
 
+    // ── הטבלה הרשמית: יעדים | הזדמנויות עבודה (עמודה לכל איש צוות) | מעקב והערכה ──
+    // הסדר מימין לשמאל, ומתחת שורת המלצות + הערות ושינויים. זה בדיוק המבנה
+    // שבטופס של המכינה (משוב נעמי לוי, 20/08).
     goals.forEach(g => {
       const roles = (g.roles && typeof g.roles === 'object') ? g.roles : {};
       const rk = roleKeysOf(roles);
-      h += '<section class="page">' + hdr('תל"א — תכנית לימודים אישית') + meta +
+      const gl = Array.isArray(g.goals_list) ? g.goals_list.filter(x => String(x || '').trim()) : [];
+      const oppCols = rk.length || 1;
+      h += '<section class="page">' + hdr('תלי"א אינטגרטיבי — תכנית לימודים אישית') + meta +
         '<div class="band">תחום: <b>' + esc(g.domain || '') + '</b></div>' +
-        (g.baseline ? '<div class="para"><b>קו בסיס:</b> ' + esc(g.baseline) + '</div>' : '') +
-        (g.top_goal ? '<div class="para"><b>מטרת על:</b> ' + esc(g.top_goal) + '</div>' : '') +
-        '<table class="grid"><thead><tr><th>מטרה מסכמת</th><th>מטרה מבצעת</th>' +
-        (rk.length ? '<th colspan="' + rk.length + '">התנהגויות, אמצעים והתאמות</th>' : '') + '</tr>' +
-        (rk.length ? '<tr><th></th><th></th>' + rk.map(k => '<th class="sub">' + esc(k) + '</th>').join('') + '</tr>' : '') +
-        '</thead><tbody><tr><td class="tall">' + esc(g.goal_sum || '') + '</td><td class="tall">' + esc(g.goal_exec || '') + '</td>' +
-        rk.map(k => '<td class="tall">' + esc(roles[k]) + '</td>').join('') + '</tr></tbody></table>' +
-        (g.means ? '<div class="para"><b>אמצעים / יעדים:</b> ' + esc(g.means) + '</div>' : '') +
-        '<table class="grid"><tr><th style="width:50%">הישגים</th><th>הערות ושינויים משמעותיים במהלך השנה</th></tr>' +
-        '<tr><td class="tall">' + esc(g.achievements || '') + '</td><td class="tall">' + esc(g.notes || '') + '</td></tr></table>' +
+        '<div class="para"><b>קו בסיס:</b> ' + esc(g.baseline || '') + '</div>' +
+        '<div class="para"><b>מטרת על:</b> ' + esc(g.top_goal || '') + '</div>' +
+        '<table class="grid"><thead>' +
+          '<tr><th style="width:30%">יעדים</th>' +
+              '<th colspan="' + oppCols + '">הזדמנויות עבודה ואמצעים להשגתם</th>' +
+              '<th colspan="2" style="width:26%">מעקב והערכה</th></tr>' +
+          '<tr><th class="sub"></th>' +
+              (rk.length ? rk.map(k => '<th class="sub">' + esc(k) + '</th>').join('') : '<th class="sub"></th>') +
+              '<th class="sub">הערכה מעצבת</th><th class="sub">הערכה מסכמת</th></tr>' +
+        '</thead><tbody><tr>' +
+          '<td class="tall">' + (gl.length
+            ? '<ol style="margin:0;padding-inline-start:5mm">' + gl.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>'
+            : '') + '</td>' +
+          (rk.length ? rk.map(k => '<td class="tall">' + esc(roles[k]) + '</td>').join('') : '<td class="tall"></td>') +
+          '<td class="tall">' + esc(g.eval_form || '') + '</td>' +
+          '<td class="tall">' + esc(g.eval_sum || '') + '</td>' +
+        '</tr></tbody></table>' +
+        '<table class="grid" style="margin-top:3mm"><tr><th style="width:50%">המלצות</th>' +
+        '<th>הערות ושינויים משמעותיים במהלך השנה</th></tr>' +
+        '<tr><td class="tall">' + esc(g.recommendations || '') + '</td>' +
+        '<td class="tall">' + esc(g.notes || '') + '</td></tr></table>' +
         '<div class="sig">חתימת ההורים: ' + esc(plan.signed_by || '____________________') +
         (plan.signed_at ? ' &nbsp; תאריך: ' + esc(dmy(plan.signed_at)) : '') + '</div></section>';
     });
