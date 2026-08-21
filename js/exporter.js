@@ -118,19 +118,37 @@
       async rows() { return []; },
     },
     docs: {
-      label: 'תיק מסמכים — מה חסר', icon: 'bi-folder2-open',
+      // נעמי לוי ביקשה "לבדוק מה קיים בחומרים ומה לא" לפני בניית התל"אות.
+      // לכן זו מטריצה אמיתית: עמודה לכל מסמך חובה, ולא רק "יש תיקייה".
+      label: 'תיק מסמכים — מה קיים ומה חסר', icon: 'bi-folder2-open',
       cols: [
         { k: 'idx', t: '#', def: true, w: 40 },
         { k: 'name', t: 'שם התלמיד', def: true },
-        { k: 'cls', t: 'כיתה', def: true },
-        { k: 'folder', t: 'תיקייה בדרייב', def: true, w: 90 },
+        { k: 'cls', t: 'כיתה', def: true, w: 70 },
+        { k: 'vitur', t: 'ויתור סודיות', def: true, w: 70 },
+        { k: 'shaalon', t: 'שאלון הפניה', def: true, w: 70 },
+        { k: 'ivhun', t: 'אבחונים', def: true, w: 60 },
+        { k: 'kavil', t: 'מסמך קביל', def: true, w: 65 },
+        { k: 'vaada', t: 'החלטת ועדה', def: true, w: 70 },
+        { k: 'total', t: 'סה״כ בתיק', def: false, w: 60 },
+        { k: 'missing', t: 'חסר', def: true },
       ],
       async rows(ctx) {
         const all = await window.store.list('student_docs');
-        return ctx.students.map(s => ({
-          name: nm(s), cls: ctx.clsName(s.class_id),
-          folder: all.some(d => d.student_id === s.id && d.source === 'drive') ? 'קיימת' : '— חסרה —', _s: s,
-        }));
+        const NEED = [['vitur', 'ויתור סודיות'], ['shaalon', 'שאלון הפניה'],
+          ['ivhun', 'אבחונים ורקע קודם'], ['kavil', 'מסמך קביל'], ['vaada', 'החלטת ועדה']];
+        return ctx.students.map(s => {
+          const mine = all.filter(d => d.student_id === s.id);
+          const r = { name: nm(s), cls: ctx.clsName(s.class_id), total: mine.length, _s: s };
+          const miss = [];
+          NEED.forEach(([k, kind]) => {
+            const has = mine.some(d => String(d.kind || '') === kind);
+            r[k] = has ? '✔' : '✗';
+            if (!has) miss.push(kind);
+          });
+          r.missing = miss.length ? miss.join(', ') : '— תיק מלא —';
+          return r;
+        });
       },
     },
   };
