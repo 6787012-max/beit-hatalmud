@@ -327,5 +327,24 @@
     load();
   }
 
-  window.cv3StudentDocs = { forStudent, cardSection, openManager, KINDS, classify };
+  // ── סריקת תיק לצורך דוחות ──────────────────────────────────────────────
+  // רשומות student_docs מחזיקות רק את *התיקיות*, לא את הקבצים. לכן דוח
+  // "מה קיים ומה חסר" חייב לשאול את הדרייב עצמו. מסננים את הזבל, מסווגים
+  // לפי שם, ומחזירים אילו מסמכי חובה נמצאו. תוצאה נשמרת לזיכרון הדף.
+  const _scan = {};
+  async function scanStudent(sid) {
+    if (_scan[sid]) return _scan[sid];
+    try {
+      const d = await callJson('list', { studentId: sid });
+      const files = (d.files || []).filter(f => f.mimeType !== FOLDER_MIME && !isJunk(f));
+      const kinds = {};
+      files.forEach(f => { kinds[classify(f.name)] = (kinds[classify(f.name)] || 0) + 1; });
+      _scan[sid] = { ok: true, total: files.length, kinds: kinds };
+    } catch (e) {
+      _scan[sid] = { ok: false, total: 0, kinds: {}, error: e.message || String(e) };
+    }
+    return _scan[sid];
+  }
+
+  window.cv3StudentDocs = { forStudent, cardSection, openManager, KINDS, classify, NEED, scanStudent };
 })();

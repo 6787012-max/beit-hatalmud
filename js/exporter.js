@@ -134,19 +134,33 @@
         { k: 'missing', t: 'חסר', def: true },
       ],
       async rows(ctx) {
-        const all = await window.store.list('student_docs');
         const NEED = [['vitur', 'ויתור סודיות'], ['shaalon', 'שאלון הפניה'],
           ['ivhun', 'אבחונים ורקע קודם'], ['kavil', 'מסמך קביל'], ['vaada', 'החלטת ועדה']];
+        const D = window.cv3StudentDocs;
+        const links = await window.store.list('student_docs');
+        // סורקים את הדרייב עצמו — התיקים לא מאונדקסים במסד, רק התיקיות.
+        // שישה במקביל: מספיק מהר, בלי להציף את ה-Edge Function.
+        const scans = {};
+        const list = ctx.students.slice();
+        await Promise.all(Array.from({ length: 6 }, async () => {
+          while (list.length) {
+            const s = list.shift();
+            scans[s.id] = D ? await D.scanStudent(s.id) : { ok: false, total: 0, kinds: {} };
+          }
+        }));
         return ctx.students.map(s => {
-          const mine = all.filter(d => d.student_id === s.id);
-          const r = { name: nm(s), cls: ctx.clsName(s.class_id), total: mine.length, _s: s };
+          const sc = scans[s.id] || { ok: false, total: 0, kinds: {} };
+          const hasFolder = links.some(d => d.student_id === s.id && d.source === 'drive');
+          const r = { name: nm(s), cls: ctx.clsName(s.class_id), total: sc.total, _s: s };
           const miss = [];
           NEED.forEach(([k, kind]) => {
-            const has = mine.some(d => String(d.kind || '') === kind);
+            const has = (sc.kinds[kind] || 0) > 0;
             r[k] = has ? '✔' : '✗';
             if (!has) miss.push(kind);
           });
-          r.missing = miss.length ? miss.join(', ') : '— תיק מלא —';
+          r.missing = !hasFolder ? '— אין תיקייה בדרייב —'
+            : (!sc.ok ? 'לא ניתן לקרוא את התיק'
+            : (miss.length ? miss.join(', ') : '— תיק מלא —'));
           return r;
         });
       },
