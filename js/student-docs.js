@@ -26,6 +26,12 @@
   ];
   const KINDS = KIND_RULES.map(r => r[0]).concat(['אחר']);
   const NEED = KIND_RULES.slice(0, 4).map(r => r[0]);   // ארבעת המסמכים שהאפיון דורש
+  // כמה מתיקיות התלמידים בדרייב הן למעשה מזבלה: קבצי עזר של וורד (~$),
+  // חומרי הוראה כלליים וסריקות בשם מכונה — עד 200 קבצים אצל תלמיד אחד,
+  // שמטביעים את המסמכים האמיתיים. מסתירים אותם כברירת מחדל, עם מתג להצגה.
+  const JUNK = /^~\$|פורים מהגמרא|האותיות שבסוגריים|דף מידע להורים|getUserFile|^SKM_|^IMG[-_]?\d|^Doc \w+ \d|^Scan|^\d{6,}\./i;
+  const isJunk = f => JUNK.test(String(f && f.name || ''));
+
   function classify(name) {
     const n = String(name || '');
     for (const [kind, re] of KIND_RULES) if (re.test(n)) return kind;
@@ -116,9 +122,11 @@
           '<button class="btn-primary sm" id="sdPick"><i class="bi bi-upload"></i> העלאה לדרייב</button>' +
         '</div>' +
         '<div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn-ghost sm" id="sdMkdir"><i class="bi bi-folder-plus"></i> תיקייה חדשה</button>' +
-          '<button class="btn-ghost sm" id="sdReload"><i class="bi bi-arrow-clockwise"></i> רענון</button></div>' +
+          '<button class="btn-ghost sm" id="sdReload"><i class="bi bi-arrow-clockwise"></i> רענון</button>' +
+          '<label class="cb" style="margin-inline-start:auto"><input type="checkbox" id="sdAll"> הצג גם קבצים כלליים</label></div>' +
         '<input type="file" id="sdFile" multiple style="display:none">' +
         '<div id="sdMsg" class="tl-note" style="min-height:1.1em;font-size:.82rem"></div>' +
+        '<div id="sdJunkNote" class="tl-note" style="font-size:.78rem;color:#92400e"></div>' +
         '<div id="sdList"><div class="ld"><i class="bi bi-hourglass-split"></i> טוען מהדרייב…</div></div>' +
       '</div>';
 
@@ -126,7 +134,7 @@
     m.el.classList.add('modal-wide');
     const el = m.el;
     const msg = t => { const e = el.querySelector('#sdMsg'); if (e) e.innerHTML = t || ''; };
-    let files = [], folders = [];
+    let files = [], folders = [], hiddenJunk = 0;
 
     const folderTitle = id => {
       const r = folderRows.find(x => x.drive_id === id);
@@ -138,7 +146,10 @@
     async function load() {
       try {
         const d = await callJson('list', idArg());
-        files = (d.files || []).filter(f => f.mimeType !== FOLDER_MIME);
+        const showAll = !!(el.querySelector('#sdAll') && el.querySelector('#sdAll').checked);
+        const raw = (d.files || []).filter(f => f.mimeType !== FOLDER_MIME);
+        hiddenJunk = raw.filter(isJunk).length;
+        files = showAll ? raw : raw.filter(f => !isJunk(f));
         folders = d.folders || [];
         const subs = (d.files || []).filter(f => f.mimeType === FOLDER_MIME);
         // בורר יעד ההעלאה: התיקיות הראשיות + תיקיות המשנה שנוצרו בתוכן
@@ -158,6 +169,8 @@
           (has ? '✓ ' : '✗ ') + esc(k) + '</span>';
       }).join('');
 
+      const jn = el.querySelector('#sdJunkNote');
+      if (jn) jn.textContent = hiddenJunk ? ('הוסתרו ' + hiddenJunk + ' קבצים כלליים שאינם שייכים לתלמיד') : '';
       if (!files.length && !(subs || []).length) {
         el.querySelector('#sdList').innerHTML = '<div class="empty-state"><i class="bi bi-folder2-open"></i><div>אין קבצים בתיקיות הדרייב של התלמיד</div></div>';
         return;
@@ -305,6 +318,7 @@
       } catch (e) { msg('<span style="color:#b91c1c">' + esc(e.message || e) + '</span>'); }
     });
     el.querySelector('#sdReload').addEventListener('click', () => { msg(''); load(); });
+    el.querySelector('#sdAll').addEventListener('change', () => { msg(''); load(); });
 
     load();
   }
