@@ -44,6 +44,15 @@
     return _staffCache;
   }
   const goalsArr = g => Array.isArray(g && g.goals_list) ? g.goals_list.filter(x => String(x || '').trim()) : [];
+  // סדר עמודות הצוות נשמר במערך `opps` — ב-jsonb סדר מפתחות של אובייקט אובד,
+  // ולכן `roles` הישן משמש רק כנפילה אחורה לרשומות שטרם הוגרו.
+  function oppsArr(g) {
+    if (Array.isArray(g && g.opps) && g.opps.length) {
+      return g.opps.filter(o => o && String(o.who || '').trim()).map(o => ({ who: String(o.who).trim(), what: String(o.what || '').trim() }));
+    }
+    const r = (g && g.roles && typeof g.roles === 'object') ? g.roles : {};
+    return roleKeysOf(r).map(k => ({ who: k, what: r[k] }));
+  }
   const STATUSES = ['טיוטה', 'פעילה', 'הסתיימה'];
 
   // Intl מחזיר את השנה העברית כמספר (5786) — ממירים לגימטריה (תשפ"ו)
@@ -295,9 +304,8 @@
     return first.concat(keys.filter(k => DEFAULT_ROLES.indexOf(k) === -1));
   }
   function goalCard(g) {
-    const roles = (g.roles && typeof g.roles === 'object') ? g.roles : {};
-    const roleRows = roleKeysOf(roles).map(k =>
-      '<div class="det-row"><span class="det-lbl">' + esc(k) + '</span><span class="det-val">' + esc(roles[k]) + '</span></div>').join('');
+    const roleRows = oppsArr(g).map(o =>
+      '<div class="det-row"><span class="det-lbl">' + esc(o.who) + '</span><span class="det-val">' + esc(o.what) + '</span></div>').join('');
     const line = (lbl, v) => v ? '<div class="det-row"><span class="det-lbl">' + esc(lbl) + '</span><span class="det-val">' + esc(v) + '</span></div>' : '';
     const gl = goalsArr(g);
     return '<div class="qr-card tla-goal"><h3><i class="bi bi-bullseye"></i> ' + esc(g.domain || 'תחום') +
@@ -317,7 +325,7 @@
   // צוות נבחר → מעקב והערכה (מעצבת/מסכמת) → המלצות והערות.
   async function editGoal(plan, g, onDone) {
     g = g || {};
-    const roles = (g.roles && typeof g.roles === 'object') ? g.roles : {};
+    const op = oppsArr(g);
     const staff = await staffNames();
     const staffOpts = staff.map(x => '<option value="' + esc(x.name) + '">' +
       (x.role_label ? ' — ' + esc(x.role_label) : '') + '</option>').join('');
@@ -347,7 +355,7 @@
       '<button class="btn-ghost sm" id="g_addgoal" type="button"><i class="bi bi-plus-lg"></i> יעד נוסף</button>' +
       '<h4 class="tla-sub">הזדמנויות עבודה ואמצעים להשגתם</h4>' +
       '<p class="login-hint" style="margin:0 0 6px">כל שורה = איש צוות שותף ביישום, ומה שהוא עושה. אפשר לבחור מהרשימה או לכתוב חופשי.</p>' +
-      '<div id="g_opps">' + (Object.keys(roles).length ? Object.keys(roles).map(k => oppRow(k, roles[k])).join('') : oppRow('', '')) + '</div>' +
+      '<div id="g_opps">' + (op.length ? op.map(o => oppRow(o.who, o.what)).join('') : oppRow('', '')) + '</div>' +
       '<button class="btn-ghost sm" id="g_addopp" type="button"><i class="bi bi-plus-lg"></i> איש צוות נוסף</button>' +
       '<h4 class="tla-sub">מעקב והערכה</h4><div class="form-grid">' +
         ta('g_evf', 'הערכה מעצבת', g.eval_form, 'הערכה במהלך השנה') +
@@ -362,11 +370,11 @@
       title: g.id ? 'עריכת תחום' : 'תחום חדש', bodyHTML: body, saveLabel: 'שמירה',
       onSave: async (card) => {
         const list = [...card.querySelectorAll('.g-goal-t')].map(t => t.value.trim()).filter(Boolean);
-        const rl = {};
+        const opps = [];
         card.querySelectorAll('.g-opp').forEach(row => {
           const who = row.querySelector('.g-opp-who').value.trim();
           const what = row.querySelector('.g-opp-what').value.trim();
-          if (who && what) rl[who] = what;
+          if (who) opps.push({ who: who, what: what });
         });
         const row = {
           plan_id: plan.id,
@@ -375,7 +383,7 @@
           baseline: card.querySelector('#g_base').value.trim() || null,
           top_goal: card.querySelector('#g_top').value.trim() || null,
           goals_list: list,
-          roles: rl,
+          opps: opps,
           eval_form: card.querySelector('#g_evf').value.trim() || null,
           eval_sum: card.querySelector('#g_evs').value.trim() || null,
           recommendations: card.querySelector('#g_rec').value.trim() || null,
@@ -650,26 +658,25 @@
     // הסדר מימין לשמאל, ומתחת שורת המלצות + הערות ושינויים. זה בדיוק המבנה
     // שבטופס של המכינה (משוב נעמי לוי, 20/08).
     goals.forEach(g => {
-      const roles = (g.roles && typeof g.roles === 'object') ? g.roles : {};
-      const rk = roleKeysOf(roles);
-      const gl = Array.isArray(g.goals_list) ? g.goals_list.filter(x => String(x || '').trim()) : [];
-      const oppCols = rk.length || 1;
+      const op = oppsArr(g);
+      const gl = goalsArr(g);
+      const oppCols = op.length || 1;
       h += '<section class="page">' + hdr('תלי"א אינטגרטיבי — תכנית לימודים אישית') + meta +
         '<div class="band">תחום: <b>' + esc(g.domain || '') + '</b></div>' +
         '<div class="para"><b>קו בסיס:</b> ' + esc(g.baseline || '') + '</div>' +
         '<div class="para"><b>מטרת על:</b> ' + esc(g.top_goal || '') + '</div>' +
         '<table class="grid"><thead>' +
-          '<tr><th style="width:30%">יעדים</th>' +
+          '<tr><th rowspan="2" style="width:30%">יעדים</th>' +
               '<th colspan="' + oppCols + '">הזדמנויות עבודה ואמצעים להשגתם</th>' +
               '<th colspan="2" style="width:26%">מעקב והערכה</th></tr>' +
-          '<tr><th class="sub"></th>' +
-              (rk.length ? rk.map(k => '<th class="sub">' + esc(k) + '</th>').join('') : '<th class="sub"></th>') +
+          '<tr>' +
+              (op.length ? op.map(o => '<th class="sub">' + esc(o.who) + '</th>').join('') : '<th class="sub"></th>') +
               '<th class="sub">הערכה מעצבת</th><th class="sub">הערכה מסכמת</th></tr>' +
         '</thead><tbody><tr>' +
           '<td class="tall">' + (gl.length
             ? '<ol style="margin:0;padding-inline-start:5mm">' + gl.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>'
             : '') + '</td>' +
-          (rk.length ? rk.map(k => '<td class="tall">' + esc(roles[k]) + '</td>').join('') : '<td class="tall"></td>') +
+          (op.length ? op.map(o => '<td class="tall">' + esc(o.what) + '</td>').join('') : '<td class="tall"></td>') +
           '<td class="tall">' + esc(g.eval_form || '') + '</td>' +
           '<td class="tall">' + esc(g.eval_sum || '') + '</td>' +
         '</tr></tbody></table>' +
