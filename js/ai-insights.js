@@ -17,8 +17,8 @@
   const MODEL = 'gemini-2.5-flash';
   const API = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
   const nm = s => (window.UI && window.UI.fullName) ? window.UI.fullName(s) : (s && s.name) || '';
-  // ארבעת המסמכים שהאפיון (ונעמי) מחייבים בכל תיק — אותה רשימה כמו ב-student-docs.js
-  const NEED = ['ויתור סודיות', 'שאלון הפניה', 'אבחונים ורקע קודם', 'מסמך קביל'];
+  // מסמכי החובה בכל תיק (אפיון + החלטת ועדה שנעמי הוסיפה) — זהה ל-student-docs.js
+  const NEED = ['ויתור סודיות', 'שאלון הפניה', 'אבחונים ורקע קודם', 'מסמך קביל', 'החלטת ועדה'];
 
   function key() {
     try { if (typeof window.geminiKey === 'function') return window.geminiKey(); } catch (_) {}
