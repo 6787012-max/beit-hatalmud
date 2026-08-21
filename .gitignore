@@ -16,3 +16,7 @@ _qa_*
 node_modules/
 _shots/
 *.pdf
+
+# מיילים יוצאים — מכילים שמות תלמידים, לא לריפו
+_send_*.py
+package-lock.json

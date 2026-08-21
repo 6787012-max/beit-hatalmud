@@ -53,10 +53,14 @@
   }
 
   const SYS = [
-    'אתה עוזר עזרה ראשונית למערכת הניהול של מכינת בית התלמוד.',
+    'אתה העוזר החכם של מערכת הניהול של מכינת בית התלמוד.',
     'ענה בעברית פשוטה וברורה בלבד. אסור אנגלית ואסור מונחים טכניים.',
-    'ענה רק על סמך המידע על המערכת שמופיע למטה.',
-    'אם השאלה אינה קשורה למערכת, או שאין במידע תשובה — אמור בפשטות שאינך בטוח, והצע לפנות למנהל.',
+    'אתה עונה על שני סוגי שאלות: (א) איך משתמשים במערכת; (ב) שאלות על הנתונים עצמם.',
+    'לשאלות על נתונים — השתמש אך ורק בטבלת הנתונים שתקבל בהמשך. היא כבר מסוננת',
+    'לפי ההרשאות של המשתמש המחובר, ולכן כל מה שאין בה — פשוט אין לך גישה אליו.',
+    'כשמבקשים רשימה או השוואה — החזר טבלת markdown (| עמודה | עמודה |).',
+    'אל תמציא מספרים ואל תשלים נתונים חסרים. אם חסר מידע — אמור זאת במשפט אחד.',
+    'אל תיתן אבחון או חוות דעת רפואית. כתוב ענייני ומכבד.',
     'תשובות קצרות וממוקדות. כשמסבירים פעולה — תן שלבים קצרים לפי הסדר.',
     '', 'המידע על המערכת:', '', knowledgeBase(),
   ].join('\n');
@@ -66,13 +70,20 @@
   async function ask(question) {
     const k = key();
     if (!k) throw new Error('אין מפתח זמין לעוזר החכם.');
+    // הקשר הנתונים נבנה בדפדפן דרך ה-store, כלומר עובר את ה-RLS של המשתמש:
+    // מורה מקבל רק את הכיתות שלו, מנהל מקבל הכל. אין כאן דרך לעקוף הרשאה.
+    let dataCtx = '';
+    try { if (window.cv3AI) dataCtx = await window.cv3AI.dataContext(); } catch (_) {}
+    const sys = dataCtx
+      ? SYS + '\n\n── נתוני המערכת שהמשתמש הזה רשאי לראות ──\n' + dataCtx
+      : SYS;
     const contents = [];
     history.slice(-8).forEach(m => contents.push({ role: m.role, parts: [{ text: m.text }] }));
     contents.push({ role: 'user', parts: [{ text: question }] });
     const body = {
-      systemInstruction: { parts: [{ text: SYS }] },
+      systemInstruction: { parts: [{ text: sys }] },
       contents,
-      generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1200 },
     };
     const r = await fetch(URL + '?key=' + encodeURIComponent(k),
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -88,20 +99,25 @@
 
   // ── ממשק צ'אט ─────────────────────────────────────────────────────────
   function bubble(who, text, cls) {
+    // תשובת המודל עשויה להכיל טבלת markdown — מרנדרים אותה דרך cv3AI.md
+    const body = (cls === 'bot' && window.cv3AI && /\|/.test(text))
+      ? window.cv3AI.md(text)
+      : esc(text).replace(/\n/g, '<br>');
     return '<div class="aih-msg ' + cls + '">' +
       '<div class="aih-who">' + who + '</div>' +
-      '<div class="aih-txt">' + esc(text).replace(/\n/g, '<br>') + '</div></div>';
+      '<div class="aih-txt">' + body + '</div></div>';
   }
 
   function open() {
     const bodyHTML =
       '<div id="aihLog" class="aih-log">' +
-        bubble('העוזר', 'שלום! אני העוזר החכם של המערכת. אפשר לשאול אותי איך עושים דברים במערכת — למשל "איך רושמים נוכחות?" או "מי יכול לראות מידע רפואי?"', 'bot') +
+        bubble('העוזר', 'שלום! אני העוזר החכם. אפשר לשאול איך עושים דברים במערכת, וגם על הנתונים עצמם — למשל "מי חסר לו ויתור סודיות?", "טבלה של אחוזי הגעה לפי כיתה" או "אילו תלמידים עם הכי הרבה חיסורים". אני עונה רק על מה שמותר לך לראות.', 'bot') +
       '</div>' +
       '<div class="aih-input"><input id="aihQ" type="text" placeholder="כתבו כאן שאלה על המערכת…" autocomplete="off">' +
       '<button id="aihSend" class="btn-primary sm">שליחה</button></div>' +
       '<div class="aih-hint">עזרה ראשונית בלבד — למקרים מורכבים פנו למנהל.</div>';
     const m = window.UI.modal({ title: 'עוזר חכם — בית התלמוד', bodyHTML });
+    m.el.classList.add('modal-wide');
     const log = m.el.querySelector('#aihLog');
     const inp = m.el.querySelector('#aihQ');
     const btn = m.el.querySelector('#aihSend');
@@ -146,6 +162,11 @@
       '.aih-msg.me{align-self:flex-start;background:var(--primary,#2563eb);color:#fff;border-bottom-inline-start-radius:4px}' +
       '.aih-msg.bot{align-self:flex-end;background:var(--accent-soft,#f1f0fb);border-bottom-inline-end-radius:4px}' +
       '.aih-who{font-size:.72rem;opacity:.7;margin-bottom:2px}' +
+      // תשובה שמכילה טבלה צריכה את כל רוחב החלון, אחרת העמודות נמעכות
+      '.aih-msg.bot:has(table){max-width:100%;align-self:stretch}' +
+      '.aih-msg .table-wrap{overflow-x:auto;margin:6px 0}' +
+      '.aih-msg table.tbl{font-size:.82rem;width:100%}' +
+      '.aih-msg table.tbl th,.aih-msg table.tbl td{padding:4px 8px;white-space:nowrap}' +
       '.aih-input{display:flex;gap:8px;margin-top:6px}' +
       '.aih-input input{flex:1;padding:9px 12px;border:1px solid var(--border,#d1d5db);border-radius:10px;font:inherit}' +
       '.aih-hint{font-size:.75rem;color:var(--muted,#6b7280);margin-top:8px;text-align:center}';

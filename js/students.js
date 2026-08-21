@@ -211,6 +211,8 @@
         (window.cv3ReadAssess ? window.cv3ReadAssess.cardSection(raCats, raAssess) : '') +
         (window.cv3Tla ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
         (window.cv3StudentDocs ? window.cv3StudentDocs.cardSection(sdocs) : '') +
+        '<div class="det-sec"><h4><i class="bi bi-stars"></i> סיכום AI</h4>'
+          + '<div id="aiStuSum"></div></div>' +
         attSec + frmSec + vSec +
         sec('שכר לימוד', 'bi-cash-coin', tui, t => li((esc(t.month) || '') + (t.amount ? ' · ₪' + esc(t.amount) : ''), t.status === 'paid' ? 'שולם' : 'חוב', t.status === 'paid' ? 'lo' : 'hi')) +
         tasksSec +
@@ -242,6 +244,8 @@
       const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
       const ctb = m.el.querySelector('[data-cert]'); if (ctb && window.cv3Cert) ctb.addEventListener('click', () => window.cv3Cert.openCertificate(s));
       const tlb = m.el.querySelector('[data-tla]'); if (tlb && window.cv3Tla) tlb.addEventListener('click', () => { m.close(); window.cv3Tla.openForStudent(s); });
+      // סיכום AI נטען אחרי שהכרטיס כבר על המסך, כדי לא לעכב את הפתיחה
+      if (window.cv3AI) setTimeout(() => window.cv3AI.renderStudent(m.el.querySelector('#aiStuSum'), s), 60);
       const dcb = m.el.querySelector('[data-docs]');
       if (dcb && window.cv3StudentDocs) dcb.addEventListener('click', () => { m.close(); window.cv3StudentDocs.openManager(s, () => {}); });
 

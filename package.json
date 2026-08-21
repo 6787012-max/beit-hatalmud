@@ -5,5 +5,8 @@
   "private": true,
   "scripts": {
     "serve": "python -m http.server 8090 --bind 127.0.0.1"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1"
   }
 }

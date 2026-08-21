@@ -106,11 +106,17 @@
   }
   async function renderHomeReports() {
     const box = $('#homeReports'); if (!box || !window.store) return;
-    box.innerHTML = '<div class="qr-card home-report-banner"><div class="hrb-head">' +
+    box.innerHTML =
+      // סיכום AI על המוסד — לפי ההרשאות של המשתמש (הנתונים נאספים בשמו, דרך RLS)
+      '<div class="qr-card"><div class="hrb-head"><h3 style="margin:0">' +
+        '<i class="bi bi-stars"></i> תמונת מצב — ניתוח AI</h3></div>' +
+        '<div id="homeAiSum"></div></div>' +
+      '<div class="qr-card home-report-banner"><div class="hrb-head">' +
       '<h3 style="margin:0"><i class="bi bi-clipboard-check"></i> דיווחים אחרונים</h3>' +
       '<button class="btn-primary sm" id="homeNewReport"><i class="bi bi-plus-lg"></i> דיווח חדש</button></div>' +
       '<div id="homeReportList"><div class="empty-state" style="padding:12px">טוען…</div></div>' +
       '<div style="text-align:center;margin-top:8px"><a href="#behavior" class="btn-ghost sm" id="homeAllReports">כל הדיווחים ←</a></div></div>';
+    if (window.cv3AI) setTimeout(() => window.cv3AI.renderOrg($('#homeAiSum')), 80);
     const nb = $('#homeNewReport'); if (nb) nb.addEventListener('click', () => showPage('behavior'));
     const al = $('#homeAllReports'); if (al) al.addEventListener('click', (e) => { e.preventDefault(); showPage('behavior'); });
     try {
