@@ -183,7 +183,24 @@
       (subs || []).forEach(f => { (byFolder[f.folderId] = byFolder[f.folderId] || { subs: [], files: [] }).subs.push(f); });
       files.forEach(f => { (byFolder[f.folderId] = byFolder[f.folderId] || { subs: [], files: [] }).files.push(f); });
 
-      el.querySelector('#sdList').innerHTML = Object.keys(byFolder).map(fid => {
+      // סדר קבוע: בתוך כל תיקייה — לפי סדר הקטגוריות (ויתור סודיות ראשון,
+      // "אחר" אחרון) ואז לפי שם. תיקיות ממוספרות ("1. ויתור סודיות") ממוינות
+      // לפי המספר, כך שהמבנה החדש בדרייב מוצג בדיוק בסדר שבו בנו אותו.
+      const catOrder = k => { const i = KINDS.indexOf(k); return i < 0 ? 98 : i; };
+      const numOf = t => { const m = /^(\d+)\s*\./.exec(String(t || '')); return m ? +m[1] : 999; };
+      Object.keys(byFolder).forEach(fid => {
+        byFolder[fid].files.sort((a, b) =>
+          (catOrder(classify(a.name)) - catOrder(classify(b.name))) ||
+          String(a.name).localeCompare(String(b.name), 'he'));
+        byFolder[fid].subs.sort((a, b) =>
+          (numOf(a.name) - numOf(b.name)) || String(a.name).localeCompare(String(b.name), 'he'));
+      });
+      const order = Object.keys(byFolder).sort((a, b) => {
+        const ta = folderTitle(a), tb = folderTitle(b);
+        return (numOf(ta) - numOf(tb)) || String(ta).localeCompare(String(tb), 'he');
+      });
+
+      el.querySelector('#sdList').innerHTML = order.map(fid => {
         const g = byFolder[fid];
         const subRows = g.subs.map(f =>
           '<div class="tl-item"><i class="bi bi-folder" style="color:var(--muted)"></i>' +
