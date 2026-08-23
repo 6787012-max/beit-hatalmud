@@ -54,16 +54,75 @@
     function drawIn() {
       page.querySelector('#inBody').innerHTML = income.slice().reverse().map(r =>
         '<tr><td>' + esc(r.date || '') + '</td><td>' + esc(r.source || '') + '</td><td>' + ILS(r.amount) + '</td><td>' + esc(r.method || '') + '</td><td>' + esc(r.note || '') + '</td>' +
-        '<td class="row-act"><button class="mini danger" data-delin="' + r.id + '"><i class="bi bi-trash"></i></button></td></tr>').join('') ||
+        '<td class="row-act"><button class="mini" data-editin="' + r.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+        '<button class="mini danger" data-delin="' + r.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></td></tr>').join('') ||
         '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">אין הכנסות נוספות</td></tr>';
       page.querySelectorAll('[data-delin]').forEach(b => b.addEventListener('click', async () => { await window.store.remove('income', Number(b.dataset.delin)); const i = income.findIndex(x => x.id == b.dataset.delin); if (i >= 0) income.splice(i, 1); render(page); }));
+      page.querySelectorAll('[data-editin]').forEach(b => b.addEventListener('click', () => {
+        const r = income.find(x => x.id == b.dataset.editin); if (r) editRow('income', r, IN_FIELDS, 'עריכת הכנסה');
+      }));
     }
     function drawEx() {
       page.querySelector('#exBody').innerHTML = expenses.slice().reverse().map(r =>
         '<tr><td>' + esc(r.date || '') + '</td><td>' + esc(r.name || '') + '</td><td>' + esc(r.tz || '') + '</td><td>' + esc(r.kind || '') + '</td><td>' + esc(r.method || '') + '</td><td>' + esc(r.payslip || '') + '</td><td>' + ILS(r.amount) + '</td><td>' + esc(r.note || '') + '</td>' +
-        '<td class="row-act"><button class="mini danger" data-delex="' + r.id + '"><i class="bi bi-trash"></i></button></td></tr>').join('') ||
+        '<td class="row-act"><button class="mini" data-editex="' + r.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+        '<button class="mini danger" data-delex="' + r.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></td></tr>').join('') ||
         '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px">אין הוצאות</td></tr>';
       page.querySelectorAll('[data-delex]').forEach(b => b.addEventListener('click', async () => { await window.store.remove('expenses', Number(b.dataset.delex)); const i = expenses.findIndex(x => x.id == b.dataset.delex); if (i >= 0) expenses.splice(i, 1); render(page); }));
+      page.querySelectorAll('[data-editex]').forEach(b => b.addEventListener('click', () => {
+        const r = expenses.find(x => x.id == b.dataset.editex); if (r) editRow('expenses', r, EX_FIELDS, 'עריכת הוצאה');
+      }));
+    }
+
+    // ── עריכת שורה קיימת ──────────────────────────────────────────────────
+    // רישום כספי לא אמור להיות "מחק וכתוב מחדש": טעות בסכום או בתאריך צריכה
+    // להיות ניתנת לתיקון במקום, עם שמירה אמיתית למסד ורענון היתרה.
+    const IN_FIELDS = [
+      { k: 'date', t: 'תאריך', type: 'date' },
+      { k: 'source', t: 'מקור' },
+      { k: 'amount', t: 'סכום ₪', type: 'number' },
+      { k: 'method', t: 'אמצעי', opts: METHODS },
+      { k: 'note', t: 'הערה', wide: true },
+    ];
+    const EX_FIELDS = [
+      { k: 'date', t: 'תאריך', type: 'date' },
+      { k: 'name', t: 'שם' },
+      { k: 'tz', t: 'ת״ז' },
+      { k: 'kind', t: 'סוג', opts: ['עובד', 'כללית'] },
+      { k: 'method', t: 'אמצעי', opts: METHODS },
+      { k: 'payslip', t: 'תלוש', opts: ['ללא תלוש', 'עם תלוש'] },
+      { k: 'amount', t: 'סכום ₪', type: 'number' },
+      { k: 'note', t: 'הערה', wide: true },
+    ];
+    function editRow(table, rec, fields, title) {
+      const fld = f => {
+        const v = rec[f.k] == null ? '' : String(rec[f.k]);
+        const input = f.opts
+          ? '<select class="inp mb0" data-c="' + f.k + '"><option value=""></option>' +
+            f.opts.map(o => '<option' + (v === o ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>'
+          : '<input class="inp mb0" data-c="' + f.k + '"' + (f.type ? ' type="' + f.type + '"' : '') +
+            ' value="' + esc(f.type === 'date' ? v.slice(0, 10) : v) + '">';
+        return '<label class="fld' + (f.wide ? ' fld-wide' : '') + '"><span>' + esc(f.t) + '</span>' + input + '</label>';
+      };
+      window.UI.modal({
+        title: title, saveLabel: 'שמירה',
+        bodyHTML: '<div class="form-grid">' + fields.map(fld).join('') + '</div>',
+        onSave: async (mel) => {
+          const row = {};
+          fields.forEach(f => {
+            const el = mel.querySelector('[data-c="' + f.k + '"]');
+            const v = (el.value || '').trim();
+            row[f.k] = f.type === 'number' ? (v === '' ? null : Number(v)) : (v || null);
+          });
+          if (row.amount == null) { window.UI.toast('חובה להזין סכום', 'err'); return false; }
+          const r = await window.store.update(table, rec.id, row);
+          if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
+          Object.assign(rec, row);
+          render(page);                 // מרענן גם את היתרה ואת הכרטיסים למעלה
+          window.UI.toast('עודכן');
+          return true;
+        },
+      });
     }
     page.querySelector('#inSave').addEventListener('click', async () => {
       const amt = page.querySelector('#inAmt').value; const src = page.querySelector('#inSrc').value.trim();

@@ -15,6 +15,7 @@
   }
   async function add(table, row) { const r = await window.store.add(table, row); return { ok: r.ok, data: r.data }; }
   async function del(table, id) { return window.store.remove(table, id); }
+  async function upd(table, id, row) { return window.store.update(table, id, row); }
 
   // ----- מחולל דף רשומות גנרי -----
   function makeRecord(cfg) {
@@ -46,7 +47,8 @@
         page.querySelector('#recList-' + uid).innerHTML = data.slice().reverse().map(x =>
           '<div class="tl-item"><span class="sev-dot mid"></span><div class="tl-main"><strong>' + esc(nameOf(x.student_id)) + '</strong> · ' +
           cfg.fields.map(f => esc(x[f.k])).filter(Boolean).join(' · ') + '</div><div class="tl-meta">' + esc(x[cfg.dateField || 'date'] || x.date || x.event_date || '') + '</div>' +
-          '<button class="mini danger" data-del="' + x.id + '"><i class="bi bi-trash"></i></button></div>').join('');
+          '<button class="mini" data-edit="' + x.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+          '<button class="mini danger" data-del="' + x.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></div>').join('');
         page.querySelector('#recEmpty-' + uid).hidden = data.length > 0;
         page.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
           const ok = await window.UI.confirm('למחוק?'); if (!ok) return;
@@ -54,6 +56,40 @@
           if (!dr || dr.ok === false) { window.UI.toast('המחיקה נכשלה', 'err'); return; }
           data = data.filter(x => x.id != b.dataset.del); draw(); window.UI.toast('נמחק');
         }));
+        page.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+          const rec = data.find(x => x.id == b.dataset.edit); if (rec) editRec(rec);
+        }));
+      }
+
+      // עריכה גנרית: הטופס נבנה מאותו cfg.fields שממנו נבנה טופס ההוספה,
+      // ולכן כל המודולים שנשענים על makeRecord (מבחנים, תפקוד, שיחות,
+      // אסיפות, רפואי, קריאה, כתיבה) מקבלים עריכה בבת אחת.
+      function editRec(rec) {
+        const dk = cfg.dateField === null ? null : (cfg.dateField || 'date');
+        const stuOpts = studs.map(x => '<option value="' + x.id + '"' + (x.id == rec.student_id ? ' selected' : '') + '>' +
+          esc(window.UI.fullName ? window.UI.fullName(x) : x.name) + '</option>').join('');
+        window.UI.modal({
+          title: 'עריכת רישום — ' + cfg.title, saveLabel: 'שמירה',
+          bodyHTML: '<div class="form-grid">' +
+            '<label class="fld"><span>תלמיד</span><select class="inp mb0" id="er_stu">' + stuOpts + '</select></label>' +
+            (dk ? '<label class="fld"><span>תאריך</span><input class="inp mb0" id="er_date" type="date" value="' +
+                  esc(String(rec[dk] || '').slice(0, 10)) + '"></label>' : '') +
+            cfg.fields.map(f => '<label class="fld' + (f.wide ? ' fld-wide' : '') + '"><span>' + esc(f.label) + '</span>' +
+              '<input class="inp mb0" data-e="' + f.k + '"' + (f.type === 'number' ? ' type="number"' : '') +
+              ' value="' + esc(rec[f.k] == null ? '' : rec[f.k]) + '"></label>').join('') +
+            '</div>',
+          onSave: async (mel) => {
+            const row = { student_id: Number(mel.querySelector('#er_stu').value) || null };
+            if (!row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
+            if (dk) row[dk] = mel.querySelector('#er_date').value || null;
+            cfg.fields.forEach(f => { row[f.k] = mel.querySelector('[data-e="' + f.k + '"]').value.trim() || null; });
+            const r = await upd(cfg.table, rec.id, row);
+            if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
+            Object.assign(rec, row);
+            draw(); window.UI.toast('הרישום עודכן');
+            return true;
+          },
+        });
       }
       page.querySelector('#recCsv-' + uid).addEventListener('click', () => {
         const head = ['תלמיד'].concat(cfg.fields.map(f => f.label)).concat(['תאריך']);

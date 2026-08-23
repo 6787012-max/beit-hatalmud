@@ -21,6 +21,7 @@
   }
   async function addEvent(row) { const r = await window.store.add('behavior_events', row); return { ok: r.ok, data: r.data }; }
   async function delEvent(id) { return window.store.remove('behavior_events', id); }
+  async function updEvent(id, row) { return window.store.update('behavior_events', id, row); }
 
   async function classes() { return window.cv3Students ? await window.cv3Students.getClasses() : []; }
 
@@ -88,7 +89,8 @@
       '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + esc(catOf(e.category_id)) +
       (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
       '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') + '</div>' +
-      '<button class="mini danger" data-del="' + e.id + '"><i class="bi bi-trash"></i></button></div>';
+      '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+      '<button class="mini danger" data-del="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></div>';
     const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id) : catOf(e.category_id) || 'ללא קטגוריה';
     function draw() {
       const rows = filtered();
@@ -109,7 +111,49 @@
         const ok = await window.UI.confirm('למחוק את הדיווח?'); if (!ok) return;
         await delEvent(Number(b.dataset.del)); list = list.filter(e => e.id != b.dataset.del); draw(); window.UI.toast('נמחק');
       }));
+      page.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+        const ev = list.find(x => x.id == b.dataset.edit); if (ev) editEvent(ev);
+      }));
     }
+    // עריכת דיווח קיים: אותם שדות של הרישום המהיר, כדי שלא יהיו שני מסלולים
+    // שונים לאותו נתון. השמירה מעדכנת גם את השורה בזיכרון וגם את התצוגה.
+    function editEvent(ev) {
+      const stuOpts = studs.map(x => '<option value="' + x.id + '"' + (x.id == ev.student_id ? ' selected' : '') + '>' +
+        esc(window.UI.fullName ? window.UI.fullName(x) : x.name) + '</option>').join('');
+      const catSel = cs.map(c => '<option value="' + c.id + '"' + (c.id == ev.category_id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+      const sevSel = ['נמוכה', 'רגילה', 'גבוהה'].map(x =>
+        '<option' + ((ev.severity || 'רגילה') === x ? ' selected' : '') + '>' + x + '</option>').join('');
+      window.UI.modal({
+        title: 'עריכת דיווח', saveLabel: 'שמירה',
+        bodyHTML:
+          '<div class="form-grid">' +
+            '<label class="fld"><span>תלמיד</span><select class="inp mb0" id="ee_stu">' + stuOpts + '</select></label>' +
+            '<label class="fld"><span>קטגוריה</span><select class="inp mb0" id="ee_cat"><option value="">ללא</option>' + catSel + '</select></label>' +
+            '<label class="fld"><span>תאריך</span><input class="inp mb0" id="ee_date" type="date" value="' + esc(String(ev.event_date || '').slice(0, 10)) + '"></label>' +
+            '<label class="fld"><span>שעה</span><input class="inp mb0" id="ee_time" type="time" value="' + esc(ev.event_time || '') + '"></label>' +
+            '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev">' + sevSel + '</select></label>' +
+            '<label class="fld fld-wide"><span>הערה</span><input class="inp mb0" id="ee_note" value="' + esc(ev.note || '') + '"></label>' +
+          '</div>',
+        onSave: async (mel) => {
+          const row = {
+            student_id: Number(mel.querySelector('#ee_stu').value) || null,
+            category_id: Number(mel.querySelector('#ee_cat').value) || null,
+            event_date: mel.querySelector('#ee_date').value || null,
+            event_time: mel.querySelector('#ee_time').value || null,
+            severity: mel.querySelector('#ee_sev').value,
+            note: mel.querySelector('#ee_note').value.trim() || null,
+          };
+          if (!row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
+          const r = await updEvent(ev.id, row);
+          if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
+          Object.assign(ev, row);
+          draw();
+          window.UI.toast('הדיווח עודכן');
+          return true;
+        },
+      });
+    }
+
     page.querySelector('#fCat').addEventListener('change', draw);
     page.querySelector('#fGroup').addEventListener('change', draw);
     page.querySelector('#behCsv').addEventListener('click', () => {
