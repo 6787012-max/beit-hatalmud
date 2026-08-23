@@ -19,7 +19,6 @@
     { id: 'forms',         label: 'טפסים וחתימות',    icon: 'bi-file-earmark-check', group: G2, color: '#c0398a' },
     { id: 'calendar',      label: 'לוח שנה',          icon: 'bi-calendar3',       group: G2, color: '#117a65' },
     { id: 'reports',       label: 'דשבורד ודוחות',    icon: 'bi-graph-up-arrow',  group: G3, color: '#34495e' },
-    { id: 'tuition',       label: 'שכר לימוד',        icon: 'bi-cash-coin',       group: G3, color: '#229954' },
     { id: 'cashbox',       label: 'קופה כללית',       icon: 'bi-wallet2',         group: G3, color: '#16794f' },
     { id: 'yemot',         label: 'קו ימות המשיח',     icon: 'bi-telephone-inbound', group: G3, color: '#0e7490', adminOnly: true },
     { id: 'voicereports',  label: 'דיווחים קוליים',    icon: 'bi-mic-fill',        group: G3, color: '#8e44ad', adminOnly: true },

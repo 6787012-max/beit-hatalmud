@@ -78,10 +78,6 @@
     ],
     reading: [{ id: 1, student_id: 1, level: 'שוטף', date: daysAgo(8), note: 'קורא יפה' }],
     writing: [{ id: 1, student_id: 1, level: 'טוב', date: daysAgo(8), note: '' }],
-    tuition: [
-      { id: 1, student_id: 1, month: T().slice(0, 7), pay_date: T(), amount: 500, method: 'העברה', status: 'paid', note: '' },
-      { id: 2, student_id: 2, month: T().slice(0, 7), pay_date: '', amount: 500, method: '', status: 'due', note: '' },
-    ],
     // קופה כללית — הכנסות (מעבר לגבייה) והוצאות (עובדים/כלליות)
     income: [
       { id: 1, date: daysAgo(10), source: 'מלגת קרן', amount: 2000, method: 'העברה', note: 'תרומה חד-פעמית' },

@@ -111,7 +111,7 @@
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
         window.store.byStudent('medications', s.id), window.store.byStudent('conversations', s.id),
         window.store.byStudent('meetings', s.id), window.store.byStudent('reading', s.id), window.store.byStudent('writing', s.id),
-        window.store.byStudent('tuition', s.id), window.store.byStudent('tasks', s.id),
+        window.store.byStudent('tasks', s.id),
         (window.cv3ReadAssess ? window.cv3ReadAssess.cats() : Promise.resolve([])),
         (window.cv3ReadAssess ? window.cv3ReadAssess.forStudent(s.id) : Promise.resolve([])),
         (window.cv3Tla ? window.cv3Tla.forStudent(s.id) : Promise.resolve({ plans: [], goals: [] })),
@@ -238,7 +238,6 @@
         '<div class="det-sec"><h4><i class="bi bi-stars"></i> סיכום AI</h4>'
           + '<div id="aiStuSum"></div></div>' +
         attSec + frmSec + vSec +
-        sec('שכר לימוד', 'bi-cash-coin', tui, t => li((esc(t.month) || '') + (t.amount ? ' · ₪' + esc(t.amount) : ''), t.status === 'paid' ? 'שולם' : 'חוב', t.status === 'paid' ? 'lo' : 'hi')) +
         tasksSec +
         '<div class="det-actions" style="margin-top:14px">' +
           '<button class="btn-primary sm" data-edit2><i class="bi bi-pencil"></i> עריכת פרטים</button>' +

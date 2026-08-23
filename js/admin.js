@@ -1,4 +1,4 @@
-// admin.js — חלק 7: הגדרות והרשאות (מנהל), שכר לימוד, בקשות תיקון, יומן פעולות.
+// admin.js — חלק 7: הגדרות והרשאות (מנהל), בקשות תיקון, יומן פעולות.
 (function () {
   'use strict';
   const DEMO = !window.sb;
@@ -202,90 +202,9 @@
     drawCls(); drawCats(); drawUsers(); drawFb();
   }
 
-  const PAY_METHODS = ['מזומן', 'העברה', 'בית ספר', 'נדרים פלוס'];
-  async function renderTuition(page) {
-    const [studs, tuition, classes] = await Promise.all([
-      window.cv3Students ? window.cv3Students.getStudents() : [], window.store.list('tuition'),
-      window.cv3Students ? window.cv3Students.getClasses() : [],
-    ]);
-    const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
-    const clsOf = id => { const s = studs.find(x => x.id == id); const c = s && classes.find(x => x.id == s.class_id); return c ? c.name : ''; };
-    const ym = today().slice(0, 7);
-    const clsFilter = classes.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
-    const methodOpts = PAY_METHODS.map(m => '<option>' + m + '</option>').join('');
-    const pickHtml = await window.cv3Picker.html('tui');
-    page.innerHTML =
-      '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>שכר לימוד</h2>' +
-      '<div class="head-actions"><button class="btn-ghost sm" id="tCsv"><i class="bi bi-download"></i> ייצוא לאקסל</button></div></div>' +
-      '<div class="qr-card"><h3><i class="bi bi-cash-coin"></i> רישום תשלום/חוב</h3><div class="qr-grid" style="grid-template-columns:repeat(3,1fr) auto">' +
-        pickHtml +
-        '<input class="inp mb0" id="tMonth" type="month" value="' + ym + '" title="חודש">' +
-        '<input class="inp mb0" id="tDate" type="date" value="' + today() + '" title="תאריך תשלום">' +
-        '<input class="inp mb0" id="tAmt" type="number" placeholder="סכום ₪">' +
-        '<select class="inp mb0" id="tMethod"><option value="">אמצעי תשלום…</option>' + methodOpts + '</select>' +
-        '<select class="inp mb0" id="tStatus"><option value="paid">שולם</option><option value="due">חוב</option></select>' +
-        '<input class="inp mb0" id="tNote" placeholder="הערה (רשות)">' +
-        '<button class="btn-primary sm" id="tSave"><i class="bi bi-plus-lg"></i> הוסף</button>' +
-      '</div></div>' +
-      '<div class="toolbar" style="grid-template-columns:auto auto 1fr"><select class="inp mb0" id="tClsF"><option value="">כל הכיתות</option>' + clsFilter + '</select>' +
-        '<select class="inp mb0" id="tGroup" title="תצוגה לפי"><option value="">ללא קיבוץ</option><option value="student">לפי תלמיד</option><option value="class">לפי כיתה</option><option value="status">לפי סטטוס</option></select>' +
-        '<span class="count-line" id="tSum" style="align-self:center"></span></div>' +
-      '<div class="table-wrap"><table class="tbl"><thead><tr><th>תלמיד</th><th>כיתה</th><th>חודש</th><th>תאריך</th><th>סכום</th><th>אמצעי</th><th>סטטוס</th><th>הערה</th><th></th></tr></thead><tbody id="tBody"></tbody></table></div>';
-    const pick = window.cv3Picker.wire(page, 'tui');
-    const rows = () => { const cf = page.querySelector('#tClsF').value; return tuition.filter(t => !cf || String((studs.find(s => s.id == t.student_id) || {}).class_id) === cf); };
-    const rowHtml = t =>
-      '<tr><td>' + esc(nameOf(t.student_id)) + '</td><td>' + esc(clsOf(t.student_id)) + '</td><td>' + esc(t.month || '') + '</td><td>' + esc(t.pay_date || '') + '</td>' +
-      '<td>' + (t.amount ? '₪' + esc(t.amount) : '') + '</td><td>' + esc(t.method || '') + '</td>' +
-      '<td><button class="chip ' + (t.status === 'paid' ? 'ok' : 'off') + '" data-tog="' + t.id + '">' + (t.status === 'paid' ? 'שולם' : 'חוב') + '</button></td>' +
-      '<td>' + esc(t.note || '') + '</td>' +
-      '<td class="row-act"><button class="mini danger" data-del="' + t.id + '"><i class="bi bi-trash"></i></button></td></tr>';
-    const gKey = (t, g) => g === 'student' ? nameOf(t.student_id) : g === 'class' ? (clsOf(t.student_id) || 'ללא כיתה') : (t.status === 'paid' ? 'שולם' : 'חוב');
-    function draw() {
-      const rs = rows();
-      const g = page.querySelector('#tGroup').value;
-      let html;
-      if (!g) {
-        // בלי קיבוץ הרשימה הייתה בסדר ההכנסה; ממיינים לפי שם התלמיד
-        html = rs.slice().sort((a, b) =>
-          String(nameOf(a.student_id)).localeCompare(String(nameOf(b.student_id)), 'he')).map(rowHtml).join('');
-      }
-      else {
-        const groups = {};
-        rs.forEach(t => { const k = gKey(t, g); (groups[k] = groups[k] || []).push(t); });
-        html = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'he')).map(k => {
-          const sum = groups[k].reduce((s, t) => s + (Number(t.amount) || 0), 0);
-          return '<tr class="grp-hdr"><td colspan="9" style="background:var(--bg2,#f1f4f8);font-weight:700;padding:8px 10px">' +
-            esc(k) + ' <span style="color:var(--muted);font-weight:400">(' + groups[k].length + ' · ₪' + sum + ')</span></td></tr>' +
-            groups[k].map(rowHtml).join('');
-        }).join('');
-      }
-      page.querySelector('#tBody').innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">אין רישומים</td></tr>';
-      const paid = rs.filter(t => t.status === 'paid').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const due = rs.filter(t => t.status !== 'paid').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      page.querySelector('#tSum').textContent = 'שולם ₪' + paid + ' · חוב ₪' + due + ' · ' + rs.length + ' רישומים';
-      page.querySelectorAll('[data-tog]').forEach(b => b.addEventListener('click', async () => { const t = tuition.find(x => x.id == b.dataset.tog); t.status = t.status === 'paid' ? 'due' : 'paid'; await window.store.update('tuition', t.id, { status: t.status }); draw(); }));
-      page.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => { await window.store.remove('tuition', Number(b.dataset.del)); const i = tuition.findIndex(x => x.id == b.dataset.del); if (i >= 0) tuition.splice(i, 1); draw(); window.UI.toast('נמחק'); }));
-    }
-    page.querySelector('#tSave').addEventListener('click', async () => {
-      const sid = pick.value(); if (!sid) { window.UI.toast('בחר תלמיד', 'err'); return; }
-      const row = { student_id: Number(sid), month: page.querySelector('#tMonth').value, pay_date: page.querySelector('#tDate').value, amount: page.querySelector('#tAmt').value, method: page.querySelector('#tMethod').value, status: page.querySelector('#tStatus').value, note: page.querySelector('#tNote').value.trim() };
-      const r = await window.store.add('tuition', row);
-      tuition.push((r.data && r.data[0]) || row);
-      page.querySelector('#tAmt').value = ''; page.querySelector('#tNote').value = '';
-      draw(); window.UI.toast('נוסף');
-    });
-    page.querySelector('#tClsF').addEventListener('change', draw);
-    page.querySelector('#tGroup').addEventListener('change', draw);
-    page.querySelector('#tCsv').addEventListener('click', () => {
-      const head = ['תלמיד', 'כיתה', 'חודש', 'תאריך תשלום', 'סכום', 'אמצעי', 'סטטוס', 'הערה'];
-      const lines = [head.join(',')].concat(rows().map(t => [nameOf(t.student_id), clsOf(t.student_id), t.month, t.pay_date, t.amount, t.method, t.status === 'paid' ? 'שולם' : 'חוב', t.note].map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')));
-      const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tuition.csv'; a.click();
-    });
-    draw();
-  }
+  // מסך שכר הלימוד הוסר (2026-08-23): גוף חיצוני מטפל בגבייה, ולכן אין
+  // למוסד מה לנהל כאן. הטבלה במסד הייתה ריקה ונמחקה יחד עם המסך.
 
   const R = window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
   R.settings = renderSettings;
-  R.tuition = renderTuition;
 })();
