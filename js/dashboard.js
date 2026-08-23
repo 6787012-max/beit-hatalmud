@@ -19,12 +19,12 @@
   function killCharts() { CHARTS.forEach(c => { try { c.destroy(); } catch (_) {} }); CHARTS = []; }
 
   async function renderReports(page) {
-    const [studs, cls, beh, att, tst, catRows, fnc, tui] = await Promise.all([
+    const [studs, cls, beh, att, tst, catRows, fnc] = await Promise.all([
       students(),
       window.cv3Students ? window.cv3Students.getClasses() : [],
       window.store.list('behavior_events'), window.store.list('attendance'),
       window.store.list('tests'), window.store.list('categories'),
-      window.store.list('functioning'), window.store.list('tuition'),
+      window.store.list('functioning'),
     ]);
     // מודולים אופציונליים — רק אם נטענו
     const [raCats, raAll, tlaPlans] = await Promise.all([
@@ -70,7 +70,6 @@
       const tstR = mine(tst).filter(t => inRange(t.date));
       const fncR = mine(fnc).filter(f => inRange(f.date));
       const raR = mine(raAll).filter(a => inRange(a.assessed_on || a.created_at));
-      const tuiR = mine(tui);
       const tlaR = (tlaPlans || []).filter(p => sIds.includes(p.student_id));
 
       const present = attR.filter(a => a.status === 'present').length;
@@ -196,16 +195,8 @@
           '</div>');
       }
 
-      // ── שכר לימוד (רק למי שרואה את המסך) ──
-      if (!window.Auth || window.Auth.canAccess('tuition')) {
-        const paid = tuiR.filter(t => t.status === 'paid');
-        const due = tuiR.filter(t => t.status !== 'paid');
-        const sum = arr => arr.reduce((a, t) => a + (Number(t.amount) || 0), 0);
-        h += rpSection('שכר לימוד', 'bi-cash-coin', tuiR.length
-          ? '<div class="det-grid"><div class="det-row"><span class="det-lbl">שולם</span><span class="det-val">' + paid.length + ' · ₪' + sum(paid).toLocaleString() + '</span></div>' +
-            '<div class="det-row"><span class="det-lbl">בחוב</span><span class="det-val">' + due.length + ' · ₪' + sum(due).toLocaleString() + '</span></div></div>'
-          : '<div class="empty-state" style="padding:16px">אין רישומי שכר לימוד</div>');
-      }
+      // (סקשן שכר הלימוד הוסר מהדוח לבקשת יוסף, 2026-08-23.
+      //  הנתונים והמסך הייעודי לא נגענו בהם.)
 
       body.innerHTML = h;
 
