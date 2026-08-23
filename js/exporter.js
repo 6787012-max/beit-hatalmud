@@ -461,14 +461,30 @@
         const cs = getComputedStyle(sh);
         const availW = sh.clientWidth - parseFloat(cs.paddingInlineStart || cs.paddingLeft)
                                       - parseFloat(cs.paddingInlineEnd || cs.paddingRight);
-        // table-layout:fixed מותח את הטבלה לרוחב מלא, ולכן scrollWidth לא
-        // מלמד. מודדים את הרוחב ה"טבעי" ע"י ביטול זמני של הפריסה הקבועה.
-        const prevLayout = tbl.style.tableLayout, prevW = tbl.style.width;
+        // מדידת הרוחב ה"טבעי" של הטבלה. שלושה דברים חייבים להתבטל זמנית:
+        // table-layout:fixed (מותח לרוחב מלא), ו-word-break/overflow-wrap
+        // בתאים — הם מאפשרים שבירת מילים ולכן max-content מתכווץ, וכך
+        // טבלה עם 15 עמודות "נמדדה" כרחבה מספיק ולא הוקטנה בכלל.
+        const cells = tbl.querySelectorAll('th, td');
+        const prev = { layout: tbl.style.tableLayout, w: tbl.style.width };
         tbl.style.tableLayout = 'auto'; tbl.style.width = 'max-content';
+        cells.forEach(c => {
+          c.dataset.pw = c.style.whiteSpace || '';
+          c.style.whiteSpace = 'nowrap';
+          c.style.wordBreak = 'normal';
+          c.style.overflowWrap = 'normal';
+        });
         const natural = tbl.scrollWidth || availW;
-        tbl.style.tableLayout = prevLayout; tbl.style.width = prevW;
+        cells.forEach(c => {
+          c.style.whiteSpace = c.dataset.pw; delete c.dataset.pw;
+          c.style.wordBreak = ''; c.style.overflowWrap = '';
+        });
+        tbl.style.tableLayout = prev.layout; tbl.style.width = prev.w;
 
+        // הגדלה מוגבלת: טבלה של שתי עמודות "יכולה" להגיע ל-40px, וזה נראה
+        // כמו שלט ולא כמו רשימה. עד פי 1.6 מהבחירה של המשתמש, ולא מעל 20px.
         let size = base * (availW / Math.max(1, natural));
+        size = Math.min(size, base * 1.6, 20);
         if (mode === 'page') {
           // גם לגובה: מכווצים עד שהתוכן נכנס לעמוד אחד, בלי להגדיל מעבר לרוחב
           sh.style.fontSize = size + 'px';
@@ -478,7 +494,7 @@
             sh.style.fontSize = size + 'px';
           }
         }
-        size = Math.max(5, Math.min(40, size));
+        size = Math.max(5, Math.min(20, size));
         sh.style.fontSize = size.toFixed(1) + 'px';
       });
       const hint = page.querySelector('#exHint');
