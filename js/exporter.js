@@ -562,7 +562,12 @@
       const land = $('#exOrient').value === 'landscape';
       let st = document.getElementById('exPageStyle');
       if (!st) { st = document.createElement('style'); st.id = 'exPageStyle'; document.head.appendChild(st); }
-      st.textContent = '@page { size: A4 ' + (land ? 'landscape' : 'portrait') + '; margin: 12mm; }';
+      // בהתאמה לעמוד מלא גודל הטקסט כבר לקח את השוליים בחשבון;
+      // שוליים גדולים בהדפסה היו מכווצים שוב ומבטלים את ההתאמה.
+      const mm = (($('#exFit') || {}).value === 'page') ? 8 : 12;
+      st.textContent = '@page { size: A4 ' + (land ? 'landscape' : 'portrait') + '; margin: ' + mm + 'mm; }';
+      const dup = $('#exDuplex');
+      document.body.classList.toggle('ex-duplex', !!(dup && dup.checked));
       document.body.classList.add('printing-sheet');
       const done = () => document.body.classList.remove('printing-sheet');
       window.addEventListener('afterprint', done, { once: true });
