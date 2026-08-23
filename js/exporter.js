@@ -248,6 +248,11 @@
           SORTS.map(s => '<option value="' + s[0] + '">' + esc(s[1]) + '</option>').join('') + '</select></label>' +
         '<label class="fld"><span>כיוון הדף</span><select class="inp mb0" id="exOrient">' +
           '<option value="portrait">לאורך</option><option value="landscape">לרוחב</option></select></label>' +
+        '<label class="fld"><span>התאמה לדף</span><select class="inp mb0" id="exFit">' +
+          '<option value="">ללא — גודל הטקסט שבחרתי</option>' +
+          '<option value="width">התאם לרוחב הדף</option>' +
+          '<option value="page">התאם לעמוד מלא (רוחב וגובה)</option>' +
+        '</select></label>' +
         '<label class="fld"><span>גודל טקסט <b id="exFontVal">13</b></span>' +
           '<input class="inp mb0" id="exFont" type="range" min="8" max="24" step="1" value="13" style="padding:6px 0"></label>' +
       '</div>' +
@@ -264,6 +269,7 @@
         '<label class="cb"><input type="checkbox" id="exDate" checked> תאריך בכותרת</label>' +
         '<label class="cb"><input type="checkbox" id="exSign"> שורת חתימה בתחתית</label>' +
         '<label class="cb"><input type="checkbox" id="exSplit"> עמוד נפרד לכל שיעור</label>' +
+        '<label class="cb"><input type="checkbox" id="exDuplex"> דו-צדדי — כל שיעור מתחיל בדף חדש</label>' +
         '<label class="fld" style="min-width:220px"><span>כותרת</span><input class="inp mb0" id="exTitle" placeholder="לדוגמה: רשימת תלמידים תשפ״ז"></label>' +
       '</div>' +
       '<div id="exBlankBar" style="display:none;border-top:1px dashed var(--line);margin-top:10px;padding-top:10px">' +
@@ -430,11 +436,59 @@
         html = sheet(rows, title);
       }
       $('#exSheetWrap').innerHTML = html;
+      fitToPage();
       page._rows = rows; page._picked = picked; page._title = title;
       // עצה קטנה במקום שהמשתמש יגלה לבד שהדף צר מדי
       const hint = page.querySelector('#exHint');
       if (hint) hint.innerHTML = (picked.length > 7 && !land)
         ? '<i class="bi bi-lightbulb"></i> נבחרו ' + picked.length + ' עמודות — כדאי לעבור ל"דף לרוחב" כדי שיהיה מרווח.' : '';
+    }
+
+    // ── התאמה אוטומטית לגודל A4 ──────────────────────────────────────────
+    // המשתמש ביקש שהטבלה תתפוס את הדף — גם להקטין וגם *להגדיל* אם יש מקום.
+    // עובדים על גודל הפונט ולא על transform:scale, כי scale משבש שבירת
+    // עמודים בהדפסה ומקטין גם את השוליים; שינוי פונט נשאר טיפוגרפיה אמיתית.
+    function fitToPage() {
+      const mode = ($('#exFit') || {}).value || '';
+      const base = Number($('#exFont').value) || 13;
+      const sheets = [...page.querySelectorAll('.ex-sheet')];
+      sheets.forEach(sh => { sh.style.fontSize = base + 'px'; });
+      if (!mode) return;
+
+      sheets.forEach(sh => {
+        const tbl = sh.querySelector('.ex-table');
+        if (!tbl) return;
+        const cs = getComputedStyle(sh);
+        const availW = sh.clientWidth - parseFloat(cs.paddingInlineStart || cs.paddingLeft)
+                                      - parseFloat(cs.paddingInlineEnd || cs.paddingRight);
+        // table-layout:fixed מותח את הטבלה לרוחב מלא, ולכן scrollWidth לא
+        // מלמד. מודדים את הרוחב ה"טבעי" ע"י ביטול זמני של הפריסה הקבועה.
+        const prevLayout = tbl.style.tableLayout, prevW = tbl.style.width;
+        tbl.style.tableLayout = 'auto'; tbl.style.width = 'max-content';
+        const natural = tbl.scrollWidth || availW;
+        tbl.style.tableLayout = prevLayout; tbl.style.width = prevW;
+
+        let size = base * (availW / Math.max(1, natural));
+        if (mode === 'page') {
+          // גם לגובה: מכווצים עד שהתוכן נכנס לעמוד אחד, בלי להגדיל מעבר לרוחב
+          sh.style.fontSize = size + 'px';
+          let guard = 0;
+          while (sh.scrollHeight > sh.clientHeight && size > 5 && guard++ < 40) {
+            size -= 0.4;
+            sh.style.fontSize = size + 'px';
+          }
+        }
+        size = Math.max(5, Math.min(40, size));
+        sh.style.fontSize = size.toFixed(1) + 'px';
+      });
+      const hint = page.querySelector('#exHint');
+      if (hint && sheets[0]) {
+        const got = Math.round(parseFloat(sheets[0].style.fontSize));
+        if (got !== base) {
+          hint.innerHTML = '<i class="bi bi-aspect-ratio"></i> הותאם לדף: גודל הטקסט ' +
+            (got > base ? 'הוגדל' : 'הוקטן') + ' מ-' + base + ' ל-' + got + '.';
+        }
+      }
     }
 
     // ── עריכה מבנית של הטבלה: הוספה/מחיקה של שורות ועמודות בכל מקור נתונים ──
@@ -495,7 +549,7 @@
     }));
 
     ['#exSrc'].forEach(s => $(s).addEventListener('change', async () => { await buildCols(); draw(); }));
-    ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit'].forEach(s => {
+    ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit', '#exFit', '#exDuplex'].forEach(s => {
       $(s).addEventListener('input', draw);
       $(s).addEventListener('change', draw);   // select משנה דרך change, לא רק input
     });

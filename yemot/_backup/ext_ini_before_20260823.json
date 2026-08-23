@@ -1,0 +1,12 @@
+{
+ "ivr2:/ext.ini": "type=menu\ntitle=שלוחה ראשית\nplay_file=M0000\n",
+ "ivr2:/0/ext.ini": "type=admin_login\n",
+ "ivr2:/1/ext.ini": "type=playfile\ntitle=הודעות חברי הקבוצה\n",
+ "ivr2:/3/ext.ini": "type=confbridge\ntitle=חדר ועידה\n",
+ "ivr2:/4/ext.ini": "type=go_to_folder\ntitle=ניהול קבלת התראות\n",
+ "ivr2:/5/ext.ini": "type=menu\ntitle=תפריט ראשי\nplay_file=M0000\n",
+ "ivr2:/6/ext.ini": "type=menu\ntitle=הסרה מהקבוצה\n",
+ "ivr2:/7/ext.ini": "type=menu\ntitle=ניהול\n",
+ "ivr2:/8/ext.ini": "type=menu\ntitle=רישום לקבלת צינתוק\n",
+ "ivr2:/9/ext.ini": "type=menu\nrouting_yemot_number=07731377702\ntitle=פתיחת מערכת חברתית\n"
+}
