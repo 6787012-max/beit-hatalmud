@@ -124,6 +124,7 @@
         (window.cv3StudentDocs ? window.cv3StudentDocs.forStudent(s.id) : Promise.resolve([])),
         window.store.byStudent('passport', s.id),
       ]);
+      const canTla = !window.Auth || window.Auth.canAccess('tla');
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
@@ -244,7 +245,8 @@
         sec('התנהגות ומעקב', 'bi-clipboard-check', beh, e => li('<strong>' + esc(catName(e.category_id)) + '</strong>' + (e.note ? ' — ' + esc(e.note) : ''), e.event_date, sevc(e.severity))) +
         attSec +
         (window.cv3Passport ? window.cv3Passport.cardSection(psp) : '') +
-        (window.cv3Tla ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
+        // תל"א מוצג רק למי שיש לו גישה למסך תל"א (מלמד — לא).
+        ((window.cv3Tla && canTla) ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
         (window.cv3StudentDocs ? window.cv3StudentDocs.cardSection(sdocs) : '') +
         // ── כל השאר מאחורי "הרחב": פרטי הרישום המלאים וההיסטוריה ──
         '<button class="btn-ghost sm det-more-btn" id="stuMoreBtn" type="button">' +
@@ -265,7 +267,7 @@
           '<button class="btn-primary sm" data-edit2><i class="bi bi-pencil"></i> עריכת פרטים</button>' +
           '<button class="btn-ghost sm" data-reading><i class="bi bi-book-half"></i> מעקב קריאה</button>' +
           '<button class="btn-ghost sm" data-cert><i class="bi bi-award"></i> אישור לימודים</button>' +
-          '<button class="btn-ghost sm" data-tla><i class="bi bi-journal-bookmark"></i> תל"א</button>' +
+          (canTla ? '<button class="btn-ghost sm" data-tla><i class="bi bi-journal-bookmark"></i> תל"א</button>' : '') +
           '<button class="btn-ghost sm" data-docs><i class="bi bi-folder2-open"></i> תיק מסמכים</button>' +
           '<button class="btn-ghost sm" data-pdf2><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
           '<button class="btn-ghost sm" data-print2><i class="bi bi-printer"></i> הדפסה</button>' +

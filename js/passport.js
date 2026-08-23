@@ -74,7 +74,9 @@
         '<button class="btn-ghost sm" id="pspCsv"><i class="bi bi-download"></i> ייצוא לאקסל</button>' +
         '<button class="btn-ghost sm" id="pspPrint"><i class="bi bi-printer"></i> הדפסה</button>' +
       '</div></div>' +
-      '<div class="toolbar">' +
+      // entry-ui: הטבלה *היא* טופס ההזנה. בלי הסימון הזה מצב "הזנה בלבד"
+      // (מלמד) היה מסתיר אותה ומונע ממנו למלא את הדרכון בכלל.
+      '<div class="toolbar entry-ui">' +
         '<select class="inp mb0" id="pspView">' +
           '<option value="week">תצוגה: שבוע אחד (הזנה)</option>' +
           '<option value="all">תצוגה: סיכום כל השבועות</option>' +
@@ -87,7 +89,7 @@
         (window.cv3Sort ? window.cv3Sort.bar('psp') : '') +
       '</div>' +
       '<div class="count-line" id="pspSum"></div>' +
-      '<div id="pspWrap" class="table-wrap"></div>';
+      '<div id="pspWrap" class="table-wrap entry-ui"></div>';
 
     page.querySelector('#pspWeek').value = String(currentWeek());
 

@@ -69,7 +69,9 @@
   // יכולות לפי תפקיד (בקשת עמנואל): מסכים מותרים + מצב (מלא/צפייה-בלבד/הזנה-בלבד).
   function roleCaps(role) {
     const money = ['cashbox', 'exporter'];
-    const entry = ['behavior', 'attendance', 'tests', 'passport'];  // מסכי הזנה (מלמד)
+    // מלמד: כל מעקב הלמידה — מעקב, נוכחות, מבחנים, מעקב קריאה ודרכון.
+    // **בלי תל"א**: זו תכנית חינוכית אישית שנכתבת ע"י המחנך והצוות הרב-מקצועי.
+    const entry = ['behavior', 'attendance', 'tests', 'readassess', 'passport'];
     const nonMoney = ['behavior', 'attendance', 'tests', 'readassess', 'tla', 'passport', 'students', 'medical', 'forms', 'calendar', 'reports', 'exporter'];
     switch (role) {
       case 'מנהל':  return { perms: null, mode: 'full', scoped: false };          // הכל + שינויים + כספים

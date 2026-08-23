@@ -2,7 +2,7 @@
 // network-first לנכסי האפליקציה: תיקון/עדכון שנפרס מגיע למשתמש מיד.
 // ה-cache משמש רק כגיבוי כשאין רשת. (cache-first עם CACHE קבוע גרם לכך
 // שמשתמש שטען את האתר פעם אחת המשיך לקבל את הגרסה הישנה לנצח.)
-const CACHE = 'cv3-v28';
+const CACHE = 'cv3-v29';
 const ASSETS = ['./', 'index.html', 'css/main.css', 'manifest.webmanifest', 'favicon.svg', 'icon-192.png',
   'js/config.js', 'js/supabase.js', 'js/api.js', 'js/store.js', 'js/ui.js', 'js/sortui.js', 'js/auth.js',
   'js/students.js', 'js/picker.js', 'js/behavior.js', 'js/tla.js', 'js/passport.js', 'js/reading-assess.js', 'js/certificate.js', 'js/tracking.js', 'js/dashboard.js',

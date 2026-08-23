@@ -62,9 +62,9 @@
   async function renderPage(target) {
     target.innerHTML = '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>מעקב קריאה</h2>' +
       '<div class="head-actions">' + (isAdmin() ? '<button class="btn-ghost sm" id="raCats"><i class="bi bi-gear"></i> קטגוריות</button>' : '') + '</div></div>' +
-      '<div class="toolbar"><select class="inp mb0" id="raClass"><option value="">בחר כיתה…</option></select>' +
+      '<div class="toolbar entry-ui"><select class="inp mb0" id="raClass"><option value="">בחר כיתה…</option></select>' +
         (window.cv3Sort ? window.cv3Sort.bar('ra', { group: false }) : '') + '</div>' +
-      '<div id="raGrid" class="table-wrap"></div>';
+      '<div id="raGrid" class="table-wrap entry-ui"></div>';
     const [classes, cs, students] = await Promise.all([
       window.store.list('classes'), cats(),
       (window.cv3Students ? window.cv3Students.getStudents() : window.store.list('students')),
