@@ -29,15 +29,23 @@
         { k: 'mother_name', t: 'שם האם', def: false },
         { k: 'mother_phone', t: 'טלפון אם', def: true },
         { k: 'mother_email', t: 'אימייל', def: false },
-        { k: 'address', t: 'כתובת', def: false },
+        // ↓ פירוק הכתובת והטלפון הביתי — כמו בגיליון "כולם טלפונים" של יוסף
+        { k: 'city', t: 'עיר', def: false },
+        { k: 'street', t: 'רחוב', def: false },
+        { k: 'houseno', t: 'מספר', def: false, w: 55 },
+        { k: 'homephone', t: 'טלפון בבית', def: false },
+        { k: 'address', t: 'כתובת מלאה', def: false },
         { k: 'blank', t: 'הערות', def: false, blank: true },
       ],
       async rows(ctx) {
+        const rg = (s, k) => (s.reg && (s.reg[k] != null ? String(s.reg[k]).trim() : '')) || '';
         return ctx.students.map(s => ({
           name: nm(s), cls: ctx.clsName(s.class_id), tz: s.tz, birthdate_heb: s.birthdate_heb,
           birthdate: d10(s.birthdate), parent_name: s.parent_name, parent_phone: s.parent_phone,
           mother_name: s.mother_name, mother_phone: s.mother_phone,
           mother_email: s.mother_email || (s.reg && (s.reg['אימייל אב'] || s.reg['אימייל אם'])),
+          city: rg(s, 'עיר'), street: rg(s, 'רחוב'), houseno: rg(s, 'מספר'),
+          homephone: rg(s, 'טלפון בבית'),
           address: s.address, _s: s,
         }));
       },
@@ -219,6 +227,7 @@
         '<label class="cb"><input type="checkbox" id="exGrid" checked> קווי טבלה</label>' +
         '<label class="cb"><input type="checkbox" id="exDate" checked> תאריך בכותרת</label>' +
         '<label class="cb"><input type="checkbox" id="exSign"> שורת חתימה בתחתית</label>' +
+        '<label class="cb"><input type="checkbox" id="exSplit"> עמוד נפרד לכל שיעור</label>' +
         '<label class="fld" style="min-width:220px"><span>כותרת</span><input class="inp mb0" id="exTitle" placeholder="לדוגמה: רשימת תלמידים תשפ״ז"></label>' +
       '</div>' +
       '<div id="exBlankBar" style="display:none;border-top:1px dashed var(--line);margin-top:10px;padding-top:10px">' +
@@ -346,24 +355,45 @@
       const rowH = isBlank ? Number($('#exBh').value || 34) : 0;
       const head = '<tr>' + picked.map(c =>
         '<th' + (c.weekend ? ' class="wk"' : '') + ' style="' + (c.w ? 'width:' + c.w + 'px;' : '') + '">' + esc(c.t) + '</th>').join('') + '</tr>';
-      const body = rows.map((r, i) => '<tr' + (rowH ? ' style="height:' + rowH + 'px"' : '') + '>' + picked.map(c =>
+      const bodyOf = rs => rs.map((r, i) => '<tr' + (rowH ? ' style="height:' + rowH + 'px"' : '') + '>' + picked.map(c =>
         '<td' + (c.weekend ? ' class="wk"' : '') + '>' +
         (c.k === 'idx' ? (i + 1) : (c.blank ? '' : esc(r[c.k] == null ? '' : r[c.k]))) + '</td>').join('') + '</tr>').join('');
 
       const today = new Date().toLocaleDateString('he-IL');
-      $('#exSheetWrap').innerHTML =
+      // גיליון אחד = דף A4 אחד. כשמפצלים לפי שיעור בונים כמה גיליונות,
+      // כל אחד עם כותרת משלו ומספור שמתחיל מ-1 — בדיוק כמו הגיליונות
+      // הנפרדים בקובץ האקסל ("שיעור א", "שיעור ב"...).
+      const sheet = (rs, ttl) =>
         '<div class="ex-sheet' + (land ? ' land' : '') + '" contenteditable="true" spellcheck="false" ' +
           'style="font-size:' + fs + 'px">' +
           ($('#exLogo').checked ? '<div class="ex-head">' +
             '<img src="img/logo.png" alt="" class="ex-logo">' +
             '<div class="ex-titles"><div class="ex-inst">' + esc(inst) + '</div>' +
-            '<h1>' + esc(title) + '</h1>' +
-            ($('#exDate').checked ? '<div class="ex-date">' + esc(today) + (isBlank ? '' : ' · ' + rows.length + ' רשומות') + '</div>' : '') +
-            '</div></div>' : '<h1 class="ex-plain">' + esc(title) + '</h1>') +
+            '<h1>' + esc(ttl) + '</h1>' +
+            ($('#exDate').checked ? '<div class="ex-date">' + esc(today) + (isBlank ? '' : ' · ' + rs.length + ' רשומות') + '</div>' : '') +
+            '</div></div>' : '<h1 class="ex-plain">' + esc(ttl) + '</h1>') +
           '<table class="ex-table' + (zebra ? ' zebra' : '') + (grid ? ' grid' : '') + '">' +
-            '<thead>' + head + '</thead><tbody>' + body + '</tbody></table>' +
+            '<thead>' + head + '</thead><tbody>' + bodyOf(rs) + '</tbody></table>' +
           ($('#exSign').checked ? '<div class="ex-sign"><div>חתימה: ____________________</div><div>תאריך: ____________</div></div>' : '') +
         '</div>';
+
+      const splitEl = $('#exSplit');
+      const split = !isBlank && splitEl && splitEl.checked;
+      let html;
+      if (split) {
+        const groups = [];
+        rows.forEach(r => {
+          const k = r.cls || 'ללא שיעור';
+          let g = groups.find(x => x.k === k);
+          if (!g) groups.push(g = { k: k, rs: [] });
+          g.rs.push(r);
+        });
+        groups.sort((a, b) => String(a.k).localeCompare(String(b.k), 'he'));
+        html = groups.map(g => sheet(g.rs, title + ' — ' + g.k)).join('');
+      } else {
+        html = sheet(rows, title);
+      }
+      $('#exSheetWrap').innerHTML = html;
       page._rows = rows; page._picked = picked; page._title = title;
       // עצה קטנה במקום שהמשתמש יגלה לבד שהדף צר מדי
       const hint = page.querySelector('#exHint');
@@ -374,8 +404,9 @@
     // ── עריכה מבנית של הטבלה: הוספה/מחיקה של שורות ועמודות בכל מקור נתונים ──
     // הגיליון כבר contenteditable (טקסט), אבל הוספת שורה/עמודה דורשת שינוי DOM אמיתי.
     // המיקום נקבע לפי התא האחרון שנלחץ; בלי בחירה — הפעולה מתבצעת בסוף הטבלה.
-    let sel = null;   // {r, c} — r=-1 מסמן שורת הכותרת
-    function tbl() { return page.querySelector('.ex-table'); }
+    let sel = null;   // {r, c, t} — r=-1 מסמן שורת הכותרת, t = הטבלה שנבחרה
+    // עם פיצול לפי שיעור יש כמה טבלאות בדף; העריכה חלה על זו שנלחצה.
+    function tbl() { return (sel && sel.t && sel.t.isConnected) ? sel.t : page.querySelector('.ex-table'); }
     function markSel() {
       page.querySelectorAll('.ex-cell-sel').forEach(e => e.classList.remove('ex-cell-sel'));
       const t = tbl(); if (!t || !sel) return;
@@ -389,7 +420,8 @@
       const cell = e.target.closest('.ex-table td, .ex-table th');
       if (!cell) return;
       const row = cell.parentElement;
-      sel = { r: row.parentElement.tagName === 'THEAD' ? -1 : row.rowIndex - (tbl().tHead ? 1 : 0), c: cell.cellIndex };
+      const t = cell.closest('.ex-table');
+      sel = { r: row.parentElement.tagName === 'THEAD' ? -1 : row.rowIndex - (t.tHead ? 1 : 0), c: cell.cellIndex, t: t };
       markSel();
     });
     page.querySelectorAll('#exEdit [data-ed]').forEach(btn => btn.addEventListener('click', () => {
@@ -427,7 +459,7 @@
     }));
 
     ['#exSrc'].forEach(s => $(s).addEventListener('change', async () => { await buildCols(); draw(); }));
-    ['#exSort', '#exOrient', '#exFont', '#exTitle'].forEach(s => {
+    ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit'].forEach(s => {
       $(s).addEventListener('input', draw);
       $(s).addEventListener('change', draw);   // select משנה דרך change, לא רק input
     });
@@ -450,18 +482,27 @@
 
     // הורדת PDF ישירה — הגיליון עצמו, בכיוון הדף שנבחר
     if (window.cv3Pdf) window.cv3Pdf.wire($('#exPdf'),
-      () => page.querySelector('.ex-sheet'),
+      // עם פיצול לפי שיעור יש כמה גיליונות — מייצאים את כולם, לא רק את הראשון
+      () => (page.querySelectorAll('.ex-sheet').length > 1 ? $('#exSheetWrap') : page.querySelector('.ex-sheet')),
       () => page._title || 'יצוא',
       () => ({ orientation: $('#exOrient').value === 'landscape' ? 'landscape' : 'portrait', margin: 6 }));
 
     $('#exCsv').addEventListener('click', () => {
       // מייצאים מה-DOM ולא מהנתונים המקוריים — כך העריכות הידניות (שורות/עמודות
       // שנוספו, טקסט שתוקן) נכנסות גם לקובץ, ולא רק להדפסה.
-      const t = page.querySelector('.ex-table');
-      if (!t) { window.UI.toast('אין נתונים ליצוא', 'err'); return; }
+      const tables = [...page.querySelectorAll('.ex-table')];
+      if (!tables.length) { window.UI.toast('אין נתונים ליצוא', 'err'); return; }
       const cell = v => { v = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
       const lines = [];
-      [...t.tHead.rows, ...t.tBodies[0].rows].forEach(r => lines.push([...r.cells].map(c => cell(c.innerText)).join(',')));
+      tables.forEach((t, i) => {
+        // כותרת פעם אחת בלבד; לפני כל שיעור נוסף — שורה עם שם השיעור
+        if (i > 0) {
+          const h = t.closest('.ex-sheet').querySelector('h1');
+          lines.push(''); lines.push(cell(h ? h.innerText : 'המשך'));
+        }
+        const rs = i === 0 ? [...t.tHead.rows, ...t.tBodies[0].rows] : [...t.tBodies[0].rows];
+        rs.forEach(r => lines.push([...r.cells].map(c => cell(c.innerText)).join(',')));
+      });
       const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(10))], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);

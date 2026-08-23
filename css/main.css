@@ -509,6 +509,8 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .ex-table.grid th,.ex-table.grid td{border:1px solid #b9c4cd}
 .ex-table.zebra tbody tr:nth-child(even){background:#f2f5f8}
 .ex-sign{display:flex; justify-content:space-between; margin-top:28px; font-size:.95em; color:#333}
+/* פיצול לפי שיעור = כמה גיליונות בדף אחד; רווח ביניהם על המסך */
+.ex-sheet + .ex-sheet{margin-top:22px}
 
 @media print{
   /* ⚠️ #pages אינו ילד ישיר של body (body > main#main > #pages), ולכן הכלל הישן
@@ -525,6 +527,9 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
   body.printing-sheet #exSheetWrap{background:none !important; padding:0 !important; overflow:visible !important; border-radius:0 !important}
   body.printing-sheet .ex-sheet{width:auto !important; min-height:0 !important; box-shadow:none !important;
     margin:0 !important; padding:0 !important; border-radius:0 !important}
+  /* כל גיליון (=שיעור) מתחיל בעמוד חדש; האחרון בלי דף ריק אחריו */
+  body.printing-sheet .ex-sheet{break-after:page; page-break-after:always}
+  body.printing-sheet .ex-sheet:last-child{break-after:auto; page-break-after:auto}
   body.printing-sheet .ex-table{break-inside:auto}
   body.printing-sheet .ex-table thead{display:table-header-group}   /* כותרת הטבלה חוזרת בכל עמוד */
   body.printing-sheet .ex-table tr{break-inside:avoid; page-break-inside:avoid}
