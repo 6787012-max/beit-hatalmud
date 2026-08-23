@@ -122,7 +122,13 @@
     function draw() {
       const q = (page.querySelector('#tlaQ').value || '').trim();
       const stf = page.querySelector('#tlaStat').value;
-      let rows = plans.slice().sort((a, b) => b.id - a.id);
+      // היה מיון לפי id יורד (סדר יצירה). ברשימת תל"אות מחפשים תלמיד — ולכן
+      // ממיינים לפי שם משפחה, כמו בכל שאר המסכים.
+      let rows = plans.slice().sort((a, b) => {
+        const A = stOf(a.student_id) || {}, B = stOf(b.student_id) || {};
+        return String(A.family || '').localeCompare(String(B.family || ''), 'he') ||
+               String(A.name || '').localeCompare(String(B.name || ''), 'he') || b.id - a.id;
+      });
       if (stf) rows = rows.filter(p => (p.status || 'טיוטה') === stf);
       if (q) rows = rows.filter(p => fullName(stOf(p.student_id)).indexOf(q) > -1);
       page.querySelector('#tlaCount').textContent = rows.length + ' תכניות';

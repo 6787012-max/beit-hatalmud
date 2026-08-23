@@ -62,7 +62,8 @@
   async function renderPage(target) {
     target.innerHTML = '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>מעקב קריאה</h2>' +
       '<div class="head-actions">' + (isAdmin() ? '<button class="btn-ghost sm" id="raCats"><i class="bi bi-gear"></i> קטגוריות</button>' : '') + '</div></div>' +
-      '<div class="toolbar"><select class="inp mb0" id="raClass"><option value="">בחר כיתה…</option></select></div>' +
+      '<div class="toolbar"><select class="inp mb0" id="raClass"><option value="">בחר כיתה…</option></select>' +
+        (window.cv3Sort ? window.cv3Sort.bar('ra', { group: false }) : '') + '</div>' +
       '<div id="raGrid" class="table-wrap"></div>';
     const [classes, cs, students] = await Promise.all([
       window.store.list('classes'), cats(),
@@ -75,22 +76,25 @@
     async function drawGrid(classId) {
       const grid = target.querySelector('#raGrid');
       if (!classId) { grid.innerHTML = '<div class="empty-state"><i class="bi bi-book"></i><div>בחר כיתה להצגת מעקב הקריאה</div></div>'; return; }
-      const kids = students.filter(s => String(s.class_id) === String(classId));
+      // מיון אחיד (js/sortui.js). המסך הוא פר-כיתה ולכן אין קיבוץ, רק סדר.
+      let kids = students.filter(s => String(s.class_id) === String(classId));
+      if (window.cv3Sort) kids = window.cv3Sort.sort(kids, window.cv3Sort.mode(target, 'ra'));
       const all = await Promise.all(kids.map(async k => ({ s: k, a: (await forStudent(k.id))[0] })));
-      const head = '<tr><th>תלמיד</th>' + cs.map(c => '<th>' + esc(c.name) + '</th>').join('') + '<th></th></tr>';
-      const rows = all.map(({ s, a }) => {
+      const head = '<tr><th style="width:44px">#</th><th>תלמיד</th>' + cs.map(c => '<th>' + esc(c.name) + '</th>').join('') + '<th></th></tr>';
+      const rows = all.map(({ s, a }, i) => {
         const sc = (a && a.scores) || {};
-        return '<tr><td>' + esc(window.UI.fullName(s)) + '</td>' +
+        return '<tr><td class="idx">' + (i + 1) + '</td><td>' + esc(window.UI.fullName(s)) + '</td>' +
           cs.map(c => '<td>' + (sc[c.id] != null ? '<b>' + esc(sc[c.id]) + '</b>' : '<span style="color:var(--muted)">—</span>') + '</td>').join('') +
           '<td class="row-act"><button class="mini" data-add="' + s.id + '" title="הערכה חדשה"><i class="bi bi-plus-lg"></i></button></td></tr>';
       }).join('');
-      grid.innerHTML = '<table class="tbl"><thead>' + head + '</thead><tbody>' + (rows || '<tr><td colspan="' + (cs.length + 2) + '">אין תלמידים בכיתה</td></tr>') + '</tbody></table>';
+      grid.innerHTML = '<table class="tbl"><thead>' + head + '</thead><tbody>' + (rows || '<tr><td colspan="' + (cs.length + 3) + '">אין תלמידים בכיתה</td></tr>') + '</tbody></table>';
       grid.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
         const st = kids.find(k => String(k.id) === b.dataset.add);
         if (st) openAssessment(st, () => drawGrid(classId));
       }));
     }
     sel.addEventListener('change', () => drawGrid(sel.value));
+    if (window.cv3Sort) window.cv3Sort.wire(target, 'ra', () => drawGrid(sel.value));
     drawGrid('');
   }
 

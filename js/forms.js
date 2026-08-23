@@ -191,8 +191,15 @@
       page.querySelector('#fPrintAll').addEventListener('click', () => printAll(f));
       page.querySelector('#fCards').addEventListener('click', () => buildCards(f));
     }
+    // מיון אחיד: שם משפחה ואז שם מלא — כמו בכל שאר המסכים (js/sortui.js)
+    const stuOf = id => studs.find(x => x.id == id) || {};
+    const byStudent = (a, b) => {
+      const A = stuOf(a.student_id), B = stuOf(b.student_id);
+      return String(A.family || '').localeCompare(String(B.family || ''), 'he') ||
+             String(A.name || '').localeCompare(String(B.name || ''), 'he');
+    };
     function drawDetail(f) {
-      const rs = respOf(f.id);
+      const rs = respOf(f.id).slice().sort(byStudent);
       page.querySelector('#fBody').innerHTML = rs.map(r => {
         const link = signBase() + '?f=' + f.id + '&t=' + r.token;
         const isSigned = r.status === 'signed';

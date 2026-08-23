@@ -57,7 +57,8 @@
 
       // פירוט גביית שכר לימוד (אוטומטי, לקריאה)
       '<div class="qr-card"><h3><i class="bi bi-cash-stack"></i> גביית שכר לימוד (אוטומטי) <span class="det-badge">' + tuitionPaid.length + '</span></h3><div class="table-wrap"><table class="tbl"><thead><tr><th>תלמיד</th><th>חודש</th><th>תאריך</th><th>סכום</th><th>אמצעי</th></tr></thead><tbody>' +
-        (tuitionPaid.length ? tuitionPaid.map(t => '<tr><td>' + esc(nameOf(t.student_id)) + '</td><td>' + esc(t.month || '') + '</td><td>' + esc(t.pay_date || '') + '</td><td>' + ILS(t.amount) + '</td><td>' + esc(t.method || '') + '</td></tr>').join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">אין תשלומים ששולמו עדיין</td></tr>') +
+        (tuitionPaid.length ? tuitionPaid.slice().sort((a, b) =>
+          String(nameOf(a.student_id)).localeCompare(String(nameOf(b.student_id)), 'he')).map(t => '<tr><td>' + esc(nameOf(t.student_id)) + '</td><td>' + esc(t.month || '') + '</td><td>' + esc(t.pay_date || '') + '</td><td>' + ILS(t.amount) + '</td><td>' + esc(t.method || '') + '</td></tr>').join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">אין תשלומים ששולמו עדיין</td></tr>') +
       '</tbody></table></div></div>';
 
     function drawIn() {

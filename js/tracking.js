@@ -91,23 +91,32 @@
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>נוכחות</h2></div>' +
       // entry-ui: במסך הנוכחות הטבלה והסרגל *הם* טופס ההזנה, ולא תצוגת נתונים.
       // בלי הסימון הזה מצב "הזנה בלבד" (מלמד) הסתיר אותם ומנע ממנו לרשום נוכחות כלל.
-      '<div class="toolbar entry-ui" style="grid-template-columns:auto auto 1fr auto">' +
+      '<div class="toolbar entry-ui">' +
         '<input type="date" class="inp mb0" id="attDate" value="' + today() + '">' +
         '<select class="inp mb0" id="attClass"><option value="">כל הכיתות</option>' + clsOpts + '</select>' +
         '<input type="search" class="inp mb0" id="attSearch" placeholder="🔍 חיפוש תלמיד…">' +
+        (window.cv3Sort ? window.cv3Sort.bar('att') : '') +
         '<span class="count-line" id="attSum" style="align-self:center"></span></div>' +
-      '<div class="table-wrap entry-ui"><table class="tbl"><thead><tr><th>תלמיד</th><th>נוכחות</th></tr></thead><tbody id="attBody"></tbody></table></div>';
+      '<div class="table-wrap entry-ui"><table class="tbl"><thead><tr>' +
+        '<th style="width:44px">#</th><th>תלמיד</th><th>נוכחות</th></tr></thead>' +
+        '<tbody id="attBody"></tbody></table></div>';
     function visible() {
       const cid = page.querySelector('#attClass').value, q = (page.querySelector('#attSearch').value || '').trim();
       return studs.filter(s => (!cid || String(s.class_id) === cid) && (!q || (s.name || '').includes(q)));
     }
+    const clsNameOf = s => { const c = classes.find(x => x.id == s.class_id); return c ? c.name : 'ללא שיעור'; };
     function draw() {
-      page.querySelector('#attBody').innerHTML = visible().map(s => {
+      // מיון וקיבוץ אחידים לכל המסכים — ראה js/sortui.js
+      const row = (s, n) => {
         const v = state[s.id] || '';
         const btn = (val, lbl, cls) => '<button class="att-btn ' + cls + (v === val ? ' on' : '') + '" data-sid="' + s.id + '" data-v="' + val + '">' + lbl + '</button>';
-        return '<tr><td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> ' + esc(s.name) + '</td>' +
+        return '<tr><td class="idx">' + n + '</td>' +
+          '<td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> ' + esc(s.name) + '</td>' +
           '<td class="att-cell">' + btn('present', 'נוכח', 'p') + btn('late', 'איחור', 'l') + btn('absent', 'נעדר', 'a') + '</td></tr>';
-      }).join('');
+      };
+      page.querySelector('#attBody').innerHTML = window.cv3Sort
+        ? window.cv3Sort.rows(page, 'att', visible(), clsNameOf, row, 3)
+        : visible().map((s, i) => row(s, i + 1)).join('');
       const c = { present: 0, late: 0, absent: 0 };
       Object.values(state).forEach(v => c[v] != null && c[v]++);
       page.querySelector('#attSum').textContent = 'נוכחים ' + c.present + ' · איחורים ' + c.late + ' · נעדרים ' + c.absent;
@@ -146,6 +155,7 @@
     page.querySelector('#attDate').addEventListener('change', loadDate);
     page.querySelector('#attClass').addEventListener('change', draw);
     page.querySelector('#attSearch').addEventListener('input', draw);
+    if (window.cv3Sort) window.cv3Sort.wire(page, 'att', draw);
     loadDate();
   }
 

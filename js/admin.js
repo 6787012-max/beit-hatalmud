@@ -244,7 +244,11 @@
       const rs = rows();
       const g = page.querySelector('#tGroup').value;
       let html;
-      if (!g) { html = rs.map(rowHtml).join(''); }
+      if (!g) {
+        // בלי קיבוץ הרשימה הייתה בסדר ההכנסה; ממיינים לפי שם התלמיד
+        html = rs.slice().sort((a, b) =>
+          String(nameOf(a.student_id)).localeCompare(String(nameOf(b.student_id)), 'he')).map(rowHtml).join('');
+      }
       else {
         const groups = {};
         rs.forEach(t => { const k = gKey(t, g); (groups[k] = groups[k] || []).push(t); });

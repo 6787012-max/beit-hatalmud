@@ -53,12 +53,7 @@
         '<select class="inp mb0" id="stuClass"><option value="">כל הכיתות</option>' +
           classes.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('') + '</select>' +
         '<select class="inp mb0" id="stuStatus"><option value="">כל הסטטוסים</option><option value="פעיל">פעיל</option><option value="לא פעיל">לא פעיל</option></select>' +
-        '<select class="inp mb0" id="stuSort">' +
-          '<option value="family">מיון: שם משפחה (א״ב)</option>' +
-          '<option value="first">מיון: שם פרטי (א״ב)</option>' +
-          '<option value="cls">מיון: כיתה ואז שם משפחה</option>' +
-        '</select>' +
-        '<label class="cb" style="white-space:nowrap"><input type="checkbox" id="stuGroup"> קיבוץ לפי שיעור</label>' +
+        (window.cv3Sort ? window.cv3Sort.bar('stu') : '') +
       '</div>' +
       '<div class="count-line" id="stuCount"></div>' +
       '<div class="table-wrap"><table class="tbl"><thead><tr>' +
@@ -71,24 +66,16 @@
     // הוא מיון לפי שם פרטי. ברשימת שיעור מצפים לשם משפחה — וזו ברירת המחדל.
     const he = (a, b) => String(a || '').localeCompare(String(b || ''), 'he');
     const famOf = s => String(s.family || '').trim();
-    const byFamily = (a, b) => he(famOf(a), famOf(b)) || he(a.name, b.name);
-    const byFirst = (a, b) => he(a.name, b.name);
     const clsOf = s => classNameOf(classes, s.class_id) || 'ללא שיעור';
 
     function draw() {
       const q = (page.querySelector('#stuSearch').value || '').trim();
       const cf = page.querySelector('#stuClass').value;
       const sf = page.querySelector('#stuStatus').value;
-      const sortKey = page.querySelector('#stuSort').value;
-      const grouped = page.querySelector('#stuGroup').checked;
       let rows = students.slice();
       if (q) rows = rows.filter(s => [s.name, s.family, s.parent_name, s.parent_phone].join(' ').includes(q));
       if (cf) rows = rows.filter(s => String(s.class_id) === cf);
       if (sf) rows = rows.filter(s => (s.status || '') === sf);
-
-      const cmp = sortKey === 'first' ? byFirst : byFamily;
-      if (sortKey === 'cls' || grouped) rows.sort((a, b) => he(clsOf(a), clsOf(b)) || cmp(a, b));
-      else rows.sort(cmp);
 
       const tr = (s, n) =>
         '<tr>' +
@@ -104,23 +91,10 @@
         '</tr>';
 
       const body = page.querySelector('#stuBody');
-      if (grouped) {
-        // כותרת לכל שיעור, והמספור מתחיל מ-1 בכל שיעור — כמו רשימת כיתה מודפסת
-        let html = '', cur = null, n = 0;
-        rows.forEach(s => {
-          const c = clsOf(s);
-          if (c !== cur) {
-            cur = c; n = 0;
-            const cnt = rows.filter(x => clsOf(x) === c).length;
-            html += '<tr class="grp"><td colspan="7"><i class="bi bi-mortarboard"></i> ' +
-              esc(c) + ' <span class="det-badge">' + cnt + '</span></td></tr>';
-          }
-          html += tr(s, ++n);
-        });
-        body.innerHTML = html;
-      } else {
-        body.innerHTML = rows.map((s, i) => tr(s, i + 1)).join('');
-      }
+      // מיון וקיבוץ דרך המודול המשותף — אותה התנהגות בדיוק בכל המסכים
+      body.innerHTML = window.cv3Sort
+        ? window.cv3Sort.rows(page, 'stu', rows, clsOf, tr, 7)
+        : rows.map((s, i) => tr(s, i + 1)).join('');
       page.querySelector('#stuCount').textContent = rows.length + ' מתוך ' + students.length + ' תלמידים';
       page.querySelector('#stuEmpty').hidden = rows.length > 0;
       body.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => openDetail(students.find(s => s.id == b.dataset.view))));

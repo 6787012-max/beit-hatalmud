@@ -44,6 +44,10 @@
         '</tr></thead><tbody id="stBody"></tbody></table></div></div>';
 
     function draw() {
+      // מיון אחיד גם לצוות — לפי שם משפחה ואז שם מלא
+      rows.sort((a, b) =>
+        String(a.family || '').localeCompare(String(b.family || ''), 'he') ||
+        String(full(a) || '').localeCompare(String(full(b) || ''), 'he'));
       host.querySelector('#stBody').innerHTML = rows.length ? rows.map(r =>
         '<tr' + (r.active === false ? ' style="opacity:.6"' : '') + '>' +
           '<td><b>' + esc(full(r)) + '</b>' + (r.active === false ? ' <span class="det-badge">לא פעיל</span>' : '') + '</td>' +
