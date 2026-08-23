@@ -545,3 +545,9 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 
 .ex-cell-sel{outline:2px solid #f0b429; outline-offset:-2px}
 @media print{.ex-cell-sel{outline:none !important}}
+
+/* ===== רשימות ממוינות: שורת קיבוץ ועמודת מספור ===== */
+.tbl td.idx{color:var(--muted,#6b7280); font-variant-numeric:tabular-nums; text-align:center; width:44px}
+.tbl tr.grp td{background:var(--accent-soft,#eef2f7); font-weight:700; color:var(--primary,#003048);
+  padding:7px 10px; border-top:2px solid var(--primary,#003048)}
+.tbl tr.grp td .det-badge{margin-inline-start:6px}

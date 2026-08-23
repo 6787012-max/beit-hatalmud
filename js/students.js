@@ -21,7 +21,16 @@
   async function getClasses() { return window.store.list('classes'); }
   async function getStudents() {
     // מודל עמנואל: כל צוות רואה את כל התלמידים; היקף הנתונים נאכף ב-RLS בשרת.
-    return window.store.list('students');
+    //
+    // ⚠️ ממוין כאן, במקום אחד, ולא בכל מסך בנפרד: כמעט כל המסכים (נוכחות,
+    // מעקב, תל"א, טפסים, בוררי תלמיד, יצוא) שואבים דרך הפונקציה הזאת, ולפני
+    // כן הם הציגו את סדר ההכנסה למסד — כלומר בלי סדר בכלל.
+    // המיון לפי **שם משפחה**: העמודה `name` היא "פרטי + משפחה", ולכן מיון
+    // לפיה בלבד הוא מיון לפי שם פרטי, וזה לא מה שמצפים ברשימת שיעור.
+    const list = await window.store.list('students');
+    return (list || []).slice().sort((a, b) =>
+      String(a.family || '').localeCompare(String(b.family || ''), 'he') ||
+      String(a.name || '').localeCompare(String(b.name || ''), 'he'));
   }
   async function saveStudent(row) { return row.id ? window.store.update('students', row.id, row) : window.store.add('students', row); }
   async function removeStudent(id) { return window.store.remove('students', id); }
@@ -44,24 +53,46 @@
         '<select class="inp mb0" id="stuClass"><option value="">כל הכיתות</option>' +
           classes.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('') + '</select>' +
         '<select class="inp mb0" id="stuStatus"><option value="">כל הסטטוסים</option><option value="פעיל">פעיל</option><option value="לא פעיל">לא פעיל</option></select>' +
+        '<select class="inp mb0" id="stuSort">' +
+          '<option value="family">מיון: שם משפחה (א״ב)</option>' +
+          '<option value="first">מיון: שם פרטי (א״ב)</option>' +
+          '<option value="cls">מיון: כיתה ואז שם משפחה</option>' +
+        '</select>' +
+        '<label class="cb" style="white-space:nowrap"><input type="checkbox" id="stuGroup"> קיבוץ לפי שיעור</label>' +
       '</div>' +
       '<div class="count-line" id="stuCount"></div>' +
       '<div class="table-wrap"><table class="tbl"><thead><tr>' +
-        '<th>שם</th><th>כיתה</th><th>הורה</th><th>טלפון</th><th>סטטוס</th><th></th>' +
+        '<th style="width:44px">#</th><th>שם</th><th>כיתה</th><th>הורה</th><th>טלפון</th><th>סטטוס</th><th></th>' +
       '</tr></thead><tbody id="stuBody"></tbody></table></div>' +
       '<div id="stuEmpty" class="empty-state" hidden><i class="bi bi-people"></i><div>אין תלמידים להצגה</div></div>';
+
+    // ── מיון ──────────────────────────────────────────────────────────────
+    // העמודה `name` היא "פרטי + משפחה" ("דוד אריה אוליאל"), ולכן מיון לפיה
+    // הוא מיון לפי שם פרטי. ברשימת שיעור מצפים לשם משפחה — וזו ברירת המחדל.
+    const he = (a, b) => String(a || '').localeCompare(String(b || ''), 'he');
+    const famOf = s => String(s.family || '').trim();
+    const byFamily = (a, b) => he(famOf(a), famOf(b)) || he(a.name, b.name);
+    const byFirst = (a, b) => he(a.name, b.name);
+    const clsOf = s => classNameOf(classes, s.class_id) || 'ללא שיעור';
 
     function draw() {
       const q = (page.querySelector('#stuSearch').value || '').trim();
       const cf = page.querySelector('#stuClass').value;
       const sf = page.querySelector('#stuStatus').value;
-      let rows = students;
-      if (q) rows = rows.filter(s => [s.name, s.parent_name, s.parent_phone].join(' ').includes(q));
+      const sortKey = page.querySelector('#stuSort').value;
+      const grouped = page.querySelector('#stuGroup').checked;
+      let rows = students.slice();
+      if (q) rows = rows.filter(s => [s.name, s.family, s.parent_name, s.parent_phone].join(' ').includes(q));
       if (cf) rows = rows.filter(s => String(s.class_id) === cf);
       if (sf) rows = rows.filter(s => (s.status || '') === sf);
-      const body = page.querySelector('#stuBody');
-      body.innerHTML = rows.map(s =>
+
+      const cmp = sortKey === 'first' ? byFirst : byFamily;
+      if (sortKey === 'cls' || grouped) rows.sort((a, b) => he(clsOf(a), clsOf(b)) || cmp(a, b));
+      else rows.sort(cmp);
+
+      const tr = (s, n) =>
         '<tr>' +
+        '<td class="idx">' + n + '</td>' +
         '<td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> <span class="name-link" data-view="' + s.id + '">' + esc(s.name) + '</span></td>' +
         '<td>' + esc(classNameOf(classes, s.class_id)) + '</td>' +
         '<td>' + esc(s.parent_name) + '</td>' +
@@ -70,7 +101,26 @@
         '<td class="row-act"><button class="mini" data-view="' + s.id + '" title="פרטים"><i class="bi bi-eye"></i></button>' +
         '<button class="mini" data-edit="' + s.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
         ((window.currentUser || {}).role === 'מנהל' ? '<button class="mini danger" data-del="' + s.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>' : '') + '</td>' +
-        '</tr>').join('');
+        '</tr>';
+
+      const body = page.querySelector('#stuBody');
+      if (grouped) {
+        // כותרת לכל שיעור, והמספור מתחיל מ-1 בכל שיעור — כמו רשימת כיתה מודפסת
+        let html = '', cur = null, n = 0;
+        rows.forEach(s => {
+          const c = clsOf(s);
+          if (c !== cur) {
+            cur = c; n = 0;
+            const cnt = rows.filter(x => clsOf(x) === c).length;
+            html += '<tr class="grp"><td colspan="7"><i class="bi bi-mortarboard"></i> ' +
+              esc(c) + ' <span class="det-badge">' + cnt + '</span></td></tr>';
+          }
+          html += tr(s, ++n);
+        });
+        body.innerHTML = html;
+      } else {
+        body.innerHTML = rows.map((s, i) => tr(s, i + 1)).join('');
+      }
       page.querySelector('#stuCount').textContent = rows.length + ' מתוך ' + students.length + ' תלמידים';
       page.querySelector('#stuEmpty').hidden = rows.length > 0;
       body.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => openDetail(students.find(s => s.id == b.dataset.view))));
@@ -363,7 +413,12 @@
 
     page.querySelector('#stuAdd').addEventListener('click', () => openForm(null));
     page.querySelector('#stuCsv').addEventListener('click', exportCsv);
-    ['#stuSearch', '#stuClass', '#stuStatus'].forEach(sel => page.querySelector(sel).addEventListener('input', draw));
+    // select ו-checkbox משדרים change, לא input — בלי זה המיון לא היה מגיב
+    ['#stuSearch', '#stuClass', '#stuStatus', '#stuSort', '#stuGroup'].forEach(sel => {
+      const el = page.querySelector(sel);
+      el.addEventListener('input', draw);
+      el.addEventListener('change', draw);
+    });
     draw();
   }
 
