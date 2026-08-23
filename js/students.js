@@ -241,7 +241,19 @@
         // ── מה שרואים תמיד: המידע שבגללו פותחים כרטיס ──
         '<div class="det-sec"><h4><i class="bi bi-stars"></i> סיכום AI</h4>'
           + '<div id="aiStuSum"></div></div>' +
-        sec('רפואי', 'bi-capsule', med, x => li('<strong>' + esc(x.name) + '</strong>' + (x.details ? ' — ' + esc(x.details) : ''), x.kind === 'allergy' ? 'אלרגיה' : 'תרופה', 'hi')) +
+        // רפואי מופרד לשלושה סוגים (ראה js/medical.js): רגישות היא לא תרופה,
+        // ובכרטיס צריך לראות מיד מה אסור לתת לו.
+        sec('רגישויות ואלרגיות', 'bi-exclamation-octagon', med.filter(x => x.category === 'רגישות'),
+          x => li('<strong>' + esc(x.name) + '</strong>' + (x.details ? ' — ' + esc(x.details) : ''), '', 'hi')) +
+        sec('מצב רפואי', 'bi-heart-pulse', med.filter(x => x.category === 'מצב רפואי'),
+          x => li('<strong>' + esc(x.name) + '</strong>' + (x.details ? ' — ' + esc(x.details) : ''), '', 'mid')) +
+        sec('נטילת תרופות', 'bi-capsule', med.filter(x => (x.category || 'תרופה') === 'תרופה'), x => {
+          const f = window.cv3Medical ? window.cv3Medical.freshness(x) : { txt: '', cls: 'off' };
+          const parts = [x.purpose, x.dose && ('מינון ' + x.dose), x.hours && (x.hours + ' שעות'),
+            x.take_time, x.take_how, x.second ? 'כדור נוסף בצהריים' : ''].filter(Boolean);
+          return li('<strong>' + esc(x.name) + '</strong>' + (parts.length ? ' — ' + esc(parts.join(' · ')) : '') +
+            ' <span class="chip ' + f.cls + '">' + esc(f.txt) + '</span>', '', 'hi');
+        }) +
         sec('התנהגות ומעקב', 'bi-clipboard-check', beh, e => li('<strong>' + esc(catName(e.category_id)) + '</strong>' + (e.note ? ' — ' + esc(e.note) : ''), e.event_date, sevc(e.severity))) +
         attSec +
         (window.cv3Passport ? window.cv3Passport.cardSection(psp) : '') +

@@ -213,7 +213,9 @@
   R.functioning = makeRecord({ table: 'functioning', title: 'ציוני תפקוד', icon: 'bi-bar-chart-line', fields: [{ k: 'area', label: 'תחום' }, { k: 'score', label: 'ציון', type: 'number' }] });
   R.conversations = makeRecord({ table: 'conversations', title: 'שיחות עם תלמידים', icon: 'bi-chat-dots', fields: [{ k: 'summary', label: 'סיכום השיחה', wide: true }] });
   R.meetings = makeRecord({ table: 'meetings', title: 'אסיפות הורים', icon: 'bi-people', fields: [{ k: 'attendees', label: 'משתתפים' }, { k: 'summary', label: 'סיכום', wide: true }] });
-  R.medical = makeRecord({ table: 'medications', title: 'רפואי — אלרגיות ותרופות', icon: 'bi-capsule', restricted: true, dateField: null, fields: [{ k: 'kind', label: 'סוג (אלרגיה/תרופה)' }, { k: 'name', label: 'שם' }, { k: 'details', label: 'פרטים', wide: true }] });
+  // המסך הרפואי עבר ל-js/medical.js: שלוש קטגוריות נפרדות (רגישות / מצב רפואי /
+  // תרופה) עם שדות משלהן ומעקב עדכניות. הטבלה השטוחה כאן לא התאימה לזה.
+
   R.attendance = renderAttendance;
   R.calendar = renderCalendar;
 })();
