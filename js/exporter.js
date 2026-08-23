@@ -167,11 +167,19 @@
     },
   };
 
+  // ⚠️ העמודה `name` במסד היא "פרטי + משפחה" (למשל "דוד אריה אוליאל"), ולכן
+  // מיון לפיה הוא מיון לפי שם פרטי — לא מה שמצפים ברשימת כיתה. ברירת המחדל
+  // היא שם משפחה, ומיון לפי שם פרטי נשאר כאפשרות מפורשת.
   const SORTS = [
-    ['name', 'שם התלמיד (א״ב)'],
-    ['cls', 'כיתה ואז שם'],
+    ['family', 'שם משפחה (א״ב)'],
+    ['cls', 'כיתה ואז שם משפחה'],
+    ['name', 'שם פרטי (א״ב)'],
     ['none', 'סדר המערכת'],
   ];
+  const famOf = s => String((s && s.family) || '').trim();
+  const byFamily = (a, b) =>
+    famOf(a._s).localeCompare(famOf(b._s), 'he') ||
+    String(a.name || '').localeCompare(String(b.name || ''), 'he');
 
   async function render(page) {
     const [classes, students] = await Promise.all([
@@ -252,6 +260,12 @@
       $('#exBlankBar').style.display = blank ? '' : 'none';
       $('#exCols').closest('.fld').style.display = blank ? 'none' : '';
       cols = typeof src.cols === 'function' ? await src.cols({ }) : src.cols.slice();
+      // עמודת שם משפחה זמינה בכל דוח — היא מה שמסתדר לפי א"ב ברשימת כיתה,
+      // בעוד שהעמודה "שם התלמיד" היא "פרטי + משפחה".
+      if (!blank && !cols.some(c => c.k === 'family')) {
+        const at = Math.max(1, cols.findIndex(c => c.k === 'name'));
+        cols.splice(at, 0, { k: 'family', t: 'שם משפחה', def: false });
+      }
       $('#exCols').innerHTML = cols.map((c, i) =>
         '<label class="cb"><input type="checkbox" data-col="' + i + '"' + (c.def ? ' checked' : '') + '> ' + esc(c.t) + '</label>').join('');
       $('#exCols').querySelectorAll('input').forEach(x => x.addEventListener('change', draw));
@@ -303,16 +317,21 @@
       const ctx = { students: list, clsName };
       if (src.blankMode) {
         const sortB = $('#exSort').value;
-        if (sortB !== 'none') list.sort((a, b) => String(nm(a)).localeCompare(String(nm(b)), 'he'));
+        if (sortB === 'name') list.sort((a, b) => String(nm(a)).localeCompare(String(nm(b)), 'he'));
+        else if (sortB !== 'none') list.sort((a, b) =>
+          String(a.family || '').localeCompare(String(b.family || ''), 'he') ||
+          String(nm(a)).localeCompare(String(nm(b)), 'he'));
         const plan = blankPlan(list);
         return paint(plan.rows, plan.picked, src, true);
       }
       let rows = await src.rows(ctx);
 
       const sort = $('#exSort').value;
-      if (sort === 'name') rows.sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
-      else if (sort === 'cls') rows.sort((a, b) => String(a.cls).localeCompare(String(b.cls), 'he') || String(a.name).localeCompare(String(b.name), 'he'));
+      if (sort === 'family') rows.sort(byFamily);
+      else if (sort === 'name') rows.sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
+      else if (sort === 'cls') rows.sort((a, b) => String(a.cls).localeCompare(String(b.cls), 'he') || byFamily(a, b));
 
+      rows.forEach(r => { if (r.family == null) r.family = (r._s && r._s.family) || ''; });
       const picked = [...$('#exCols').querySelectorAll('input:checked')].map(x => cols[Number(x.dataset.col)]);
       return paint(rows, picked, src, false);
     }
