@@ -102,10 +102,14 @@
       systemInstruction: { parts: [{ text: sys }] },
       contents,
       generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 1600,
-        // ראה ההסבר ב-ai-insights.js: טוקני החשיבה נספרים בתוך התקרה
-        thinkingConfig: { thinkingBudget: 0 },
+        temperature: 0.2,
+        // ⚠️ שני איזונים הפוכים כאן, ושניהם נמדדו:
+        // 1. טוקני החשיבה נספרים בתוך maxOutputTokens. עם 600 התשובה נחתכה.
+        // 2. אבל *בלי* חשיבה המודל טועה בספירה — הוא ענה "9 תלמידים בשיעור א"
+        //    במקום 10, וטען שאחוז ההגעה לא בטבלה כשהוא כן. לעוזר הזה יש
+        //    שאלות שדורשות ספירה וסיכום, ולכן משאירים חשיבה ונותנים תקרה
+        //    גבוהה מספיק שגם החשיבה וגם התשובה ייכנסו.
+        maxOutputTokens: 4000,
       },
     };
     const r = await fetch(URL + '?key=' + encodeURIComponent(k),
