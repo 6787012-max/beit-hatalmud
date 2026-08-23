@@ -83,7 +83,12 @@
     const body = {
       systemInstruction: { parts: [{ text: sys }] },
       contents,
-      generationConfig: { temperature: 0.3, maxOutputTokens: 1200 },
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 1600,
+        // ראה ההסבר ב-ai-insights.js: טוקני החשיבה נספרים בתוך התקרה
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     };
     const r = await fetch(URL + '?key=' + encodeURIComponent(k),
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

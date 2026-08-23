@@ -109,7 +109,7 @@
       // שכר הלימוד נשאר כאן משתנה מיותר, וכל מה שאחריו הוזז במקום אחד:
       // קטגוריות הקריאה הוצגו כ"משימות" ותיק המסמכים נעלם. אין להוסיף או
       // להסיר כאן שורה בלי לעדכן את שני הצדדים יחד.
-      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs] = await Promise.all([
+      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs, psp] = await Promise.all([
         window.store.list('categories'),
         window.store.byStudent('behavior_events', s.id), window.store.byStudent('attendance', s.id),
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
@@ -122,12 +122,23 @@
         window.store.byStudent('form_responses', s.id), window.store.list('forms'),
         ((!window.Auth || window.Auth.canAccess('voicereports')) ? window.store.byStudent('voice_reports', s.id) : Promise.resolve([])),
         (window.cv3StudentDocs ? window.cv3StudentDocs.forStudent(s.id) : Promise.resolve([])),
+        window.store.byStudent('passport', s.id),
       ]);
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
       const li = (main, meta, dot) => '<div class="det-item">' + (dot ? '<span class="sev-dot ' + dot + '"></span>' : '') + '<span class="di-main">' + main + '</span><span class="di-meta">' + esc(meta || '') + '</span></div>';
-      const sec = (title, icon, items, fmt) => items.length ? ('<div class="det-sec"><h4><i class="bi ' + icon + '"></i> ' + title + ' <span class="det-badge">' + items.length + '</span></h4>' + items.slice(-4).reverse().map(fmt).join('') + '</div>') : '';
+      // מציג את כל הרשומות מהחדשה לישנה, אבל בגובה של כחמש שורות ועם גלילה
+      // פנימית. קודם הוצגו ארבע בלבד והשאר פשוט לא היו נגישים; מצד שני תלמיד
+      // עם 100 דיווחים היה מותח את הכרטיס לאורך אינסופי.
+      const sec = (title, icon, items, fmt) => {
+        if (!items.length) return '';
+        const body = items.slice().reverse().map(fmt).join('');
+        return '<div class="det-sec"><h4><i class="bi ' + icon + '"></i> ' + title +
+          ' <span class="det-badge">' + items.length + '</span>' +
+          (items.length > 5 ? '<span class="det-hint">5 אחרונים · גלול לעוד</span>' : '') +
+          '</h4>' + (items.length > 5 ? '<div class="det-scroll">' + body + '</div>' : body) + '</div>';
+      };
       const attC = { present: 0, late: 0, absent: 0 }; att.forEach(a => attC[a.status] != null && attC[a.status]++);
       // משימות הקשורות לתלמיד — תאריך יעד בעברית + צ'יפ סטטוס (מראה זהה לסקשנים קריאה/כתיבה/מבחנים)
       const hebDate = iso => { if (!iso) return ''; try { const d = new Date(String(iso).slice(0, 10) + 'T00:00:00'); return isNaN(d.getTime()) ? String(iso) : new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long' }).format(d); } catch (_) { return String(iso); } };
@@ -220,29 +231,36 @@
         '<div class="det-grid">' + row('כיתה', classNameOf(classes, s.class_id)) + row('שם הורה', s.parent_name) +
           (s.parent_phone ? '<div class="det-row"><span class="det-lbl">טלפון</span><span class="det-val"><a href="tel:' + esc(s.parent_phone) + '">' + esc(s.parent_phone) + '</a></span></div>' : '') +
           row('הערות', s.notes) + '</div>' +
-        regSec +
         '<div class="det-stats">' +
           '<div class="ds"><b>' + beh.length + '</b><span>דיווחים</span></div>' +
           '<div class="ds"><b>' + attC.present + '</b><span>נוכחות</span></div>' +
           '<div class="ds"><b>' + tst.length + '</b><span>מבחנים</span></div>' +
           '<div class="ds"><b>' + (med.length ? '⚠' : '—') + '</b><span>רפואי</span></div>' +
         '</div>' +
-        linksHTML +
-        sec('התנהגות', 'bi-clipboard-check', beh, e => li('<strong>' + esc(catName(e.category_id)) + '</strong>' + (e.note ? ' — ' + esc(e.note) : ''), e.event_date, sevc(e.severity))) +
-        sec('מבחנים', 'bi-card-checklist', tst, t => li(esc(t.subject) + ' · <strong>' + esc(t.grade) + '</strong>', t.date)) +
-        sec('ציוני תפקוד', 'bi-bar-chart-line', fnc, f => li(esc(f.area) + ' · <strong>' + esc(f.score) + '</strong>', f.date)) +
-        sec('רפואי', 'bi-capsule', med, x => li('<strong>' + esc(x.name) + '</strong>' + (x.details ? ' — ' + esc(x.details) : ''), x.kind === 'allergy' ? 'אלרגיה' : 'תרופה', 'hi')) +
-        sec('שיחות', 'bi-chat-dots', cnv, c => li(esc(c.summary), c.date)) +
-        sec('אסיפות הורים', 'bi-people', mtg, x => li(esc(x.summary), x.date)) +
-        sec('קריאה', 'bi-book', rdg, x => li('רמה: ' + esc(x.level) + (x.note ? ' — ' + esc(x.note) : ''), x.date)) +
-        sec('כתיבה', 'bi-pencil-square', wrt, x => li('רמה: ' + esc(x.level), x.date)) +
-        (window.cv3ReadAssess ? window.cv3ReadAssess.cardSection(raCats, raAssess) : '') +
-        (window.cv3Tla ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
-        (window.cv3StudentDocs ? window.cv3StudentDocs.cardSection(sdocs) : '') +
+        // ── מה שרואים תמיד: המידע שבגללו פותחים כרטיס ──
         '<div class="det-sec"><h4><i class="bi bi-stars"></i> סיכום AI</h4>'
           + '<div id="aiStuSum"></div></div>' +
-        attSec + frmSec + vSec +
-        tasksSec +
+        sec('רפואי', 'bi-capsule', med, x => li('<strong>' + esc(x.name) + '</strong>' + (x.details ? ' — ' + esc(x.details) : ''), x.kind === 'allergy' ? 'אלרגיה' : 'תרופה', 'hi')) +
+        sec('התנהגות ומעקב', 'bi-clipboard-check', beh, e => li('<strong>' + esc(catName(e.category_id)) + '</strong>' + (e.note ? ' — ' + esc(e.note) : ''), e.event_date, sevc(e.severity))) +
+        attSec +
+        (window.cv3Passport ? window.cv3Passport.cardSection(psp) : '') +
+        (window.cv3Tla ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
+        (window.cv3StudentDocs ? window.cv3StudentDocs.cardSection(sdocs) : '') +
+        // ── כל השאר מאחורי "הרחב": פרטי הרישום המלאים וההיסטוריה ──
+        '<button class="btn-ghost sm det-more-btn" id="stuMoreBtn" type="button">' +
+          '<i class="bi bi-chevron-down"></i> <span>הצג את כל הנתונים</span></button>' +
+        '<div id="stuMore" hidden>' +
+          regSec +
+          linksHTML +
+          sec('מבחנים', 'bi-card-checklist', tst, t => li(esc(t.subject) + ' · <strong>' + esc(t.grade) + '</strong>', t.date)) +
+          sec('ציוני תפקוד', 'bi-bar-chart-line', fnc, f => li(esc(f.area) + ' · <strong>' + esc(f.score) + '</strong>', f.date)) +
+          sec('שיחות', 'bi-chat-dots', cnv, c => li(esc(c.summary), c.date)) +
+          sec('אסיפות הורים', 'bi-people', mtg, x => li(esc(x.summary), x.date)) +
+          sec('קריאה', 'bi-book', rdg, x => li('רמה: ' + esc(x.level) + (x.note ? ' — ' + esc(x.note) : ''), x.date)) +
+          sec('כתיבה', 'bi-pencil-square', wrt, x => li('רמה: ' + esc(x.level), x.date)) +
+          (window.cv3ReadAssess ? window.cv3ReadAssess.cardSection(raCats, raAssess) : '') +
+          frmSec + vSec + tasksSec +
+        '</div>' +
         '<div class="det-actions" style="margin-top:14px">' +
           '<button class="btn-primary sm" data-edit2><i class="bi bi-pencil"></i> עריכת פרטים</button>' +
           '<button class="btn-ghost sm" data-reading><i class="bi bi-book-half"></i> מעקב קריאה</button>' +
@@ -253,6 +271,15 @@
           '<button class="btn-ghost sm" data-print2><i class="bi bi-printer"></i> הדפסה</button>' +
           '<button class="btn-ghost sm" data-go="behavior"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' +
         '</div>';
+      // "הצג את כל הנתונים" — הכרטיס נפתח על העיקר, וכל השאר בלחיצה אחת.
+      const moreBtn = m.el.querySelector('#stuMoreBtn'), moreBox = m.el.querySelector('#stuMore');
+      if (moreBtn && moreBox) moreBtn.addEventListener('click', () => {
+        const open = moreBox.hidden;
+        moreBox.hidden = !open;
+        moreBtn.querySelector('span').textContent = open ? 'הסתר את הנתונים המלאים' : 'הצג את כל הנתונים';
+        moreBtn.querySelector('i').className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+        if (open) moreBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
       m.el.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => { m.close(); showPage(btn.dataset.go); }));
       const eb = m.el.querySelector('[data-edit2]'); if (eb) eb.addEventListener('click', () => { m.close(); openForm(s); });
       // הדפסה של הכרטיס בלבד — קודם window.print() הדפיס את כל הדף שמאחורי המודאל

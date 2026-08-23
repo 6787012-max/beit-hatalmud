@@ -257,7 +257,46 @@
     document.head.appendChild(s);
   }
 
-  window.cv3Passport = { WEEKS, FIELDS, score, currentWeek };
+  // ── סקשן לכרטיס התלמיד ────────────────────────────────────────────────
+  // מציג את חמשת השבועות האחרונים שהוזנו + סיכום, ולא את כל 22 —
+  // הכרטיס אמור לתת תמונה, לא להיות טבלה שנייה.
+  function cardSection(rows) {
+    rows = (rows || []).slice().sort((a, b) => b.week_no - a.week_no);
+    const head = '<div class="det-sec"><h4><i class="bi bi-passport"></i> דרכון' +
+      ' <span class="det-badge">' + rows.length + '/' + WEEKS.length + '</span></h4>';
+    if (!rows.length) {
+      return head + '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">' +
+        'עדיין לא הוזנו נתוני דרכון לתלמיד זה.</div></div>';
+    }
+    const sc = rows.map(score).filter(x => x != null);
+    const pick = k => rows.map(r => r[k]).filter(x => x != null);
+    const sum = k => { const a = pick(k); return a.length ? a.reduce((x, y) => x + y, 0) : null; };
+    const av = k => { const a = pick(k); return a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null; };
+    const val = v => v == null ? '—' : v;
+    return head +
+      '<div class="det-grid">' +
+        '<div class="det-row"><span class="det-lbl">ניקוד ממוצע</span><span class="det-val">' +
+          (sc.length ? chip(Math.round(sc.reduce((a, b) => a + b, 0) / sc.length)) : '—') + '</span></div>' +
+        '<div class="det-row"><span class="det-lbl">סה״כ שחרית בזמן</span><span class="det-val">' + val(sum('shacharit')) + ' ימים</span></div>' +
+        '<div class="det-row"><span class="det-lbl">סה״כ לימוד בשב״ק</span><span class="det-val">' +
+          (sum('study_min') != null ? Math.round(sum('study_min') / 60) + ' שעות' : '—') + '</span></div>' +
+        '<div class="det-row"><span class="det-lbl">ממוצע מבחנים</span><span class="det-val">בכתב ' +
+          val(av('test_written')) + ' · בע״פ ' + val(av('test_oral')) + '</span></div>' +
+      '</div>' +
+      scrollWrap(rows.map(r =>
+        '<div class="det-item"><span class="di-main"><strong>' + esc(r.parasha || '') + '</strong>' +
+        ' · שחרית ' + val(r.shacharit) + ' · לימוד ' + val(r.study_min) + ' דק׳' +
+        (r.test_written != null ? ' · בכתב ' + r.test_written : '') +
+        (r.test_oral != null ? ' · בע״פ ' + r.test_oral : '') +
+        '</span><span class="di-meta">' + esc(r.heb_date || '') + '</span></div>').join(''), rows.length) +
+      '</div>';
+  }
+  // גלילה פנימית: מציג כחמש שורות, והשאר בגלילה — כך 22 שבועות לא מותחים את הכרטיס
+  function scrollWrap(html, n) {
+    return n > 5 ? '<div class="det-scroll">' + html + '</div>' : html;
+  }
+
+  window.cv3Passport = { WEEKS, FIELDS, score, currentWeek, cardSection };
   const R = window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
   R.passport = render;
 })();

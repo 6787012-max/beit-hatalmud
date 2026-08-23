@@ -88,7 +88,17 @@
       useCORS: true,
       logging: false,
       windowWidth: el.scrollWidth,
-      onclone: sanitizeColors,
+      onclone: doc => {
+        sanitizeColors(doc);
+        // ב-PDF מוציאים את הכל: מה שמוסתר מאחורי "הצג את כל הנתונים" ומה
+        // שגלול בתוך סקשן. אחרת הקובץ מציג פחות ממה שיש בכרטיס.
+        doc.querySelectorAll('[hidden]').forEach(e => { e.hidden = false; e.style.display = ''; });
+        doc.querySelectorAll('.det-scroll').forEach(e => {
+          e.style.maxHeight = 'none'; e.style.overflow = 'visible';
+          e.style.border = '0'; e.style.background = 'none';
+        });
+        doc.querySelectorAll('.det-more-btn').forEach(e => { e.style.display = 'none'; });
+      },
     });
 
     const land = opts.orientation === 'landscape';

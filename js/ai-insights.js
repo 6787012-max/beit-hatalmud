@@ -32,7 +32,15 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens || 700 },
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: maxTokens || 1200,
+          // ⚠️ gemini-2.5 מוציא טוקני "חשיבה" *מתוך* maxOutputTokens — נמדדו
+          // 1,535 טוקני חשיבה על בקשה של 57 טוקן. עם תקרה של 600 התשובה
+          // נחתכה (finishReason=MAX_TOKENS) והמשתמש ראה כותרת בלי תוכן.
+          // כאן אין צורך בחשיבה: הסיכום נגזר ישירות מהנתונים שנשלחו.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
     const d = await res.json();
@@ -46,16 +54,19 @@
   // ── מטמון: מייצרים מחדש רק כשהנתונים באמת השתנו ──
   // "סיכום בכל פתיחה" לא אמור להיות קריאה לרשת בכל פתיחה: חתימה על הנתונים
   // מספיקה כדי לדעת אם משהו זז מאז הפעם הקודמת.
+  // גרסת מטמון: סיכומים שנוצרו לפני תיקון טוקני החשיבה נשמרו קטועים.
+  // העלאת המספר מבטלת אותם בלי לגעת ב-localStorage של המשתמש.
+  const CV = 'v2:';
   function cacheGet(k, sig) {
     try {
-      const raw = localStorage.getItem('cv3ai_' + k);
+      const raw = localStorage.getItem('cv3ai_' + CV + k);
       if (!raw) return null;
       const o = JSON.parse(raw);
       return o && o.sig === sig ? o : null;
     } catch (_) { return null; }
   }
   function cacheSet(k, sig, text) {
-    try { localStorage.setItem('cv3ai_' + k, JSON.stringify({ sig: sig, text: text, at: Date.now() })); } catch (_) {}
+    try { localStorage.setItem('cv3ai_' + CV + k, JSON.stringify({ sig: sig, text: text, at: Date.now() })); } catch (_) {}
   }
   const ago = ts => {
     const m = Math.round((Date.now() - ts) / 60000);
@@ -187,7 +198,7 @@
       const r = host.querySelector('[data-airefresh]');
       if (r) r.addEventListener('click', e => {
         e.preventDefault();
-        try { localStorage.removeItem('cv3ai_' + ck); } catch (_) {}
+        try { localStorage.removeItem('cv3ai_' + CV + ck); } catch (_) {}
         renderStudent(host, student);
       });
     } catch (e) {
@@ -217,7 +228,7 @@
       const r = host.querySelector('[data-airefresh]');
       if (r) r.addEventListener('click', e => {
         e.preventDefault();
-        try { localStorage.removeItem('cv3ai_org'); } catch (_) {}
+        try { localStorage.removeItem('cv3ai_' + CV + 'org'); } catch (_) {}
         renderOrg(host);
       });
     } catch (e) {
