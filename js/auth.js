@@ -69,8 +69,8 @@
   // יכולות לפי תפקיד (בקשת עמנואל): מסכים מותרים + מצב (מלא/צפייה-בלבד/הזנה-בלבד).
   function roleCaps(role) {
     const money = ['cashbox', 'exporter'];
-    const entry = ['behavior', 'attendance', 'tests'];  // מסכי הזנה (מלמד)
-    const nonMoney = ['behavior', 'attendance', 'tests', 'readassess', 'tla', 'students', 'medical', 'forms', 'calendar', 'reports', 'exporter'];
+    const entry = ['behavior', 'attendance', 'tests', 'passport'];  // מסכי הזנה (מלמד)
+    const nonMoney = ['behavior', 'attendance', 'tests', 'readassess', 'tla', 'passport', 'students', 'medical', 'forms', 'calendar', 'reports', 'exporter'];
     switch (role) {
       case 'מנהל':  return { perms: null, mode: 'full', scoped: false };          // הכל + שינויים + כספים
       case 'מפקח':  return { perms: null, mode: 'readonly', scoped: false };       // הכל, ללא שינויים

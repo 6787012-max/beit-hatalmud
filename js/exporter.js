@@ -125,6 +125,42 @@
       async cols() { return []; },
       async rows() { return []; },
     },
+    passport: {
+      // אותם שדות כמו בחוברת הדרכון ובמסך הדרכון — כדי שהמודפס יתאים למה שרואים
+      label: 'דרכון — סיכום שבועי', icon: 'bi-passport',
+      cols: [
+        { k: 'idx', t: '#', def: true, w: 40 },
+        { k: 'name', t: 'שם התלמיד', def: true },
+        { k: 'cls', t: 'שיעור', def: true, w: 70 },
+        { k: 'weeks', t: 'שבועות שהוזנו', def: true, w: 80 },
+        { k: 'shacharit', t: 'סה״כ שחרית', def: true, w: 75 },
+        { k: 'hours', t: 'סה״כ לימוד', def: true, w: 75 },
+        { k: 'written', t: 'ממוצע בכתב', def: true, w: 75 },
+        { k: 'oral', t: 'ממוצע בע״פ', def: true, w: 75 },
+        { k: 'score', t: 'ניקוד כללי', def: true, w: 70 },
+      ],
+      async rows(ctx) {
+        const P = window.cv3Passport;
+        const all = await window.store.list('passport');
+        const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null;
+        return ctx.students.map(s => {
+          const mine = all.filter(r => r.student_id === s.id);
+          const pick = k => mine.map(r => r[k]).filter(x => x != null);
+          const sc = P ? mine.map(P.score).filter(x => x != null) : [];
+          const sum = k => { const a = pick(k); return a.length ? a.reduce((x, y) => x + y, 0) : null; };
+          const hours = sum('study_min');
+          return {
+            name: nm(s), cls: ctx.clsName(s.class_id), _s: s,
+            weeks: mine.length + (P ? '/' + P.WEEKS.length : ''),
+            shacharit: sum('shacharit') != null ? sum('shacharit') : '—',
+            hours: hours != null ? Math.round(hours / 60) + ' ש׳' : '—',
+            written: avg(pick('test_written')) != null ? avg(pick('test_written')) : '—',
+            oral: avg(pick('test_oral')) != null ? avg(pick('test_oral')) : '—',
+            score: avg(sc) != null ? avg(sc) : '—',
+          };
+        });
+      },
+    },
     docs: {
       // נעמי לוי ביקשה "לבדוק מה קיים בחומרים ומה לא" לפני בניית התל"אות.
       // לכן זו מטריצה אמיתית: עמודה לכל מסמך חובה, ולא רק "יש תיקייה".
