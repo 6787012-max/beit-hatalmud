@@ -105,7 +105,11 @@
     async function openDetail(s) {
       if (!s) return;
       const m = window.UI.modal({ title: 'כרטיס תלמיד', bodyHTML: '<div style="padding:26px;text-align:center;color:var(--muted)"><i class="bi bi-hourglass-split"></i> טוען…</div>' });
-      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tui, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs] = await Promise.all([
+      // ⚠️ סדר המשתנים חייב להתאים אחד-לאחד לסדר ההבטחות למטה. כשהוסר
+      // שכר הלימוד נשאר כאן משתנה מיותר, וכל מה שאחריו הוזז במקום אחד:
+      // קטגוריות הקריאה הוצגו כ"משימות" ותיק המסמכים נעלם. אין להוסיף או
+      // להסיר כאן שורה בלי לעדכן את שני הצדדים יחד.
+      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs] = await Promise.all([
         window.store.list('categories'),
         window.store.byStudent('behavior_events', s.id), window.store.byStudent('attendance', s.id),
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
