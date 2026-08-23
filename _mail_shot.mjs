@@ -1,0 +1,10 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ channel: 'chrome' });
+const p = await (await b.newContext({ viewport: { width: 820, height: 1200 }, deviceScaleFactor: 1.5 })).newPage();
+const url = 'file:///' + process.cwd().split(String.fromCharCode(92)).join('/') + '/.local/_mail_preview.html';
+await p.goto(url, { waitUntil: 'networkidle' });
+await p.waitForTimeout(1500);
+await p.screenshot({ path: '.local/_mail_top.png' });
+await p.screenshot({ path: '.local/_mail_full.png', fullPage: true });
+console.log('גובה:', await p.evaluate(() => document.body.scrollHeight));
+await b.close();

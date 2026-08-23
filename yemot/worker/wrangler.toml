@@ -1,0 +1,20 @@
+# Worker שקולט דיווחים קוליים משלוחה 9 בימות — רץ בענן, לא תלוי במחשב.
+name = "bht-voice-reports"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+[triggers]
+# כל 5 דקות. דיווח קולי לא דחוף לשנייה, וזה מספיק תכוף שאיש צוות
+# שהתקשר יראה את הדיווח במערכת עוד לפני שהגיע לישיבה.
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true
+
+# סודות (לא בקובץ!) — מוגדרים פעם אחת:
+#   wrangler secret put YM_USER          → 0733518751
+#   wrangler secret put YM_PASS          → סיסמת הקו
+#   wrangler secret put SB_URL           → https://jpcepdbhouuwpjdidqfo.supabase.co
+#   wrangler secret put SB_SERVICE_KEY   → service_role key
+#   wrangler secret put GEMINI_KEY       → מפתח Gemini
+#   wrangler secret put RUN_KEY          → מחרוזת אקראית להרצה ידנית
