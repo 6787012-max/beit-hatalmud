@@ -111,7 +111,9 @@
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
       '<h2>תל"א — תכנית לימודים אישית</h2>' +
-      '<div class="head-actions"><button class="btn-primary sm" id="tlaNew"><i class="bi bi-plus-lg"></i> תל"א חדש</button></div></div>' +
+      '<div class="head-actions">' +
+        (isAdmin() ? '<button class="btn-ghost sm" id="tlaBatch"><i class="bi bi-magic"></i> מילוי אוטומטי לכולם</button> ' : '') +
+        '<button class="btn-primary sm" id="tlaNew"><i class="bi bi-plus-lg"></i> תל"א חדש</button></div></div>' +
       '<div class="toolbar" style="grid-template-columns:1fr auto auto">' +
         '<input class="inp mb0" id="tlaQ" placeholder="חיפוש תלמיד…">' +
         '<select class="inp mb0" id="tlaStat"><option value="">כל הסטטוסים</option>' +
@@ -160,6 +162,10 @@
     page.querySelector('#tlaQ').addEventListener('input', draw);
     page.querySelector('#tlaStat').addEventListener('change', draw);
     page.querySelector('#tlaNew').addEventListener('click', () => newPlanDialog(() => renderPage(page)));
+    // הרצה קבוצתית — מנהל בלבד. יוצרת טיוטות, לא כותבת לתיקים.
+    const bb = page.querySelector('#tlaBatch');
+    if (bb && window.cv3TlaAutofill) bb.addEventListener('click', () => window.cv3TlaAutofill.batchModal());
+    else if (bb) bb.style.display = 'none';
     draw();
   }
 
