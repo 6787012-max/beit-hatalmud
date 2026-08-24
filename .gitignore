@@ -25,3 +25,7 @@ package-lock.json
 video/_build/
 video/shots/
 video/out/
+
+# מסך הלובי — קונפיג מקומי של המחשב בלובי
+lobby/lobby_config.json
+lobby/__pycache__/

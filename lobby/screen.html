@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מסך לובי — מכינה בית התלמוד</title>
+<link href="../vendor/heebo.css" rel="stylesheet">
+<link rel="stylesheet" href="../vendor/bootstrap-icons.css">
+<style>
+/* מסך הלובי — נבנה למסך גדול בקיוסק. כל התוכן נשלט מהפאנל שבאתר (מסך הלובי). */
+*{box-sizing:border-box;margin:0;padding:0}
+*::-webkit-scrollbar{display:none}
+*{scrollbar-width:none;-ms-overflow-style:none}
+:root{
+  --navy:#003048; --navy-2:#00405f; --gold:#a87830; --gold-lt:#e3b96b;
+  --ink:#fff; --muted:#9fb3c0; --card:rgba(255,255,255,.055);
+  --line:rgba(255,255,255,.13); --ok:#3ecf8e;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:#00131e;color:var(--ink);
+  font-family:'Heebo',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+#bg{position:fixed;inset:0;z-index:0;background:
+  radial-gradient(1200px 800px at 85% -10%,rgba(168,120,48,.20),transparent 60%),
+  radial-gradient(1000px 700px at 10% 110%,rgba(0,64,95,.55),transparent 60%),
+  linear-gradient(160deg,#00131e,#001c2b 55%,#00131e)}
+#bg::after{content:"";position:absolute;inset-inline-end:-60px;bottom:-60px;width:380px;height:380px;
+  background:url(../img/logo.png) center/contain no-repeat;opacity:.05}
+
+#stage{position:relative;z-index:2;display:grid;grid-template-columns:minmax(300px,23%) 1fr;
+  grid-template-rows:1fr auto;gap:16px;height:100vh;padding:16px}
+aside{grid-row:1/2;display:flex;flex-direction:column;gap:12px;min-height:0}
+main{grid-row:1/2;position:relative;border-radius:20px;overflow:hidden;background:#000;
+  border:1px solid var(--line);box-shadow:0 24px 70px rgba(0,0,0,.6)}
+footer{grid-column:1/-1}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;
+  backdrop-filter:blur(14px)}
+.card h3{font-size:.82rem;font-weight:700;letter-spacing:.04em;color:var(--gold-lt);
+  margin-bottom:9px;display:flex;align-items:center;gap:7px;text-transform:none}
+
+/* שעון */
+#clockCard{text-align:center;container-type:inline-size;padding-bottom:10px}
+#clock{font-size:clamp(2.6rem,26cqi,5.4rem);font-weight:800;line-height:1;letter-spacing:-2px;
+  font-variant-numeric:tabular-nums;text-shadow:0 0 40px rgba(255,255,255,.25)}
+#clock .sc{opacity:.45;font-size:.45em;font-weight:600;margin-inline-start:6px;letter-spacing:0}
+#dHeb{color:var(--gold-lt);font-size:1.15rem;font-weight:600;margin-top:6px}
+#dGreg{color:var(--muted);font-size:.86rem;margin-top:2px}
+#meta{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin-top:10px;
+  color:var(--muted);font-size:.86rem}
+#meta b{color:#dbe7ee;font-weight:600}
+#parasha{margin-top:9px;font-size:.95rem;color:var(--gold-lt);background:rgba(168,120,48,.14);
+  border:1px solid rgba(168,120,48,.3);border-radius:10px;padding:5px 9px;display:none}
+#zmanim{display:none;gap:4px 10px;flex-wrap:wrap;justify-content:center;margin-top:9px;
+  font-size:.8rem;color:var(--muted)}
+#zmanim span b{color:#cfe0ea;font-weight:600}
+
+/* תפריט */
+#menuCard{display:none}
+#menuDay{font-size:.8rem;color:var(--muted);margin-bottom:6px}
+#menuMain{font-size:1.5rem;font-weight:800;line-height:1.15}
+#menuSide{font-size:1.05rem;color:#d7e6ee;margin-top:3px}
+#menuVeg{font-size:.95rem;color:var(--muted);margin-top:2px}
+#menuNote{font-size:.85rem;color:var(--gold-lt);margin-top:6px}
+
+/* סדר יום */
+#agendaCard{flex:1;display:flex;flex-direction:column;min-height:0}
+#agenda{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.ag{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;
+  font-size:clamp(.92rem,2.1vh,1.12rem);opacity:.62;transition:all .35s}
+.ag .t{color:var(--gold-lt);font-weight:700;font-variant-numeric:tabular-nums;min-width:52px}
+.ag.done{opacity:.32}
+.ag.now{opacity:1;background:linear-gradient(90deg,rgba(168,120,48,.32),rgba(168,120,48,.06));
+  border-inline-start:4px solid var(--gold);font-weight:700;padding-inline-start:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.35);font-size:clamp(1rem,2.4vh,1.25rem)}
+.ag.next{opacity:.9}
+.ag .k{margin-inline-start:auto;font-size:.7rem;color:var(--muted);opacity:.8}
+
+/* וידאו */
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;
+  transition:opacity 1.2s ease-in-out}
+video.off{opacity:0}
+#vinfo{position:absolute;inset-inline:0;bottom:0;padding:10px 18px;display:flex;justify-content:space-between;
+  background:linear-gradient(to top,rgba(0,0,0,.75),transparent);font-size:.8rem;color:#c7d6de;
+  opacity:0;transition:opacity .25s}
+main:hover #vinfo{opacity:1}
+
+/* מסך שיעור / מנוחה */
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;padding:30px;text-align:center;opacity:0;pointer-events:none;transition:opacity 1s;
+  background:radial-gradient(ellipse at center,#00243a 0%,#00131e 75%)}
+#ov.on{opacity:1;pointer-events:auto}
+#ovClock{font-size:clamp(5rem,17vw,15rem);font-weight:800;line-height:.95;letter-spacing:-5px;
+  font-variant-numeric:tabular-nums;text-shadow:0 0 70px rgba(255,255,255,.22)}
+#ovClock .bl{animation:bl 1.1s infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
+#ovTitle{font-size:clamp(1.6rem,3.6vw,3.2rem);font-weight:700;color:var(--gold-lt)}
+#ovSub{font-size:clamp(1rem,1.8vw,1.5rem);color:var(--muted)}
+#ovBarWrap{width:min(560px,70%);height:8px;border-radius:99px;background:rgba(255,255,255,.12);
+  overflow:hidden;margin-top:14px;display:none}
+#ovBar{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-lt));
+  border-radius:99px;transition:width 1s linear}
+#ovMenu{display:none;margin-top:12px;font-size:clamp(1.1rem,2.4vw,2rem);color:#e7f1f6}
+#ovMenu .m{font-weight:800;color:#fff}
+#ovAgenda{display:none;margin-top:14px;width:min(760px,88%);text-align:start}
+#ovAgenda .ag{font-size:1.15rem}
+
+/* פס תחתון */
+footer{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);
+  border-radius:16px;padding:10px 16px;backdrop-filter:blur(14px);overflow:hidden}
+#brand{font-weight:800;color:var(--gold-lt);white-space:nowrap;font-size:1rem}
+#brand i{opacity:.7;margin-inline-end:6px}
+#tickWrap{flex:1;overflow:hidden;white-space:nowrap;-webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+#tick{display:inline-block;white-space:nowrap;animation:sc 60s linear infinite;font-size:1.05rem}
+#tick .sep{color:var(--gold);margin:0 22px;opacity:.7}
+#tick .hi{color:var(--gold-lt);font-weight:700}
+@keyframes sc{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+#dot{width:9px;height:9px;border-radius:50%;background:#5a6b75;flex:0 0 auto}
+#dot.ok{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+#dot.err{background:#e05a5a}
+
+#hint{position:fixed;inset-inline-start:14px;bottom:14px;z-index:9;font-size:.78rem;color:var(--muted);
+  background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:10px;padding:7px 11px;
+  opacity:0;transition:opacity .3s;pointer-events:none;max-width:46vw}
+#hint.on{opacity:1}
+#fsBtn{position:fixed;inset-inline-end:16px;top:16px;z-index:20;width:52px;height:52px;border-radius:14px;
+  background:rgba(0,0,0,.55);border:1px solid var(--line);color:var(--gold-lt);font-size:1.3rem;cursor:pointer;
+  opacity:0;transition:opacity .25s,transform .15s}
+#fsBtn:hover{transform:scale(1.08);background:rgba(168,120,48,.25)}
+body:hover #fsBtn,#fsBtn.show{opacity:.9}
+body.fs #fsBtn{display:none}
+@media (max-width:900px){#stage{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+  aside{grid-row:1/2}main{grid-row:2/3;min-height:40vh}}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+
+<div id="stage">
+  <aside>
+    <div class="card" id="clockCard">
+      <div id="clock">--:--</div>
+      <div id="dHeb"></div>
+      <div id="dGreg"></div>
+      <div id="meta"></div>
+      <div id="zmanim"></div>
+      <div id="parasha"></div>
+    </div>
+
+    <div class="card" id="menuCard">
+      <h3><i class="bi bi-egg-fried"></i> <span id="menuTitle">ארוחת צהריים</span></h3>
+      <div id="menuDay"></div>
+      <div id="menuMain"></div>
+      <div id="menuSide"></div>
+      <div id="menuVeg"></div>
+      <div id="menuNote"></div>
+    </div>
+
+    <div class="card" id="agendaCard">
+      <h3><i class="bi bi-clock-history"></i> סדר היום</h3>
+      <div id="agenda"></div>
+    </div>
+  </aside>
+
+  <main>
+    <video id="vA" muted playsinline preload="auto"></video>
+    <video id="vB" class="off" muted playsinline preload="auto"></video>
+    <div id="vinfo"><span id="vName"></span><span id="vCount"></span></div>
+    <div id="ov" class="on">
+      <div id="ovClock">--:--</div>
+      <div id="ovTitle"></div>
+      <div id="ovSub"></div>
+      <div id="ovBarWrap"><div id="ovBar"></div></div>
+      <div id="ovMenu"></div>
+      <div id="ovAgenda"></div>
+    </div>
+  </main>
+
+  <footer>
+    <span id="brand"><i class="bi bi-mortarboard-fill"></i><span id="brandText">מכינה בית התלמוד</span></span>
+    <div id="tickWrap"><span id="tick"></span></div>
+    <span id="dot" title="חיבור"></span>
+  </footer>
+</div>
+<button id="fsBtn" title="מסך מלא (F)"><i class="bi bi-arrows-fullscreen"></i></button>
+<div id="hint"></div>
+
+<script>
+(function () {
+'use strict';
+
+// ── חיבורים ──────────────────────────────────────────────────────────────
+var SB_URL = 'https://jpcepdbhouuwpjdidqfo.supabase.co';
+var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwY2VwZGJob3V1d3BqZGlkcWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NTY1NDIsImV4cCI6MjEwMjAzMjU0Mn0.SR1cwgyI6eDv5aXqPkL4Nu0UINuvaWIh4jtElO44LS0';
+// שרת הסרטונים המקומי. כשהדף מוגש ממנו — נתיבים יחסיים; מ-https אי אפשר לפנות ל-http (Mixed Content),
+// ואז המסך עובר אוטומטית למצב "לוח מידע בלבד".
+var LOCAL = (location.port === '8484') ? '' : (location.protocol === 'https:' ? null : 'http://localhost:8484');
+
+var DEF = { headline:'מכינה בית התלמוד', city:'בית שמש', lat:31.747, lon:34.988, geonameid:295432,
+  showWeather:true, showParasha:true, showZmanim:true, showMenu:true, showMessages:true, showAgenda:true,
+  videosEnabled:true, videosOnlyOnBreaks:true, crossfadeSec:3, refreshSec:60, lessonScreen:'clock',
+  videoRoot:'', videoFolders:[] };
+
+var cfg = { schedule:{ default:[], byDay:{}, offDays:[5,6] }, menu:{ days:{} }, messages:{ items:[] }, display:DEF };
+var srv = { ok:false, root:'', exists:false, folders:[], videos:[] };
+var $ = function (id) { return document.getElementById(id); };
+var pad = function (n) { return String(n).padStart(2, '0'); };
+
+function hint(msg) { var h = $('hint'); h.textContent = msg || ''; h.className = msg ? 'on' : ''; }
+
+// ── תאריך עברי (גימטריה — Intl לבדו מחזיר ספרות) ────────────────────────
+function gematria(n) {
+  var H = [[400,'ת'],[300,'ש'],[200,'ר'],[100,'ק'],[90,'צ'],[80,'פ'],[70,'ע'],[60,'ס'],[50,'נ'],[40,'מ'],
+           [30,'ל'],[20,'כ'],[10,'י'],[9,'ט'],[8,'ח'],[7,'ז'],[6,'ו'],[5,'ה'],[4,'ד'],[3,'ג'],[2,'ב'],[1,'א']];
+  n = Number(n) % 1000;
+  if (n === 15) return 'ט״ו';
+  if (n === 16) return 'ט״ז';
+  var out = '';
+  for (var i = 0; i < H.length; i++) while (n >= H[i][0]) { out += H[i][1]; n -= H[i][0]; }
+  if (!out) return '';
+  return out.length > 1 ? out.slice(0, -1) + '״' + out.slice(-1) : out + '׳';
+}
+function hebDate(d) {
+  try {
+    var p = new Intl.DateTimeFormat('he-u-ca-hebrew', { day:'numeric', month:'long', year:'numeric' }).formatToParts(d);
+    var get = function (t) { var x = p.find(function (q) { return q.type === t; }); return x ? x.value : ''; };
+    var mo = get('month'); if (mo && mo.charAt(0) !== 'ב') mo = 'ב' + mo;
+    return gematria(parseInt(get('day'), 10)) + ' ' + mo + ' ' + gematria(parseInt(String(get('year')).replace(/\D/g, ''), 10));
+  } catch (e) { return ''; }
+}
+var DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+var isoOf = function (d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+
+// ── הגדרות מהענן ─────────────────────────────────────────────────────────
+function applyCache() {
+  try {
+    var c = JSON.parse(localStorage.getItem('lobbyCfg') || 'null');
+    if (c) { cfg = c; cfg.display = Object.assign({}, DEF, cfg.display || {}); }
+  } catch (e) {}
+}
+async function pullConfig() {
+  try {
+    var r = await fetch(SB_URL + '/rest/v1/lobby_config?select=key,value', {
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }, cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var rows = await r.json(), next = {};
+    rows.forEach(function (x) { next[x.key] = x.value || {}; });
+    cfg.schedule = Object.assign({ default:[], byDay:{}, offDays:[5,6] }, next.schedule || {});
+    cfg.menu     = Object.assign({ days:{} }, next.menu || {});
+    cfg.messages = Object.assign({ items:[] }, next.messages || {});
+    cfg.display  = Object.assign({}, DEF, next.display || {});
+    localStorage.setItem('lobbyCfg', JSON.stringify(cfg));
+    $('dot').className = 'ok';
+    paintStatic();
+    await syncVideoSource();
+    return true;
+  } catch (e) {
+    $('dot').className = 'err';
+    return false;
+  }
+}
+// דיווח־עצמי לפאנל: אילו תת־תיקיות קיימות כאן, כמה סרטונים נמצאו ומתי המסך היה חי.
+async function reportRuntime() {
+  try {
+    await fetch(SB_URL + '/rest/v1/lobby_config?key=eq.runtime', {
+      method: 'PATCH',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ value: { seenAt: new Date().toISOString(), root: srv.root, exists: srv.exists,
+        folders: srv.folders, videoCount: srv.videos.length, local: !!LOCAL } }),
+    });
+  } catch (e) {}
+}
+
+// ── סדר היום של היום ─────────────────────────────────────────────────────
+function todayRows(now) {
+  var d = now.getDay();
+  if ((cfg.schedule.offDays || []).map(Number).indexOf(d) > -1) return [];
+  var rows = (cfg.schedule.byDay || {})[d] || (cfg.schedule.byDay || {})[String(d)] || cfg.schedule.default || [];
+  return rows.slice().filter(function (r) { return r && r.t; }).sort(function (a, b) { return a.t < b.t ? -1 : 1; });
+}
+var mins = function (t) { var p = String(t).split(':'); return Number(p[0]) * 60 + Number(p[1]); };
+function slotAt(rows, now) {
+  var cur = now.getHours() * 60 + now.getMinutes(), idx = -1;
+  for (var i = 0; i < rows.length; i++) if (cur >= mins(rows[i].t)) idx = i;
+  return idx;
+}
+
+// ── ציור סטטי (משתנה רק כשההגדרות משתנות) ────────────────────────────────
+function paintStatic() {
+  var d = cfg.display;
+  $('brandText').textContent = d.headline || '';
+  $('menuCard').style.display = d.showMenu ? 'block' : 'none';
+  $('agendaCard').style.display = d.showAgenda ? 'flex' : 'none';
+  $('zmanim').style.display = d.showZmanim ? 'flex' : 'none';
+  if (!d.showParasha) $('parasha').style.display = 'none';
+  $('tick').style.animationDuration = Math.max(20, Number(d.tickerSpeed) || 60) + 's';
+  paintMenu(); paintTicker();
+}
+
+function menuFor(dateIso) { return (cfg.menu.days || {})[dateIso] || null; }
+
+function paintMenu() {
+  if (!cfg.display.showMenu) return;
+  var now = new Date(), key = isoOf(now), m = menuFor(key), label = 'היום';
+  // אחרי הצהריים (או ביום בלי לימודים) מציגים את יום הלימודים הבא — התפריט של אתמול חסר תועלת.
+  var late = now.getHours() >= 15;
+  if (!m || m.off || late) {
+    for (var i = 1; i <= 7; i++) {
+      var nd = new Date(now); nd.setDate(nd.getDate() + i);
+      var cand = menuFor(isoOf(nd));
+      if (cand && !cand.off) { m = cand; key = isoOf(nd); label = (i === 1 ? 'מחר' : 'יום ' + DAYS[nd.getDay()]); break; }
+      if (i === 7) { m = m; }
+    }
+  }
+  var dt = new Date(key + 'T00:00:00');
+  $('menuTitle').textContent = cfg.menu.title || 'ארוחת צהריים';
+  if (!m) { $('menuDay').textContent = ''; $('menuMain').textContent = '—';
+    $('menuSide').textContent = ''; $('menuVeg').textContent = ''; $('menuNote').textContent = 'לא הוזן תפריט'; return; }
+  $('menuDay').textContent = label + ' · יום ' + DAYS[dt.getDay()] + ' · ' + hebDate(dt);
+  if (m.off) {
+    $('menuMain').textContent = m.note || 'אין לימודים';
+    $('menuSide').textContent = ''; $('menuVeg').textContent = ''; $('menuNote').textContent = '';
+  } else {
+    $('menuMain').textContent = m.main || '';
+    $('menuSide').textContent = m.side || '';
+    $('menuVeg').textContent = m.veg || '';
+    $('menuNote').textContent = m.note || '';
+  }
+}
+
+function activeMessages() {
+  var today = isoOf(new Date());
+  return (cfg.messages.items || []).filter(function (m) {
+    if (!m || !String(m.text || '').trim()) return false;
+    if (m.from && today < m.from) return false;
+    if (m.to && today > m.to) return false;
+    return true;
+  });
+}
+function paintTicker() {
+  var list = cfg.display.showMessages ? activeMessages() : [];
+  var el = $('tick');
+  if (!list.length) { el.innerHTML = ''; return; }
+  var html = list.map(function (m) {
+    return '<span class="' + (m.level === 'high' ? 'hi' : '') + '">' +
+      String(m.text).replace(/[&<>]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;' })[c]; }) + '</span>';
+  }).join('<span class="sep">◆</span>');
+  el.innerHTML = html + '<span class="sep">◆</span>' + html;
+}
+
+// ── שעון, סדר יום, מצב שיעור ─────────────────────────────────────────────
+var lastAgendaKey = '', lastVideoAllowed = null;
+
+function tick() {
+  var now = new Date(), h = pad(now.getHours()), m = pad(now.getMinutes()), s = pad(now.getSeconds());
+  $('clock').innerHTML = h + ':' + m + '<span class="sc">' + s + '</span>';
+  $('dHeb').textContent = hebDate(now);
+  $('dGreg').textContent = 'יום ' + DAYS[now.getDay()] + ' · ' + now.getDate() + '.' + (now.getMonth() + 1) + '.' + now.getFullYear();
+
+  var rows = todayRows(now), idx = slotAt(rows, now);
+  var key = rows.map(function (r) { return r.t + r.title; }).join('|') + '#' + idx;
+  if (key !== lastAgendaKey) { lastAgendaKey = key; paintAgenda(rows, idx); }
+
+  var cur = idx >= 0 ? rows[idx] : null;
+  var nxt = idx + 1 < rows.length ? rows[idx + 1] : null;
+  var kind = cur ? (cur.kind || 'lesson') : 'none';
+  var inLesson = kind === 'lesson';
+  var dayOver = rows.length && idx >= 0 && !nxt && (now.getHours() * 60 + now.getMinutes()) > mins(cur.t) + 60;
+
+  // "בלי סרטונים באמצע": בזמן שיעור המסך עובר לשעון, ומחוץ לשעות הלימוד הוא נשאר שקט.
+  var d = cfg.display;
+  var allow = d.videosEnabled && srv.videos.length > 0 && !dayOver &&
+              !(d.videosOnlyOnBreaks && (inLesson || idx < 0 || !rows.length));
+  if (allow !== lastVideoAllowed) { lastVideoAllowed = allow; allow ? startVideo() : stopVideo(); }
+  $('ov').className = allow ? '' : 'on';
+  if (!allow) paintOverlay(now, rows, idx, cur, nxt, dayOver);
+}
+
+function paintAgenda(rows, idx) {
+  var host = $('agenda');
+  if (!rows.length) { host.innerHTML = '<div class="ag">אין לימודים היום</div>'; return; }
+  var KIND = { lesson:'שיעור', break:'הפסקה', meal:'ארוחה', tefila:'תפילה', other:'' };
+  host.innerHTML = rows.map(function (r, i) {
+    var cls = i === idx ? 'now' : (i === idx + 1 ? 'next' : (i < idx ? 'done' : ''));
+    return '<div class="ag ' + cls + '"><span class="t">' + r.t + '</span><span>' +
+      String(r.title || '').replace(/[&<>]/g, '') + '</span><span class="k">' + (KIND[r.kind] || '') + '</span></div>';
+  }).join('');
+  // גלילה בתוך הרשימה בלבד (scrollIntoView היה גורר גם את העמוד), ואחרי שהפריסה התייצבה
+  var cur = host.querySelector('.ag.now');
+  if (cur) setTimeout(function () {
+    host.scrollTo({ top: Math.max(0, cur.offsetTop - host.clientHeight / 2 + cur.offsetHeight / 2), behavior:'smooth' });
+  }, 120);
+}
+
+function paintOverlay(now, rows, idx, cur, nxt, dayOver) {
+  $('ovClock').innerHTML = pad(now.getHours()) + '<span class="bl">:</span>' + pad(now.getMinutes());
+  var mode = cfg.display.lessonScreen || 'clock';
+  $('ovMenu').style.display = 'none'; $('ovAgenda').style.display = 'none'; $('ovBarWrap').style.display = 'none';
+
+  if (!rows.length) { $('ovTitle').textContent = 'אין לימודים היום'; $('ovSub').textContent = hebDate(now); }
+  else if (idx < 0) { $('ovTitle').textContent = 'בוקר טוב'; $('ovSub').textContent = 'תחילת היום בשעה ' + rows[0].t; }
+  else if (dayOver) { $('ovTitle').textContent = 'סיום היום'; $('ovSub').textContent = 'להתראות מחר'; }
+  else {
+    $('ovTitle').textContent = cur.title || '';
+    if (nxt) {
+      var left = mins(nxt.t) - (now.getHours() * 60 + now.getMinutes());
+      var total = mins(nxt.t) - mins(cur.t);
+      $('ovSub').textContent = nxt.title + ' בשעה ' + nxt.t + (left > 0 ? ' · עוד ' + left + ' דק׳' : '');
+      if (total > 0) {
+        $('ovBarWrap').style.display = 'block';
+        $('ovBar').style.width = Math.max(0, Math.min(100, ((total - left) / total) * 100)) + '%';
+      }
+    } else $('ovSub').textContent = 'המשבצת האחרונה להיום';
+  }
+
+  if (mode === 'menu') {
+    var m = menuFor(isoOf(now));
+    $('ovMenu').style.display = 'block';
+    $('ovMenu').innerHTML = m && !m.off
+      ? 'צהריים היום: <span class="m">' + [m.main, m.side, m.veg].filter(Boolean).join(' · ') + '</span>'
+      : (m && m.off ? (m.note || 'אין לימודים') : '');
+  } else if (mode === 'agenda' && rows.length) {
+    $('ovAgenda').style.display = 'block';
+    $('ovAgenda').innerHTML = rows.map(function (r, i) {
+      return '<div class="ag ' + (i === idx ? 'now' : (i < idx ? 'done' : '')) + '"><span class="t">' + r.t +
+        '</span><span>' + String(r.title || '').replace(/[&<>]/g, '') + '</span></div>';
+    }).join('');
+  }
+}
+
+// ── סרטונים מהשרת המקומי ─────────────────────────────────────────────────
+var vA = $('vA'), vB = $('vB'), active = vA, next = vB, vi = -1, fadeTimer = null, busy = false;
+
+function shuffle(a) { var b = a.slice(); for (var i = b.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = b[i]; b[i] = b[j]; b[j] = t; } return b; }
+var vurl = function (rel) { return (LOCAL || '') + '/video/' + rel.split('/').map(encodeURIComponent).join('/'); };
+
+async function syncVideoSource() {
+  if (LOCAL === null) { hint('תצוגה מקדימה — סרטונים מנוגנים רק ממחשב הלובי'); return; }
+  var d = cfg.display;
+  try {
+    var cur = await (await fetch((LOCAL || '') + '/api/config', { cache:'no-store' })).json();
+    // ההגדרות בפאנל הן מקור האמת: אם הן שונות ממה שהשרת המקומי מחזיק — מיישרים אותו.
+    if (d.videoRoot && d.videoRoot !== cur.root) {
+      await fetch((LOCAL || '') + '/api/setRoot', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ path: d.videoRoot }) });
+      cur = await (await fetch((LOCAL || '') + '/api/config', { cache:'no-store' })).json();
+    }
+    var want = (d.videoFolders || []).slice().sort().join('|');
+    var have = (cur.selected || []).slice().sort().join('|');
+    if (want !== have) {
+      await fetch((LOCAL || '') + '/api/setSelection', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ selected: d.videoFolders || [] }) });
+    }
+    var folders = await (await fetch((LOCAL || '') + '/api/folders', { cache:'no-store' })).json();
+    var meta = await (await fetch((LOCAL || '') + '/api/videos?meta=1', { cache:'no-store' })).json();
+    srv.ok = true; srv.root = meta.root || cur.root || ''; srv.exists = !!cur.rootExists;
+    srv.folders = folders.folders || [];
+    var chosen = (d.videoFolders || []).length ? (meta.videos || []) : [];
+    if (!(d.videoFolders || []).length) hint('לא נבחרו תיקיות סרטונים בפאנל — מוצג לוח מידע בלבד');
+    var fresh = shuffle(chosen);
+    var changed = fresh.length !== srv.videos.length;
+    srv.videos = fresh;
+    if (!srv.exists) hint('תיקיית הסרטונים לא נמצאה: ' + (srv.root || '—'));
+    else if ((d.videoFolders || []).length) hint('');
+    if (changed) lastVideoAllowed = null;   // מאלץ חישוב מחדש בטיק הבא
+  } catch (e) {
+    srv.ok = false; srv.videos = [];
+    hint('שרת הסרטונים המקומי לא זמין — מוצג לוח מידע בלבד');
+  }
+  reportRuntime();
+}
+
+function startVideo() { if (vi < 0) playNext(true); else { active.play().catch(function () {}); schedule(); } }
+function stopVideo() { if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; } try { active.pause(); } catch (e) {} }
+
+function playNext(first) {
+  if (busy || !srv.videos.length) return;
+  busy = true;
+  vi = (vi + 1) % srv.videos.length;
+  if (vi === 0 && !first) srv.videos = shuffle(srv.videos);
+  var rel = srv.videos[vi], target = first ? active : next;
+  target.src = vurl(rel);
+  target.currentTime = 0;
+  var go = function () {
+    target.play().then(function () {
+      if (!first) {
+        target.classList.remove('off'); active.classList.add('off');
+        var old = active; active = target; next = old;
+        setTimeout(function () { try { old.pause(); old.removeAttribute('src'); old.load(); } catch (e) {} },
+          (Number(cfg.display.crossfadeSec) || 3) * 1000 + 600);
+      }
+      $('vName').textContent = rel;
+      $('vCount').textContent = (vi + 1) + ' / ' + srv.videos.length;
+      busy = false; schedule();
+    }).catch(function () { busy = false; setTimeout(playNext, 1500); });
+  };
+  if (target.readyState >= 3) go();
+  else { target.addEventListener('canplay', go, { once:true }); target.load(); setTimeout(function () { if (busy) go(); }, 5000); }
+}
+
+function schedule() {
+  if (fadeTimer) clearTimeout(fadeTimer);
+  var fade = Number(cfg.display.crossfadeSec) || 3;
+  var arm = function () {
+    var d = active.duration;
+    if (d && isFinite(d) && d > fade + 1) fadeTimer = setTimeout(function () { playNext(false); }, (d - fade) * 1000);
+  };
+  if (active.duration && isFinite(active.duration)) arm();
+  else active.addEventListener('loadedmetadata', arm, { once:true });
+}
+[vA, vB].forEach(function (v) {
+  v.addEventListener('ended', function () { if (v === active && !busy) playNext(false); });
+  v.addEventListener('error', function () { if (v === active && !busy) setTimeout(function () { playNext(false); }, 800); });
+});
+[vA, vB].forEach(function (v) { v.style.transitionDuration = ((Number(DEF.crossfadeSec) || 3)) + 's'; });
+
+// ── מזג אוויר / פרשה / זמנים ──────────────────────────────────────────────
+var WMO = { 0:'בהיר',1:'מעונן חלקית',2:'מעונן חלקית',3:'מעונן',45:'ערפל',48:'ערפל כבד',51:'טפטוף קל',
+  53:'טפטוף',55:'טפטוף כבד',61:'גשם קל',63:'גשם',65:'גשם חזק',71:'שלג קל',73:'שלג',75:'שלג כבד',
+  80:'ממטרים קלים',81:'ממטרים',82:'ממטרים כבדים',95:'סופת רעמים',96:'סופה עם ברד',99:'סופת ברד כבדה' };
+
+async function fetchWeather() {
+  var d = cfg.display;
+  if (!d.showWeather) { $('meta').innerHTML = ''; return; }
+  try {
+    var r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + d.lat + '&longitude=' + d.lon +
+      '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Asia%2FJerusalem');
+    var j = await r.json();
+    var mx = j.daily && j.daily.temperature_2m_max ? Math.round(j.daily.temperature_2m_max[0]) : null;
+    var mn = j.daily && j.daily.temperature_2m_min ? Math.round(j.daily.temperature_2m_min[0]) : null;
+    $('meta').innerHTML = '<span><b>' + Math.round(j.current.temperature_2m) + '°</b> ' +
+      (WMO[j.current.weather_code] || '') + '</span><span>' + (d.city || '') + '</span>' +
+      (mx != null ? '<span>' + mn + '° – ' + mx + '°</span>' : '');
+  } catch (e) {}
+}
+async function fetchParasha() {
+  if (!cfg.display.showParasha) return;
+  try {
+    var j = await (await fetch('https://www.hebcal.com/shabbat?cfg=json&geonameid=' + (cfg.display.geonameid || 295432) + '&M=on')).json();
+    var p = (j.items || []).find(function (i) { return i.category === 'parashat'; });
+    if (p) { $('parasha').textContent = p.hebrew; $('parasha').style.display = 'block'; }
+  } catch (e) {}
+}
+async function fetchZmanim() {
+  if (!cfg.display.showZmanim) return;
+  try {
+    var j = await (await fetch('https://www.hebcal.com/zmanim?cfg=json&geonameid=' + (cfg.display.geonameid || 295432) +
+      '&date=' + isoOf(new Date()))).json();
+    var t = j.times || {}, hm = function (v) { return v ? String(v).slice(11, 16) : ''; };
+    var parts = [['הנץ', t.sunrise], ['מנחה גדולה', t.minchaGedola], ['שקיעה', t.sunset], ['צאת', t.tzeit7083 || t.tzeit85deg]];
+    $('zmanim').innerHTML = parts.filter(function (p) { return p[1]; })
+      .map(function (p) { return '<span>' + p[0] + ' <b>' + hm(p[1]) + '</b></span>'; }).join('');
+  } catch (e) {}
+}
+
+// ── הפעלה ────────────────────────────────────────────────────────────────
+applyCache();
+paintStatic();
+tick();
+setInterval(tick, 1000);
+setInterval(paintMenu, 60000);
+setInterval(paintTicker, 60000);
+
+pullConfig().then(function (ok) { if (!ok) hint('אין חיבור לענן — מוצגות ההגדרות האחרונות שנשמרו'); });
+setInterval(function () { pullConfig(); }, Math.max(15, Number(cfg.display.refreshSec) || 60) * 1000);
+setInterval(reportRuntime, 120000);
+
+fetchWeather(); fetchParasha(); fetchZmanim();
+setInterval(fetchWeather, 10 * 60000);
+setInterval(fetchParasha, 60 * 60000);
+setInterval(fetchZmanim, 60 * 60000);
+
+// מקשים: F = מסך מלא, R = רענון הגדרות מיידי, N = הסרטון הבא
+document.addEventListener('keydown', function (e) {
+  var k = e.key.toLowerCase();
+  if (k === 'f') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(function () {}); }
+  if (k === 'r') { pullConfig(); hint('מרענן…'); setTimeout(function () { hint(''); }, 1500); }
+  if (k === 'n' && lastVideoAllowed) playNext(false);
+});
+function toggleFs() {
+  document.fullscreenElement ? document.exitFullscreen()
+    : document.documentElement.requestFullscreen().catch(function () {});
+}
+document.addEventListener('dblclick', toggleFs);
+$('fsBtn').addEventListener('click', toggleFs);
+document.addEventListener('fullscreenchange', function () {
+  document.body.classList.toggle('fs', !!document.fullscreenElement);
+});
+// ?fs=1 — נפתח מקישור "פתח מסך לובי": הדפדפן דורש מחווה של המשתמש למסך מלא,
+// ולכן הכפתור מוצג בבירור והלחיצה הראשונה במסך נכנסת אליו.
+if (new URLSearchParams(location.search).get('fs') === '1' && !document.fullscreenElement) {
+  $('fsBtn').classList.add('show');
+  hint('לחץ במסך (או F) למסך מלא');
+  var once = function () {
+    toggleFs(); hint(''); $('fsBtn').classList.remove('show');
+    document.removeEventListener('click', once);
+  };
+  document.addEventListener('click', once);
+}
+})();
+</script>
+</body>
+</html>

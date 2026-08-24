@@ -24,6 +24,7 @@
     { id: 'yemot',         label: 'קו ימות המשיח',     icon: 'bi-telephone-inbound', group: G3, color: '#0e7490', adminOnly: true },
     { id: 'voicereports',  label: 'דיווחים קוליים',    icon: 'bi-mic-fill',        group: G3, color: '#8e44ad', adminOnly: true },
     { id: 'exporter',      label: 'יצוא והדפסה',      icon: 'bi-printer',         group: G3, color: '#475569' },
+    { id: 'lobby',         label: 'מסך הלובי',        icon: 'bi-tv',              group: G3, color: '#b45309', adminOnly: true },
     { id: 'settings',      label: 'הגדרות והרשאות',   icon: 'bi-gear',            group: G3, color: '#7f8c8d', adminOnly: true },
   ];
   window.MODULES = MODULES;
