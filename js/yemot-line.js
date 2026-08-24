@@ -34,6 +34,43 @@
   const ROUTING = 'ivr2:/FileGoToFolder.ini';
 
   const Y = () => window.Yemot;
+
+  const normPhone0 = v => {
+    if (!v) return null;
+    let d = String(v).replace(/\D/g, '');
+    if (d.startsWith('972')) d = '0' + d.slice(3);
+    if (!d.startsWith('0')) d = '0' + d;
+    return (d.length >= 9 && d.length <= 10) ? d : null;
+  };
+
+  // מספרי ההורים לפי שיעור, ישירות מ-Supabase. זהו מקור האמת לשידור בתשלום —
+  // הרשימה החינמית (tzl:) סגורה להזרקה ומכילה רק את מי שנרשם בעצמו.
+  let rosterCache = null;
+  async function roster() {
+    if (rosterCache) return rosterCache;
+    const [st, cl] = await Promise.all([window.db.list('students', {}), window.db.list('classes', {})]);
+    if (!st.ok || !cl.ok) throw new Error('לא ניתן לקרוא את נתוני המערכת');
+    const clsName = {}; cl.data.forEach(c => { clsName[c.id] = c.name; });
+    const extOf = {}; SHIURIM.forEach(x => { extOf[x.cls] = x.ext; });
+    const out = { '1': new Set(), '2': new Set(), '3': new Set(), '4': new Set() };
+    st.data.forEach(s => {
+      const ext = extOf[clsName[s.class_id]];
+      if (!ext) return;
+      const reg = s.reg || {};
+      [s.parent_phone, s.mother_phone, reg['נייד אב'], reg['נייד אם'], reg['טלפון בבית']]
+        .map(normPhone0).filter(Boolean).forEach(ph => out[ext].add(ph));
+    });
+    rosterCache = { '1': [...out['1']], '2': [...out['2']], '3': [...out['3']], '4': [...out['4']] };
+    rosterCache.all = [...new Set([].concat(rosterCache['1'], rosterCache['2'], rosterCache['3'], rosterCache['4']))];
+    return rosterCache;
+  }
+
+  const UNIT_PER_CALL = 0.1;   // אומת חי מול RunTzintuk (bilingPerCall)
+  async function units() {
+    try { const s = await Y().call('GetSession'); return typeof s.units === 'number' ? s.units : null; }
+    catch (_) { return null; }
+  }
+
   let host = null, blob = null;   // blob = הקול שנוצר/נבחר וממתין להעלאה
 
   // ---------- שלד ----------
@@ -86,12 +123,21 @@
         '<span class="count-line">או</span>' +
         '<input class="inp mb0" id="ylFile" type="file" accept="audio/*" style="width:auto">' +
         '<audio id="ylPrev" controls style="display:none;height:36px"></audio></div>' +
+      '<label class="lbl" style="margin-top:12px">אחרי ההעלאה</label>' +
+      '<div style="display:flex;flex-direction:column;gap:6px">' +
+        '<label class="ym-check"><input type="radio" name="ylTzMode" value="none" checked> ' +
+          'רק להעלות — בלי לצלצל לאיש</label>' +
+        '<label class="ym-check"><input type="radio" name="ylTzMode" value="free"> ' +
+          'צינתוק לנרשמים בלבד <span class="count-line">(חינם, רק מי שנרשם בשלוחה 7)</span></label>' +
+        '<label class="ym-check"><input type="radio" name="ylTzMode" value="roster"> ' +
+          'צינתוק לכל הורי השיעור מהמערכת <span class="count-line" id="ylTzCost">…</span></label></div>' +
       '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px">' +
         '<button class="btn-primary sm" id="ylUpload" disabled><i class="bi bi-upload"></i> העלה לשלוחה</button>' +
-        '<label class="ym-check"><input type="checkbox" id="ylTz"> הפעל צינתוק לנרשמים אחרי ההעלאה</label></div>' +
+        '<span class="count-line" id="ylBal"></span></div>' +
       '<div id="ylMsgOut" class="count-line" style="margin-top:8px;min-height:1.2em"></div>' +
       '<p class="login-hint" style="margin-top:6px"><i class="bi bi-info-circle"></i> ' +
-        'הצינתוק החינמי רק מצלצל לנרשמים — הם מתקשרים בחזרה ושומעים. הוא לא משמיע את ההודעה בשיחה.</p>';
+        'הצינתוק רק מצלצל — הנמען מתקשר בחזרה ושומע. הוא לא משמיע את ההודעה בשיחה עצמה. ' +
+        'שידור לרשימת המערכת עולה ' + UNIT_PER_CALL + ' יחידה לשיחה; לנרשמים — חינם.</p>';
 
     p.querySelector('#ylTarget').addEventListener('change', loadMsgs);
     p.querySelector('#ylMsgRefresh').addEventListener('click', loadMsgs);
@@ -102,7 +148,8 @@
       blob = f; showPrev(URL.createObjectURL(f)); p.querySelector('#ylUpload').disabled = false;
     });
     p.querySelector('#ylUpload').addEventListener('click', upload);
-    loadMsgs();
+    p.querySelector('#ylTarget').addEventListener('change', showCost);
+    loadMsgs(); showCost(); showBalance();
   }
 
   const curTarget = () => TARGETS.find(t => t.key === pane('msg').querySelector('#ylTarget').value) || TARGETS[0];
@@ -157,17 +204,41 @@
   async function upload() {
     const p = pane('msg'), out = p.querySelector('#ylMsgOut'), t = curTarget();
     if (!blob) { out.textContent = 'אין קול להעלאה.'; return; }
+    const mode = (p.querySelector('input[name="ylTzMode"]:checked') || {}).value || 'none';
+
+    // אישור מפורש לפני כל שידור — צינתוק מצלצל לאנשים אמיתיים ואי אפשר לבטל אותו.
+    if (mode === 'roster') {
+      let list;
+      try { list = (await roster())[t.key] || []; }
+      catch (e) { out.textContent = 'לא ניתן לקרוא את רשימת ההורים: ' + (e.message || e); return; }
+      if (!list.length) { out.textContent = 'אין מספרי הורים ל' + t.label + '.'; return; }
+      const bal = await units(), costN = list.length * UNIT_PER_CALL, cost = costN.toFixed(1);
+      if (bal !== null && bal < costN) {
+        out.textContent = 'היתרה בקו היא ' + bal + ' יחידות — צריך ' + cost + '. טענו יחידות קודם.';
+        return;
+      }
+      if (!confirm('לצלצל ל-' + list.length + ' מספרי הורים של ' + t.label + '?' +
+                   String.fromCharCode(10) + 'עלות: ' + cost + ' יחידות. אי אפשר לעצור אחרי הלחיצה.')) return;
+      p.__tzPhones = list;
+    } else if (mode === 'free') {
+      if (!confirm('לצלצל לכל מי שנרשם לצינתוק של ' + t.label + '? אי אפשר לעצור אחרי הלחיצה.')) return;
+    }
+
     const btn = p.querySelector('#ylUpload'); btn.disabled = true; out.textContent = 'מעלה…';
     try {
       const r = await Y().uploadBlob(t.folder, blob, 'msg.wav');
       if (r.responseStatus !== 'OK') { out.textContent = 'ההעלאה נכשלה: ' + (r.message || ''); return; }
       out.textContent = 'ההודעה עלתה ל' + t.label + '.';
-      if (p.querySelector('#ylTz').checked) {
-        // מפעילים דרך שלוחת ההקלטה של המנהל — היא זו שמחזיקה את list_tzintuk
-        const tz = await Y().call('RunTzintuk', { path: 'ivr2:/8/' + (t.key === 'all' ? '5' : t.key) });
+      if (mode !== 'none') {
+        // path = שלוחת ההקלטה של המנהל, זו שמחזיקה את list_tzintuk.
+        // phones: tzl:<רשימה> = המודל החינמי · רשימת מספרים = שידור בתשלום מנתוני המערכת.
+        const params = { path: 'ivr2:/8/' + (t.key === 'all' ? '5' : t.key) };
+        params.phones = mode === 'free' ? ('tzl:' + t.list) : p.__tzPhones.join(',');
+        const tz = await Y().call('RunTzintuk', params);
         out.textContent += tz.responseStatus === 'OK'
-          ? ' הצינתוק הופעל.'
+          ? ' הצינתוק יצא ל-' + (tz.callsCount != null ? tz.callsCount : '?') + ' מספרים (חיוב: ' + (tz.biling || '0.00') + ').'
           : ' ⚠️ הצינתוק נכשל: ' + (tz.message || '');
+        showBalance();
       }
       blob = null; p.querySelector('#ylText').value = '';
       p.querySelector('#ylPrev').style.display = 'none';
@@ -176,15 +247,42 @@
     finally { btn.disabled = false; }
   }
 
+  async function showCost() {
+    const el = pane('msg').querySelector('#ylTzCost'); if (!el) return;
+    el.textContent = '(טוען…)';
+    try {
+      const n = ((await roster())[curTarget().key] || []).length;
+      el.textContent = '(' + n + ' מספרים · ' + (n * UNIT_PER_CALL).toFixed(1) + ' יחידות)';
+    } catch (_) { el.textContent = '(לא ניתן לקרוא את המערכת)'; }
+  }
+
+  async function showBalance() {
+    const el = pane('msg').querySelector('#ylBal'); if (!el) return;
+    const b = await units();
+    el.innerHTML = b === null ? '' :
+      (b > 0 ? 'יתרה: ' + b + ' יחידות'
+             : '<span style="color:var(--danger,#b42318)">יתרה 0 — שידור בתשלום לא ירוץ</span>');
+  }
+
   // ---------- 2. רשימות תפוצה ----------
+  // שתי רשימות נפרדות לכל שיעור, וזה לא כפל:
+  //   רשימת המערכת  = כל מספרי ההורים מ-Supabase. שידור אליה עולה 0.1 יחידה לשיחה.
+  //   רשימת הנרשמים = רק מי שהתקשר ונרשם בעצמו. שידור אליה חינם.
+  // ימות חוסמת הזרקת מספרים לרשימה החינמית (TzintukimListManagement דוחה כל action) —
+  // זה התנאי שלה לצינתוק בחינם. לכן אי אפשר "להעתיק" את רשימת המערכת לתוכה.
   async function renderLists() {
     const p = pane('lists');
-    p.innerHTML = '<p class="login-hint" style="margin-top:0">מי שנרשם בעצמו בשלוחה 7 (או במקש 2 בתוך השיעור שלו). ' +
-      'במודל החינמי אי אפשר להוסיף מספרים מכאן — רק ההורה עצמו נרשם.</p>' +
+    p.innerHTML =
+      '<p class="login-hint" style="margin-top:0">לכל שיעור שתי רשימות. ' +
+      '<b>רשימת המערכת</b> — כל הורי השיעור לפי מה שמעודכן בתוכנה, תמיד מלאה, ושידור אליה בתשלום. ' +
+      '<b>רשימת הנרשמים</b> — רק מי שהתקשר ונרשם בעצמו, ושידור אליה חינם. ' +
+      'ימות לא מאפשרת להזין מספרים לרשימה החינמית — זה התנאי שלה לחינם.</p>' +
       '<div id="ylLists"><div class="empty-state" style="padding:14px">טוען…</div></div>';
     const box = p.querySelector('#ylLists');
-    const defs = SHIURIM.map(s => ({ list: s.ext, label: s.name, path: 'ivr2:/7/' + s.ext }))
-      .concat([{ list: '5', label: 'כל העדכונים', path: 'ivr2:/7/5' }]);
+    const defs = SHIURIM.map(s => ({ key: s.ext, label: s.name, path: 'ivr2:/7/' + s.ext }))
+      .concat([{ key: 'all', label: 'כל השיעורים', path: 'ivr2:/7/5' }]);
+    let ros = null;
+    try { ros = await roster(); } catch (_) {}
     const rows = [];
     for (const d of defs) {
       let nums = [];
@@ -193,11 +291,15 @@
         nums = r.split(/\r?\n/).map(x => x.trim())
           .filter(x => /^0\d{7,9}/.test(x)).map(x => x.split(/[=,\s]/)[0]);
       } catch (_) { /* אין קובץ = אין נרשמים */ }
-      rows.push('<div class="ym-row"><span class="ym-ic"><i class="bi bi-people"></i></span>' +
+      const sys = ros ? (ros[d.key] || []) : null;
+      rows.push('<div class="ym-row" style="align-items:flex-start">' +
+        '<span class="ym-ic"><i class="bi bi-people"></i></span>' +
         '<div class="ym-main"><b>' + esc(d.label) + '</b>' +
-        (nums.length ? '<div class="count-line" dir="ltr" style="text-align:right">' + nums.map(esc).join(' · ') + '</div>'
-                     : '<div class="count-line">אין נרשמים</div>') + '</div>' +
-        '<span class="chip">' + nums.length + '</span></div>');
+          '<div class="count-line">רשימת המערכת: <b>' + (sys === null ? '—' : sys.length) + '</b> מספרים' +
+            (sys && sys.length ? ' · ' + (sys.length * UNIT_PER_CALL).toFixed(1) + ' יחידות לשידור' : '') + '</div>' +
+          '<div class="count-line">רשימת הנרשמים (חינם): <b>' + nums.length + '</b>' +
+            (nums.length ? ' — <span dir="ltr">' + nums.map(esc).join(' · ') + '</span>' : ' — אין נרשמים') + '</div>' +
+        '</div></div>');
     }
     box.innerHTML = rows.join('');
   }
