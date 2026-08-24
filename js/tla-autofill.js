@@ -27,6 +27,8 @@
   // קובץ או שניים — וזה מה שצריך. גם מייתר את החלוקה לקבוצות.
   const DIAG_FOLDERS = ['מסמך קביל'];
   const MAX_MB = 18;
+  // תקרת קבצים לניתוח — האבחונים הרלוונטיים ביותר, לפי דירוג
+  const MAX_DOCS = 5;
 
   const FIELD_MAP = {                       // מפתחות ה-JSON → שדות דף ההכנה
     background: 'רקע_ומגבלות',
@@ -117,12 +119,25 @@
       e.code = 'NO_DIAG_FOLDER'; e.have = subs.map(f => f.name); throw e;
     }
     const ids = wanted.map(f => f.id);
-    const docs = all.filter(f => f.mimeType !== FOLDER && ids.indexOf(f.folderId) > -1);
+    let docs = all.filter(f => f.mimeType !== FOLDER && ids.indexOf(f.folderId) > -1);
+    // נעמי ציפתה לקובץ או שניים, אבל אצל אוליאל יש 11 קבצים ב"מסמך קביל" —
+    // ביניהם דוח קופת חולים ושאלונים. מדרגים לפי רלוונטיות אבחונית ולוקחים
+    // את המובילים: פחות רעש, פחות נפח, ותשובה מהירה בהרבה.
+    const RANK = [
+      [/אבחון|פסיכודיאגנוסט|אינטליגנצי|דידקט|נוירו|קוגניטיב/, 0],
+      [/דוח|הערכה|סיכום|חוות ?דעת/, 1],
+      [/שאלון|טופס/, 2],
+    ];
+    const rankOf = n => { for (const [re, r] of RANK) if (re.test(n)) return r; return 3; };
+    docs.sort((a, b) => rankOf(a.name) - rankOf(b.name) ||
+      String(b.modifiedTime || '').localeCompare(String(a.modifiedTime || '')));
+    const skipped = docs.slice(MAX_DOCS).map(f => f.name);
+    docs = docs.slice(0, MAX_DOCS);
     if (!docs.length) {
       const e = new Error('תיקיית "מסמך קביל" של ' + nm(student) + ' ריקה.');
       e.code = 'EMPTY'; throw e;
     }
-    return { docs: docs, foldersFound: wanted.map(f => f.name) };
+    return { docs: docs, foldersFound: wanted.map(f => f.name), skipped: skipped };
   }
 
   const isOffice = m => /officedocument|msword|ms-excel|vnd\.google-apps\.(document|spreadsheet)/.test(m || '');
@@ -167,10 +182,20 @@
         responseMimeType: 'application/json', responseSchema: SCHEMA,
       },
     };
-    const r = await fetch(API + '?key=' + encodeURIComponent(k),
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const d = await r.json();
-    if (!r.ok) throw new Error((d.error && d.error.message) || ('שגיאה ' + r.status));
+    // 429/503 = עומס או מגבלת קצב, לא תקלה אמיתית. בלי ריטריי, ריצה עם
+    // כמה קבצים גורמת ל"כל הקבצים נכשלו" — וזה בדיוק מה שנעמי קיבלה.
+    let r, d;
+    for (let attempt = 0; ; attempt++) {
+      r = await fetch(API + '?key=' + encodeURIComponent(k),
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      d = await r.json();
+      if (r.ok) break;
+      const retryable = r.status === 429 || r.status === 500 || r.status === 503;
+      if (!retryable || attempt >= 3) {
+        throw new Error((d.error && d.error.message) || ('שגיאה ' + r.status));
+      }
+      await new Promise(res => setTimeout(res, 2500 * (attempt + 1)));
+    }
     const txt = ((((d.candidates || [])[0] || {}).content || {}).parts || [])
       .map(p => p.text || '').join('').trim();
     if (!txt) throw new Error('לא התקבלה תשובה מהמודל');
@@ -308,6 +333,8 @@
         esc(res.scanned.join(' · ')) +
         (res.failed.length ? '<div class="taf-failed"><b>נכשלו (' + res.failed.length + '):</b> ' +
           res.failed.map(f => esc(f.name) + ' — ' + esc(f.why)).join(' · ') + '</div>' : '') +
+        ((res.skipped && res.skipped.length) ? '<div style="margin-top:4px"><b>לא נסרקו</b> (נבחרו האבחונים הרלוונטיים ביותר): ' +
+          esc(res.skipped.join(' · ')) + '</div>' : '') +
       '</div>' +
       Object.keys(FIELD_MAP).map(k =>
         '<div class="taf-fld"><label>' + esc(labelOf(k)) + '</label>' +
@@ -366,8 +393,10 @@
       const step = t => { const e = busy.querySelector('#tafStep'); if (e) e.textContent = t; };
       try {
         const found = await findDiagnosticDocs(student);
-        step('נמצאו ' + found.docs.length + ' מסמכים ב-' + found.foldersFound.join(', '));
+        step('נמצאו ' + found.docs.length + ' מסמכים ב"מסמך קביל"' +
+          (found.skipped && found.skipped.length ? ' (עוד ' + found.skipped.length + ' דולגו)' : ''));
         const res = await analyze(student, found.docs, step);
+        res.skipped = found.skipped || [];
         busy.remove();
         const box = paint(host, res);
         box.querySelector('[data-taf-cancel]').addEventListener('click', () => { box.remove(); msg(''); });
