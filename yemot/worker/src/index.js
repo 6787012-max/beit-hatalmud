@@ -76,12 +76,13 @@ const SCHEMA = {
     transcript: { type: 'string' },
     reporter: { type: 'string' },
     student: { type: 'string' },
+    title: { type: 'string' },
     category: { type: 'string', enum: ['התנהגות', 'לימודים', 'חברתי', 'בריאות', 'שיחת הורים', 'אחר'] },
     summary: { type: 'string' },
     severity: { type: 'string', enum: ['נמוכה', 'רגילה', 'גבוהה'] },
     confidence: { type: 'number' },
   },
-  required: ['transcript', 'student', 'category', 'summary', 'confidence'],
+  required: ['transcript', 'student', 'title', 'category', 'summary', 'confidence'],
 };
 
 async function analyze(env, audio, mime, studentNames) {
@@ -168,6 +169,7 @@ async function run(env) {
           heard_name: a.student || null,
           transcript: a.transcript || null,
           report_text: a.summary || null,
+          title: a.title || null,
           report_type: a.category || 'אחר',
           severity: a.severity || 'רגילה',
           // ⚠️ תמיד טיוטה. דיווח על תלמיד לא נכנס לכרטיס בלי אישור אנושי,
