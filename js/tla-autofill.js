@@ -136,6 +136,19 @@
     if (size > MAX_MB) throw new Error('גדול מדי (' + size.toFixed(1) + 'MB)');
     const mime = d.mimeType || f.mimeType;
     if (!canModelRead(mime)) throw new Error('סוג קובץ שאינו נתמך (' + mime + ')');
+    // ⚠️ קובץ פגום אחד מפיל את *כל* הקריאה למודל ("The document has no
+    // pages"), ואז 15 מסמכים תקינים הולכים לאיבוד. בודקים כאן את חתימת
+    // הקובץ ומוציאים את הפגום לרשימת הכשלים במקום לשלוח אותו.
+    const head = atob(String(d.dataB64).slice(0, 32));
+    const bytes = [];
+    for (let i = 0; i < Math.min(8, head.length); i++) bytes.push(head.charCodeAt(i));
+    const isPdf = head.slice(0, 4) === '%PDF';
+    const isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+    const isPng = bytes[0] === 0x89 && head.slice(1, 4) === 'PNG';
+    if (/pdf/.test(mime) && !isPdf) throw new Error('קובץ PDF פגום או ריק');
+    if (/^image\/jpe?g/.test(mime) && !isJpg) throw new Error('תמונה פגומה');
+    if (/^image\/png/.test(mime) && !isPng) throw new Error('תמונה פגומה');
+    if ((d.size || 0) < 512) throw new Error('קובץ ריק');
     return { b64: d.dataB64, mime: mime };
   }
 
@@ -190,7 +203,25 @@
       const e = new Error('אף מסמך לא ניתן לקריאה.'); e.code = 'ALL_FAILED'; e.failed = failed; throw e;
     }
     onStep('מנתח ' + scanned.length + ' מסמכים…');
-    const out = await callModel(parts);
+    let out;
+    try {
+      out = await callModel(parts);
+    } catch (e) {
+      // ניסיון שני: לפעמים מסמך עובר את בדיקת החתימה ובכל זאת המודל דוחה
+      // אותו. במקום ליפול, שולחים רק את הקבצים הטקסטואליים והתמונות.
+      if (!/no pages|invalid|unsupported/i.test(e.message || '')) throw e;
+      onStep('מסמך אחד נדחה — מנסה שוב בלעדיו…');
+      const keep = [parts[0]];
+      for (let i = 1; i < parts.length; i += 2) {
+        const inl = parts[i + 1];
+        if (inl && inl.inline_data && /^image\//.test(inl.inline_data.mime_type)) {
+          keep.push(parts[i], inl);
+        }
+      }
+      if (keep.length < 3) throw e;
+      out = await callModel(keep);
+      failed.push({ name: '(חלק מהמסמכים)', why: 'נדחו ע"י המודל' });
+    }
 
     // ולידציה: מנת משכל חייבת להופיע גם ברקע ומגבלות
     const iq = out['מנת_משכל'];
