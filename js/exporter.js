@@ -528,8 +528,11 @@
           // הגיליון מוצג בגובה של בדיוק N עמודים, כדי שמה שרואים = מה שיודפס
           sh.style.minHeight = (pageH * want) + 'px';
         }
-        size = Math.max(4, Math.min(28, size));
-        sh.style.fontSize = size.toFixed(1) + 'px';
+        // ⚠️ עיגול כלפי מטה, לא toFixed. החיפוש אימת שגודל `size` נכנס,
+        // אבל toFixed(1) יכול לעגל *למעלה* (6.05→6.1) — וזה מספיק כדי
+        // שהתוכן יגלוש לעמוד נוסף אחרי שכבר נמדד כתקין.
+        size = Math.max(4, Math.min(28, Math.floor(size * 10) / 10));
+        sh.style.fontSize = size + 'px';
       });
       const hint = page.querySelector('#exHint');
       if (hint && sheets[0]) {
