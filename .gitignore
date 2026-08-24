@@ -20,3 +20,8 @@ _shots/
 # מיילים יוצאים — מכילים שמות תלמידים, לא לריפו
 _send_*.py
 package-lock.json
+
+# סרטוני הדרכה וחומרי הביניים — כבדים, לא לריפו
+video/_build/
+video/shots/
+video/out/
