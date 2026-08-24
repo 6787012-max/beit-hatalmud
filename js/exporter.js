@@ -512,7 +512,9 @@
           const pageH = parseFloat(getComputedStyle(sh).minHeight) || sh.clientHeight;
           const fits = px => {
             sh.style.fontSize = px + 'px';
-            return sh.scrollHeight <= pageH * want + 2;
+            // בלי מרווח ביטחון שלילי הגובה נוחת בדיוק על הגבול, ו-ceil
+            // בעיגול מחזיר עמוד נוסף — בחירה של 2 הייתה יוצאת 3.
+            return sh.scrollHeight <= pageH * want - 2;
           };
           let lo = 4, hi = 28;
           if (!fits(lo)) { size = lo; }                  // אפילו 4px לא נכנס
