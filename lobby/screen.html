@@ -64,7 +64,10 @@ footer{grid-column:1/-1}
 
 /* סדר יום */
 #agendaCard{flex:1;display:flex;flex-direction:column;min-height:0}
-#agenda{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+/* הרשימה ארוכה מהמקום שיש לה; המסכה מסמנת שיש המשך במקום לחתוך שורה באמצע */
+#agenda{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;
+  -webkit-mask-image:linear-gradient(180deg,transparent,#000 5%,#000 92%,transparent);
+  mask-image:linear-gradient(180deg,transparent,#000 5%,#000 92%,transparent)}
 .ag{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;
   font-size:clamp(.92rem,2.1vh,1.12rem);opacity:.62;transition:all .35s}
 .ag .t{color:var(--gold-lt);font-weight:700;font-variant-numeric:tabular-nums;min-width:52px}
@@ -99,10 +102,40 @@ main:hover #vinfo{opacity:1}
   overflow:hidden;margin-top:14px;display:none}
 #ovBar{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-lt));
   border-radius:99px;transition:width 1s linear}
-#ovMenu{display:none;margin-top:12px;font-size:clamp(1.1rem,2.4vw,2rem);color:#e7f1f6}
-#ovMenu .m{font-weight:800;color:#fff}
-#ovAgenda{display:none;margin-top:14px;width:min(760px,88%);text-align:start}
-#ovAgenda .ag{font-size:1.15rem}
+
+/* קרוסלת המידע במסך הגדול */
+/* המעבר עובר דרך רקע כהה: השקופית היוצאת דוהה, ורק אז הנכנסת עולה. בלי ההשהיה
+   שתי שכבות הטקסט נראו זו מבעד לזו באמצע ה-fade. */
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:36px;text-align:center;opacity:0;pointer-events:none;transition:opacity .55s ease-in}
+.slide.on{opacity:1;transition:opacity .55s ease-out .55s}
+.sl-kicker{font-size:clamp(.9rem,1.5vw,1.3rem);letter-spacing:.22em;color:var(--gold);opacity:.85}
+.sl-title{font-size:clamp(2rem,5.5vw,4.6rem);font-weight:800;line-height:1.1}
+.sl-sub{font-size:clamp(1.05rem,2vw,1.8rem);color:var(--muted)}
+/* מזל טוב */
+#slBirth .cake{font-size:clamp(3rem,7vw,6rem);line-height:1}
+#slBirth .names{display:flex;flex-wrap:wrap;gap:10px 26px;justify-content:center;margin-top:6px}
+#slBirth .nm{font-size:clamp(1.6rem,4vw,3.4rem);font-weight:800;color:#fff}
+#slBirth .nm small{display:block;font-size:.42em;font-weight:600;color:var(--gold-lt);margin-top:2px}
+#slBirth .soon{margin-top:20px;font-size:clamp(.95rem,1.6vw,1.35rem);color:var(--muted);
+  border-top:1px solid var(--line);padding-top:12px;max-width:80%}
+#slBirth .soon b{color:#dbe7ee;font-weight:600}
+/* תפריט גדול */
+#slMenu .dish{font-size:clamp(2.2rem,6vw,5rem);font-weight:800}
+#slMenu .side{font-size:clamp(1.3rem,3vw,2.4rem);color:#d7e6ee;margin-top:4px}
+#slMenu .veg{font-size:clamp(1.05rem,2.2vw,1.7rem);color:var(--muted)}
+/* סדר יום מלא */
+#slAgenda .list{width:min(860px,92%);max-height:76%;overflow:hidden;display:flex;flex-direction:column;gap:4px;text-align:start}
+#slAgenda .ag{font-size:clamp(1rem,2.2vh,1.4rem)}
+/* הודעה */
+#slMsg .msg{font-size:clamp(1.6rem,4vw,3.4rem);font-weight:700;line-height:1.3;max-width:88%}
+
+/* כרטיס ימי הולדת בסרגל */
+#birthCard{display:none}
+#birthToday{font-size:1.35rem;font-weight:800;line-height:1.25}
+#birthToday small{color:var(--gold-lt);font-weight:600;font-size:.7em}
+#birthNext{margin-top:8px;font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+#birthNext b{color:#dbe7ee;font-weight:600}
 
 /* פס תחתון */
 footer{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);
@@ -155,6 +188,12 @@ body.fs #fsBtn{display:none}
       <div id="menuNote"></div>
     </div>
 
+    <div class="card" id="birthCard">
+      <h3><i class="bi bi-balloon-heart"></i> ימי הולדת</h3>
+      <div id="birthToday"></div>
+      <div id="birthNext"></div>
+    </div>
+
     <div class="card" id="agendaCard">
       <h3><i class="bi bi-clock-history"></i> סדר היום</h3>
       <div id="agenda"></div>
@@ -166,12 +205,33 @@ body.fs #fsBtn{display:none}
     <video id="vB" class="off" muted playsinline preload="auto"></video>
     <div id="vinfo"><span id="vName"></span><span id="vCount"></span></div>
     <div id="ov" class="on">
-      <div id="ovClock">--:--</div>
-      <div id="ovTitle"></div>
-      <div id="ovSub"></div>
-      <div id="ovBarWrap"><div id="ovBar"></div></div>
-      <div id="ovMenu"></div>
-      <div id="ovAgenda"></div>
+      <div class="slide on" id="slClock">
+        <div id="ovClock">--:--</div>
+        <div id="ovTitle"></div>
+        <div id="ovSub"></div>
+        <div id="ovBarWrap"><div id="ovBar"></div></div>
+      </div>
+      <div class="slide" id="slBirth">
+        <div class="cake">🎂</div>
+        <div class="sl-kicker">מזל טוב</div>
+        <div class="names" id="birthNames"></div>
+        <div class="soon" id="birthSoon"></div>
+      </div>
+      <div class="slide" id="slMenu">
+        <div class="sl-kicker" id="slMenuKicker">ארוחת צהריים</div>
+        <div class="dish" id="slMenuMain"></div>
+        <div class="side" id="slMenuSide"></div>
+        <div class="veg" id="slMenuVeg"></div>
+        <div class="sl-sub" id="slMenuNote"></div>
+      </div>
+      <div class="slide" id="slAgenda">
+        <div class="sl-kicker">סדר היום</div>
+        <div class="list" id="slAgendaList"></div>
+      </div>
+      <div class="slide" id="slMsg">
+        <div class="sl-kicker">הודעה</div>
+        <div class="msg" id="slMsgText"></div>
+      </div>
     </div>
   </main>
 
@@ -197,10 +257,12 @@ var LOCAL = (location.port === '8484') ? '' : (location.protocol === 'https:' ? 
 
 var DEF = { headline:'מכינה בית התלמוד', city:'בית שמש', lat:31.747, lon:34.988, geonameid:295432,
   showWeather:true, showParasha:true, showZmanim:true, showMenu:true, showMessages:true, showAgenda:true,
-  videosEnabled:true, videosOnlyOnBreaks:true, crossfadeSec:3, refreshSec:60, lessonScreen:'clock',
-  videoRoot:'', videoFolders:[] };
+  showBirthdays:true, videosEnabled:false, videosOnlyOnBreaks:true, crossfadeSec:3, refreshSec:60,
+  lessonScreen:'clock', videoRoot:'', videoFolders:[],
+  slides:['clock','birthdays','menu','agenda','message'], slideSec:18 };
 
-var cfg = { schedule:{ default:[], byDay:{}, offDays:[5,6] }, menu:{ days:{} }, messages:{ items:[] }, display:DEF };
+var cfg = { schedule:{ default:[], byDay:{}, offDays:[5,6] }, menu:{ days:{} }, messages:{ items:[] },
+  birthdays:{ items:[] }, display:DEF };
 var srv = { ok:false, root:'', exists:false, folders:[], videos:[] };
 var $ = function (id) { return document.getElementById(id); };
 var pad = function (n) { return String(n).padStart(2, '0'); };
@@ -231,10 +293,22 @@ var DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שיש
 var isoOf = function (d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
 // ── הגדרות מהענן ─────────────────────────────────────────────────────────
+// מקור אחד לצורת ההגדרות — גם מהענן וגם מה-cache. בלעדיו עותק שנשמר בגרסה
+// קודמת (בלי מפתח שנוסף מאז) הפיל את המסך בטעינה.
+function normalize(raw) {
+  raw = raw || {};
+  return {
+    schedule:  Object.assign({ default:[], byDay:{}, offDays:[5,6] }, raw.schedule || {}),
+    menu:      Object.assign({ days:{} }, raw.menu || {}),
+    messages:  Object.assign({ items:[] }, raw.messages || {}),
+    birthdays: Object.assign({ items:[] }, raw.birthdays || {}),
+    display:   Object.assign({}, DEF, raw.display || {}),
+  };
+}
 function applyCache() {
   try {
     var c = JSON.parse(localStorage.getItem('lobbyCfg') || 'null');
-    if (c) { cfg = c; cfg.display = Object.assign({}, DEF, cfg.display || {}); }
+    if (c) cfg = normalize(c);
   } catch (e) {}
 }
 async function pullConfig() {
@@ -244,10 +318,7 @@ async function pullConfig() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var rows = await r.json(), next = {};
     rows.forEach(function (x) { next[x.key] = x.value || {}; });
-    cfg.schedule = Object.assign({ default:[], byDay:{}, offDays:[5,6] }, next.schedule || {});
-    cfg.menu     = Object.assign({ days:{} }, next.menu || {});
-    cfg.messages = Object.assign({ items:[] }, next.messages || {});
-    cfg.display  = Object.assign({}, DEF, next.display || {});
+    cfg = normalize(next);
     localStorage.setItem('lobbyCfg', JSON.stringify(cfg));
     $('dot').className = 'ok';
     paintStatic();
@@ -293,24 +364,28 @@ function paintStatic() {
   $('zmanim').style.display = d.showZmanim ? 'flex' : 'none';
   if (!d.showParasha) $('parasha').style.display = 'none';
   $('tick').style.animationDuration = Math.max(20, Number(d.tickerSpeed) || 60) + 's';
-  paintMenu(); paintTicker();
+  paintMenu(); paintTicker(); paintBirthCard();
 }
 
 function menuFor(dateIso) { return (cfg.menu.days || {})[dateIso] || null; }
 
-function paintMenu() {
-  if (!cfg.display.showMenu) return;
+// אחרי הצהריים (או ביום בלי לימודים) מציגים את יום הלימודים הבא — התפריט של אתמול חסר תועלת.
+function menuForDisplay() {
   var now = new Date(), key = isoOf(now), m = menuFor(key), label = 'היום';
-  // אחרי הצהריים (או ביום בלי לימודים) מציגים את יום הלימודים הבא — התפריט של אתמול חסר תועלת.
   var late = now.getHours() >= 15;
   if (!m || m.off || late) {
     for (var i = 1; i <= 7; i++) {
       var nd = new Date(now); nd.setDate(nd.getDate() + i);
       var cand = menuFor(isoOf(nd));
       if (cand && !cand.off) { m = cand; key = isoOf(nd); label = (i === 1 ? 'מחר' : 'יום ' + DAYS[nd.getDay()]); break; }
-      if (i === 7) { m = m; }
     }
   }
+  return { m: m, key: key, label: label };
+}
+
+function paintMenu() {
+  if (!cfg.display.showMenu) return;
+  var pick = menuForDisplay(), m = pick.m, key = pick.key, label = pick.label;
   var dt = new Date(key + 'T00:00:00');
   $('menuTitle').textContent = cfg.menu.title || 'ארוחת צהריים';
   if (!m) { $('menuDay').textContent = ''; $('menuMain').textContent = '—';
@@ -326,6 +401,36 @@ function paintMenu() {
     $('menuNote').textContent = m.note || '';
   }
 }
+
+// ── ימי הולדת ────────────────────────────────────────────────────────────
+// מגיעים מוכנים מהפאנל (שם פרטי + תאריך החגיגה). המסך רק בוחר מי רלוונטי היום.
+function birthdays() {
+  if (!cfg.display.showBirthdays) return { today: [], soon: [] };
+  var today = isoOf(new Date()), horizon = new Date();
+  horizon.setDate(horizon.getDate() + 14);
+  var lim = isoOf(horizon);
+  var items = (cfg.birthdays.items || []).filter(function (b) { return b && b.date && b.first; });
+  return {
+    today: items.filter(function (b) { return b.date === today; }),
+    soon: items.filter(function (b) { return b.date > today && b.date <= lim; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : 1; }),
+  };
+}
+function paintBirthCard() {
+  var b = birthdays(), card = $('birthCard');
+  if (!cfg.display.showBirthdays || (!b.today.length && !b.soon.length)) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  $('birthToday').innerHTML = b.today.length
+    ? '🎂 ' + b.today.map(function (x) {
+        return esc(x.first) + (x.age ? ' <small>בן ' + x.age + '</small>' : '');
+      }).join(' · ')
+    : '<span style="color:var(--muted);font-size:.95rem;font-weight:600">אין חוגגים היום</span>';
+  $('birthNext').innerHTML = b.soon.slice(0, 4).map(function (x) {
+    var d = new Date(x.date + 'T00:00:00');
+    return '<span><b>' + esc(x.first) + '</b> · ' + esc(x.heb || hebDate(d)) + ' (יום ' + DAYS[d.getDay()] + ')</span>';
+  }).join('');
+}
+var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;' })[c]; }); };
 
 function activeMessages() {
   var today = isoOf(new Date());
@@ -363,8 +468,10 @@ function tick() {
   var cur = idx >= 0 ? rows[idx] : null;
   var nxt = idx + 1 < rows.length ? rows[idx + 1] : null;
   var kind = cur ? (cur.kind || 'lesson') : 'none';
-  var inLesson = kind === 'lesson';
   var dayOver = rows.length && idx >= 0 && !nxt && (now.getHours() * 60 + now.getMinutes()) > mins(cur.t) + 60;
+  // אחרי שהמשבצת האחרונה נגמרה כבר לא "בשיעור" — אחרת המסך היה נשאר נעול על
+  // השעון כל הערב, בלי להתחלף בין שקופיות המידע.
+  var inLesson = kind === 'lesson' && !dayOver;
 
   // "בלי סרטונים באמצע": בזמן שיעור המסך עובר לשעון, ומחוץ לשעות הלימוד הוא נשאר שקט.
   var d = cfg.display;
@@ -372,7 +479,79 @@ function tick() {
               !(d.videosOnlyOnBreaks && (inLesson || idx < 0 || !rows.length));
   if (allow !== lastVideoAllowed) { lastVideoAllowed = allow; allow ? startVideo() : stopVideo(); }
   $('ov').className = allow ? '' : 'on';
-  if (!allow) paintOverlay(now, rows, idx, cur, nxt, dayOver);
+  if (!allow) {
+    paintOverlay(now, rows, idx, cur, nxt, dayOver);
+    rotate(now, inLesson);
+  }
+}
+
+// ── קרוסלת המידע ─────────────────────────────────────────────────────────
+// השקופיות מתחלפות רק כשאין וידאו. שקופית בלי תוכן מדולגת, ובזמן שיעור אפשר
+// לרתק את המסך לשעון (lessonScreen) כדי שלא יתחלף מול הכיתה.
+var slideAt = 0, slideSince = 0, curSlide = 'clock';
+var SLIDE_EL = { clock:'slClock', birthdays:'slBirth', menu:'slMenu', agenda:'slAgenda', message:'slMsg' };
+
+function slideHasContent(name, now) {
+  if (name === 'clock') return true;
+  if (name === 'birthdays') { var b = birthdays(); return !!(b.today.length || b.soon.length); }
+  if (name === 'menu') return !!menuForDisplay().m;
+  if (name === 'agenda') return todayRows(now).length > 0;
+  if (name === 'message') return activeMessages().length > 0;
+  return false;
+}
+function rotate(now, inLesson) {
+  var d = cfg.display, mode = d.lessonScreen || 'clock';
+  var pool = (d.slides || ['clock']).filter(function (n) { return slideHasContent(n, now); });
+  if (inLesson && mode !== 'rotate') pool = [mode === 'menu' ? 'menu' : (mode === 'agenda' ? 'agenda' : 'clock')];
+  if (!pool.length) pool = ['clock'];
+  var sec = Math.max(5, Number(d.slideSec) || 18);
+  var t = now.getTime();
+  if (!slideSince) slideSince = t;
+  if (pool.indexOf(curSlide) < 0 || (t - slideSince) / 1000 >= sec) {
+    slideAt = (pool.indexOf(curSlide) + 1) % pool.length;
+    curSlide = pool[slideAt];
+    slideSince = t;
+    showSlide(curSlide, now);
+  }
+}
+function showSlide(name, now) {
+  for (var k in SLIDE_EL) { var el = $(SLIDE_EL[k]); if (el) el.className = 'slide' + (k === name ? ' on' : ''); }
+  if (name === 'birthdays') {
+    var b = birthdays();
+    var list = b.today.length ? b.today : b.soon.slice(0, 3);
+    $('slBirth').querySelector('.sl-kicker').textContent = b.today.length ? 'מזל טוב' : 'ימי הולדת קרובים';
+    $('birthNames').innerHTML = list.map(function (x) {
+      var d = new Date(x.date + 'T00:00:00');
+      return '<span class="nm">' + esc(x.first) + '<small>' +
+        (b.today.length ? (x.age ? 'היום · בן ' + x.age : 'היום') : esc(x.heb || hebDate(d))) + '</small></span>';
+    }).join('');
+    $('birthSoon').innerHTML = (b.today.length && b.soon.length)
+      ? 'בקרוב: ' + b.soon.slice(0, 4).map(function (x) { return '<b>' + esc(x.first) + '</b> ' + esc(x.heb || ''); }).join(' · ')
+      : '';
+  } else if (name === 'menu') {
+    var mm = menuForDisplay();
+    $('slMenuKicker').textContent = (cfg.menu.title || 'ארוחת צהריים') + ' · ' + mm.label;
+    if (mm.m && mm.m.off) {
+      $('slMenuMain').textContent = mm.m.note || 'אין לימודים';
+      $('slMenuSide').textContent = ''; $('slMenuVeg').textContent = ''; $('slMenuNote').textContent = '';
+    } else if (mm.m) {
+      $('slMenuMain').textContent = mm.m.main || '';
+      $('slMenuSide').textContent = mm.m.side || '';
+      $('slMenuVeg').textContent = mm.m.veg || '';
+      $('slMenuNote').textContent = mm.m.note || '';
+    }
+  } else if (name === 'agenda') {
+    var rows = todayRows(now), idx = slotAt(rows, now);
+    $('slAgendaList').innerHTML = rows.map(function (r, i) {
+      return '<div class="ag ' + (i === idx ? 'now' : (i < idx ? 'done' : '')) + '"><span class="t">' + r.t +
+        '</span><span>' + esc(r.title) + '</span></div>';
+    }).join('');
+  } else if (name === 'message') {
+    var msgs = activeMessages();
+    var pick = msgs.filter(function (m) { return m.level === 'high'; });
+    if (!pick.length) pick = msgs;
+    $('slMsgText').innerHTML = pick.map(function (m) { return esc(m.text); }).join('<br>');
+  }
 }
 
 function paintAgenda(rows, idx) {
@@ -396,8 +575,7 @@ function paintAgenda(rows, idx) {
 
 function paintOverlay(now, rows, idx, cur, nxt, dayOver) {
   $('ovClock').innerHTML = pad(now.getHours()) + '<span class="bl">:</span>' + pad(now.getMinutes());
-  var mode = cfg.display.lessonScreen || 'clock';
-  $('ovMenu').style.display = 'none'; $('ovAgenda').style.display = 'none'; $('ovBarWrap').style.display = 'none';
+  $('ovBarWrap').style.display = 'none';
 
   if (!rows.length) { $('ovTitle').textContent = 'אין לימודים היום'; $('ovSub').textContent = hebDate(now); }
   else if (idx < 0) { $('ovTitle').textContent = 'בוקר טוב'; $('ovSub').textContent = 'תחילת היום בשעה ' + rows[0].t; }
@@ -413,20 +591,6 @@ function paintOverlay(now, rows, idx, cur, nxt, dayOver) {
         $('ovBar').style.width = Math.max(0, Math.min(100, ((total - left) / total) * 100)) + '%';
       }
     } else $('ovSub').textContent = 'המשבצת האחרונה להיום';
-  }
-
-  if (mode === 'menu') {
-    var m = menuFor(isoOf(now));
-    $('ovMenu').style.display = 'block';
-    $('ovMenu').innerHTML = m && !m.off
-      ? 'צהריים היום: <span class="m">' + [m.main, m.side, m.veg].filter(Boolean).join(' · ') + '</span>'
-      : (m && m.off ? (m.note || 'אין לימודים') : '');
-  } else if (mode === 'agenda' && rows.length) {
-    $('ovAgenda').style.display = 'block';
-    $('ovAgenda').innerHTML = rows.map(function (r, i) {
-      return '<div class="ag ' + (i === idx ? 'now' : (i < idx ? 'done' : '')) + '"><span class="t">' + r.t +
-        '</span><span>' + String(r.title || '').replace(/[&<>]/g, '') + '</span></div>';
-    }).join('');
   }
 }
 
@@ -562,6 +726,7 @@ tick();
 setInterval(tick, 1000);
 setInterval(paintMenu, 60000);
 setInterval(paintTicker, 60000);
+setInterval(paintBirthCard, 60000);
 
 pullConfig().then(function (ok) { if (!ok) hint('אין חיבור לענן — מוצגות ההגדרות האחרונות שנשמרו'); });
 setInterval(function () { pullConfig(); }, Math.max(15, Number(cfg.display.refreshSec) || 60) * 1000);

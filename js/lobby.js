@@ -14,12 +14,20 @@
   const DEF_DISPLAY = {
     headline: 'מכינה בית התלמוד', city: 'בית שמש', lat: 31.747, lon: 34.988, geonameid: 295432,
     showWeather: true, showParasha: true, showZmanim: true, showMenu: true,
-    showMessages: true, showAgenda: true, videosEnabled: true, videosOnlyOnBreaks: true,
+    showMessages: true, showAgenda: true, showBirthdays: true,
+    videosEnabled: false, videosOnlyOnBreaks: true,
     crossfadeSec: 3, refreshSec: 60, lessonScreen: 'clock', videoRoot: '', videoFolders: [],
+    slides: ['clock', 'birthdays', 'menu', 'agenda', 'message'], slideSec: 18,
   };
+  const SLIDES = [
+    { v: 'clock', t: 'שעון + מה עכשיו' }, { v: 'birthdays', t: 'מזל טוב — ימי הולדת' },
+    { v: 'menu', t: 'תפריט הצהריים' }, { v: 'agenda', t: 'סדר היום המלא' },
+    { v: 'message', t: 'הודעה חשובה' },
+  ];
 
-  let cfg = { schedule: { default: [], byDay: {}, offDays: [5, 6] }, menu: { days: {} }, messages: { items: [] }, display: {}, runtime: {} };
-  let tab = 'sched', schedDay = 'all', weekStart = null;
+  let cfg = { schedule: { default: [], byDay: {}, offDays: [5, 6] }, menu: { days: {} }, messages: { items: [] },
+    display: {}, runtime: {}, birthdays: { items: [] } };
+  let tab = 'sched', schedDay = 'all', weekStart = null, bdayCalc = null;
 
   const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   function sunOf(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - x.getDay()); return x; }
@@ -34,6 +42,7 @@
     cfg.schedule = Object.assign({ default: [], byDay: {}, offDays: [5, 6] }, cfg.schedule || {});
     cfg.menu = Object.assign({ title: 'תפריט ארוחת צהריים', subtitle: '', days: {} }, cfg.menu || {});
     cfg.messages = Object.assign({ items: [] }, cfg.messages || {});
+    cfg.birthdays = Object.assign({ items: [] }, cfg.birthdays || {});
     cfg.display = Object.assign({}, DEF_DISPLAY, cfg.display || {});
   }
 
@@ -78,6 +87,7 @@
         btn('sched', 'bi-clock-history', 'סדר יום') +
         btn('menu', 'bi-egg-fried', 'תפריט המטבח') +
         btn('msg', 'bi-megaphone', 'הודעות') +
+        btn('bday', 'bi-balloon-heart', 'ימי הולדת') +
         btn('disp', 'bi-display', 'תצוגה וסרטונים') +
       '</div><div class="ym-pane" id="lbPane"></div>';
     page.querySelectorAll('.ym-tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; draw(page); }));
@@ -85,6 +95,7 @@
     if (tab === 'sched') drawSched(pane, page);
     else if (tab === 'menu') drawMenu(pane, page);
     else if (tab === 'msg') drawMsg(pane, page);
+    else if (tab === 'bday') drawBday(pane, page);
     else drawDisp(pane, page);
   }
   const btn = (id, ic, label) => '<button class="ym-tab' + (tab === id ? ' on' : '') + '" data-tab="' + id + '"><i class="bi ' + ic + '"></i> ' + label + '</button>';
@@ -256,6 +267,148 @@
     pane.querySelector('#lbSaveMsg').addEventListener('click', () => save('messages'));
   }
 
+
+  // ── ימי הולדת ─────────────────────────────────────────────────────────
+  // התלמידים עצמם לא נשלפים ע"י המסך (הוא אנונימי). הפאנל — שרץ אצל מנהל מחובר —
+  // מחשב כאן את יום ההולדת העברי הבא, ושומר לענן שם פרטי ותאריך בלבד.
+  const HVAL = { 'א':1,'ב':2,'ג':3,'ד':4,'ה':5,'ו':6,'ז':7,'ח':8,'ט':9,'י':10,'כ':20,'ך':20,'ל':30,
+    'מ':40,'ם':40,'נ':50,'ן':50,'ס':60,'ע':70,'פ':80,'ף':80,'צ':90,'ץ':90,'ק':100,'ר':200,'ש':300,'ת':400 };
+  const HMON = { 'תשרי':'Tishrei','חשון':'Heshvan','חשוון':'Heshvan','מרחשון':'Heshvan','כסלו':'Kislev',
+    'כסליו':'Kislev','טבת':'Tevet','שבט':'Shevat','אדר':'Adar','אדר א':'Adar I','אדר ב':'Adar II',
+    'ניסן':'Nisan','נסן':'Nisan','אייר':'Iyar','איר':'Iyar','סיון':'Sivan','סיוון':'Sivan',
+    'תמוז':'Tamuz','אב':'Av','אלול':'Elul' };
+  const HMON_HE = { Tishrei:'תשרי', Heshvan:'חשוון', Kislev:'כסלו', Tevet:'טבת', Shevat:'שבט',
+    Adar:'אדר', 'Adar I':'אדר א׳', 'Adar II':'אדר ב׳', Nisan:'ניסן', Iyar:'אייר', Sivan:'סיוון',
+    Tamuz:'תמוז', Av:'אב', Elul:'אלול' };
+  const baseMon = m => String(m).replace(/ I+$/, '');
+
+  function hebPartsOf(d) {
+    const p = new Intl.DateTimeFormat('en-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' }).formatToParts(d);
+    const g = t => (p.find(x => x.type === t) || {}).value || '';
+    return { d: parseInt(g('day'), 10), m: g('month'), y: parseInt(String(g('year')).replace(/\D/g, ''), 10) };
+  }
+  // "י״א טבת תשע״ו" → {day:11, mon:'Tevet'}. הערך הרשום עדיף על המרה מהתאריך הלועזי,
+  // כי תאריך עברי מתחלף בשקיעה וההמרה מפספסת יום בכל מי שנולד בערב.
+  function parseHebText(txt) {
+    const t = String(txt || '').replace(/["'׳״]/g, '').replace(/\s+/g, ' ').trim();
+    if (!t) return null;
+    const w = t.split(' ');
+    let day = 0;
+    for (const ch of w[0]) day += HVAL[ch] || 0;
+    let mon = null; const rest = w.slice(1);
+    for (let n = 2; n >= 1 && !mon; n--) {
+      const cand = rest.slice(0, n).join(' ').replace(/^ה/, '');
+      if (HMON[cand]) mon = HMON[cand];
+    }
+    if (!mon) for (const word of rest) { const c = word.replace(/^ה/, ''); if (HMON[c]) { mon = HMON[c]; break; } }
+    return (day > 0 && day <= 30 && mon) ? { day: day, mon: mon } : null;
+  }
+
+  function buildHebMap() {
+    const t0 = new Date(); t0.setHours(12, 0, 0, 0);
+    const map = [];
+    for (let i = 0; i < 400; i++) {
+      const dt = new Date(t0); dt.setDate(dt.getDate() + i);
+      const h = hebPartsOf(dt);
+      map.push({ dt: dt, d: h.d, m: h.m, y: h.y });
+    }
+    return map;
+  }
+  // התאריך הלועזי הקרוב שבו חל אותו יום עברי. בשנה מעוברת נבחר אדר ב׳ (המנהג הרווח),
+  // ואם היום לא קיים בחודש (ל׳ בחודש חסר) — היום האחרון של אותו חודש.
+  function nextHebBirthday(map, day, mon, birthYear) {
+    const want = baseMon(mon);
+    let pool = map.filter(x => baseMon(x.m) === want);
+    if (want === 'Adar') {
+      const two = pool.filter(x => x.m === 'Adar II');
+      if (two.length) pool = two;
+    }
+    let hit = pool.find(x => x.d === day);
+    if (!hit && pool.length) hit = pool.slice().sort((a, b) => b.d - a.d)[0];
+    if (!hit) return null;
+    return { date: iso(hit.dt), hebD: hit.d, hebM: hit.m, age: birthYear ? hit.y - birthYear : null };
+  }
+  const firstName = full => String(full || '').trim().split(/\s+/)[0] || '';
+
+  async function computeBirthdays() {
+    const res = await window.store.list('students');
+    const rows = (res || []).filter(r => !r.status || r.status === 'פעיל');
+    const map = buildHebMap();
+    const manual = {};
+    (cfg.birthdays.items || []).forEach(b => { if (b.sid) manual[b.sid] = b; });
+    return rows.map(r => {
+      const prev = manual[r.id] || {};
+      let src = 'רשום', p = parseHebText(r.birthdate_heb);
+      if (!p && r.birthdate) {
+        const h = hebPartsOf(new Date(String(r.birthdate).slice(0, 10) + 'T12:00:00'));
+        p = { day: h.d, mon: h.m }; src = 'מחושב מהלועזי';
+      }
+      if (!p) return { sid: r.id, name: window.UI.fullName(r), first: firstName(r.name), miss: true, show: false, src: 'חסר' };
+      const by = r.birthdate ? hebPartsOf(new Date(String(r.birthdate).slice(0, 10) + 'T12:00:00')).y : null;
+      const n = nextHebBirthday(map, p.day, p.mon, by);
+      return { sid: r.id, name: window.UI.fullName(r), first: firstName(r.name),
+        hebTxt: window.UI.gematria(p.day) + ' ב' + (HMON_HE[p.mon] || p.mon),
+        date: n && n.date, age: n && n.age, src: src,
+        show: prev.show !== false, miss: false };
+    }).sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
+  }
+
+  function drawBday(pane, page) {
+    const saved = cfg.birthdays.items || [];
+    pane.innerHTML =
+      '<div class="qr-card"><h3><i class="bi bi-balloon-heart"></i> ימי הולדת שמוצגים במסך</h3>' +
+      '<p class="ym-note" style="margin:0 0 10px">מחושב לפי התאריך העברי הרשום בכרטיס התלמיד. ' +
+      'למסך נשמרים <b>שם פרטי ותאריך בלבד</b> — לא שם משפחה, לא שנת לידה ולא שום פרט נוסף.</p>' +
+      '<div class="tla-bar">' +
+        '<button class="btn-primary sm" id="lbCalc"><i class="bi bi-arrow-repeat"></i> חשב מחדש מהתלמידים</button>' +
+        '<span class="ym-note" id="lbBdayInfo">' +
+          (cfg.birthdays.updatedAt ? 'עודכן: ' + new Date(cfg.birthdays.updatedAt).toLocaleDateString('he-IL') +
+            ' · ' + saved.length + ' תלמידים' : 'עוד לא חושב') + '</span>' +
+        '<button class="btn-primary sm" id="lbSaveBday" style="margin-inline-start:auto" disabled><i class="bi bi-check-lg"></i> שמור למסך</button>' +
+      '</div>' +
+      '<div class="table-wrap" style="margin-top:10px"><table class="tbl"><thead><tr>' +
+      '<th>תלמיד</th><th style="width:170px">תאריך עברי</th><th style="width:160px">החגיגה הקרובה</th>' +
+      '<th style="width:70px">גיל</th><th style="width:130px">מקור</th><th style="width:100px">מוצג</th>' +
+      '</tr></thead><tbody id="lbBdayBody"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">' +
+      (saved.length ? 'לחץ "חשב מחדש" כדי לראות ולעדכן' : 'עוד לא חושבו ימי הולדת') + '</td></tr></tbody></table></div></div>';
+
+    pane.querySelector('#lbCalc').addEventListener('click', async () => {
+      const b = pane.querySelector('#lbCalc'); b.disabled = true; b.textContent = 'מחשב…';
+      try { bdayCalc = await computeBirthdays(); paintBday(pane); pane.querySelector('#lbSaveBday').disabled = false; }
+      catch (e) { window.UI.toast('החישוב נכשל: ' + e.message, 'err'); }
+      b.disabled = false; b.innerHTML = '<i class="bi bi-arrow-repeat"></i> חשב מחדש מהתלמידים';
+    });
+    pane.querySelector('#lbSaveBday').addEventListener('click', async () => {
+      cfg.birthdays = {
+        updatedAt: new Date().toISOString(),
+        items: (bdayCalc || []).filter(b => b.show && !b.miss)
+          .map(b => ({ sid: b.sid, first: b.first, date: b.date, heb: b.hebTxt, age: b.age, show: true })),
+      };
+      if (await save('birthdays')) drawBday(pane, page);
+    });
+    if (bdayCalc) { paintBday(pane); pane.querySelector('#lbSaveBday').disabled = false; }
+  }
+
+  function paintBday(pane) {
+    const list = bdayCalc || [];
+    const today = iso(new Date());
+    pane.querySelector('#lbBdayBody').innerHTML = list.map((b, i) => {
+      const soon = b.date && b.date <= iso(addDays(new Date(), 14));
+      return '<tr' + (b.miss ? ' style="opacity:.55"' : (soon ? ' style="background:rgba(168,120,48,.10)"' : '')) + '>' +
+        '<td><b>' + esc(b.name) + '</b></td>' +
+        '<td>' + (b.miss ? '<span style="color:#8c2f2f">חסר תאריך עברי</span>' : esc(b.hebTxt)) + '</td>' +
+        '<td>' + (b.date ? heb(b.date, { year: false }) + '<div class="ym-note">' +
+          (b.date === today ? 'היום!' : new Date(b.date + 'T00:00:00').toLocaleDateString('he-IL')) + '</div>' : '—') + '</td>' +
+        '<td>' + (b.age != null ? b.age : '—') + '</td>' +
+        '<td class="ym-note">' + esc(b.src) + '</td>' +
+        '<td>' + (b.miss ? '—' : '<label class="ym-check"><input type="checkbox" data-bshow="' + i + '"' +
+          (b.show ? ' checked' : '') + '> הצג</label>') + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">אין תלמידים</td></tr>';
+    pane.querySelectorAll('[data-bshow]').forEach(el => el.addEventListener('change', () => {
+      list[Number(el.dataset.bshow)].show = el.checked;
+    }));
+  }
+
   // ── תצוגה וסרטונים ────────────────────────────────────────────────────
   function drawDisp(pane, page) {
     const d = cfg.display, rt = cfg.runtime || {};
@@ -268,16 +421,27 @@
         '<label class="fld"><span>כותרת המסך</span><input class="inp mb0" data-d="headline" value="' + esc(d.headline || '') + '"></label>' +
         '<label class="fld"><span>עיר (למזג אוויר)</span><input class="inp mb0" data-d="city" value="' + esc(d.city || '') + '"></label>' +
         '<label class="fld"><span>מה מוצג בזמן שיעור</span><select class="inp mb0" data-d="lessonScreen">' +
-          [['clock', 'שעון גדול + שם השיעור'], ['menu', 'תפריט הצהריים של היום'], ['agenda', 'סדר היום המלא']]
+          [['clock', 'שעון גדול + שם השיעור'], ['rotate', 'רוטציה של כל השקופיות'],
+           ['menu', 'תפריט הצהריים של היום'], ['agenda', 'סדר היום המלא']]
             .map(o => '<option value="' + o[0] + '"' + (d.lessonScreen === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
         '</select></label>' +
       '</div>' +
       '<div style="margin-top:10px">' +
         chk('showAgenda', 'סדר היום') + chk('showMenu', 'תפריט הצהריים') + chk('showMessages', 'הודעות רצות') +
+        chk('showBirthdays', 'ימי הולדת') +
         chk('showWeather', 'מזג אוויר') + chk('showParasha', 'פרשת השבוע') + chk('showZmanim', 'זמני היום') +
       '</div></div>' +
 
-      '<div class="qr-card"><h3><i class="bi bi-play-btn"></i> סרטונים</h3>' +
+      '<div class="qr-card"><h3><i class="bi bi-images"></i> השקופיות במסך הגדול</h3>' +
+      '<p class="ym-note" style="margin:0 0 10px">האזור המרכזי מתחלף בין השקופיות שסימנת. שקופית בלי תוכן (למשל אין ימי הולדת קרובים) מדולגת אוטומטית.</p>' +
+      '<div class="tla-bar">' +
+        SLIDES.map(sl => '<label class="ym-check"><input type="checkbox" data-slide="' + sl.v + '"' +
+          ((d.slides || []).indexOf(sl.v) > -1 ? ' checked' : '') + '> ' + sl.t + '</label>').join('') +
+        '<label class="fld" style="margin-inline-start:auto"><span>שניות לכל שקופית</span>' +
+        '<input class="inp mb0" type="number" min="5" max="120" data-d="slideSec" value="' + esc(d.slideSec) + '" style="width:110px"></label>' +
+      '</div></div>' +
+
+      '<div class="qr-card"><h3><i class="bi bi-play-btn"></i> סרטונים <span class="ym-note">(רשות — כבוי כברירת מחדל)</span></h3>' +
       '<div style="margin-bottom:10px">' + chk('videosEnabled', 'נגן סרטונים') +
         chk('videosOnlyOnBreaks', 'רק בהפסקות ובארוחות', '(בזמן שיעור המסך עובר לשעון — בלי סרטונים באמצע)') + '</div>' +
       '<div class="qr-grid" style="grid-template-columns:2fr 1fr 1fr">' +
@@ -315,6 +479,13 @@
         d[f] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? Number(el.value) : el.value);
       });
     });
+    pane.querySelectorAll('[data-slide]').forEach(el => el.addEventListener('change', () => {
+      const v = el.dataset.slide;
+      const list = (d.slides || []).filter(x => x !== v);
+      if (el.checked) list.push(v);
+      // שמירה על סדר קבוע, כדי שהמסך יתחלף באותו סבב בכל פעם
+      d.slides = SLIDES.map(sl => sl.v).filter(x => list.indexOf(x) > -1);
+    }));
     pane.querySelectorAll('[data-folder]').forEach(el => el.addEventListener('change', () => {
       const f = el.dataset.folder;
       const list = (d.videoFolders || []).filter(x => x !== f);
