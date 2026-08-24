@@ -189,8 +189,8 @@
     for (const d of defs) {
       let nums = [];
       try {
-        const r = await Y().getText(d.path + '/tzintuk.ini');
-        nums = (r.contents || '').split(/\r?\n/).map(x => x.trim())
+        const r = (await Y().getText(d.path + '/tzintuk.ini')) || '';   // getText מחזיר מחרוזת, לא אובייקט
+        nums = r.split(/\r?\n/).map(x => x.trim())
           .filter(x => /^0\d{7,9}/.test(x)).map(x => x.split(/[=,\s]/)[0]);
       } catch (_) { /* אין קובץ = אין נרשמים */ }
       rows.push('<div class="ym-row"><span class="ym-ic"><i class="bi bi-people"></i></span>' +
@@ -241,8 +241,8 @@
       // אנשי צוות מוחרגים — אחרת הם ננעלים בשלוחת השיעור ומאבדים את שלוחה 9
       let staff = new Set();
       try {
-        const w = await Y().getText(WHITELIST);
-        (w.contents || '').split(/\r?\n/).forEach(l => {
+        const w = (await Y().getText(WHITELIST)) || '';
+        w.split(/\r?\n/).forEach(l => {
           const m = l.trim().match(/^(0\d{8,9})$/); if (m) staff.add(m[1]);
         });
       } catch (_) {}
@@ -302,8 +302,8 @@
     const box = pane('route').querySelector('#ylRtOut');
     note(box, 'קורא מהקו…');
     try {
-      const r = await Y().getText(ROUTING);
-      const lines = (r.contents || '').split(/\r?\n/).filter(l => /^0\d/.test(l));
+      const r = (await Y().getText(ROUTING)) || '';
+      const lines = r.split(/\r?\n/).filter(l => /^0\d/.test(l));
       box.innerHTML = '<p class="count-line">' + lines.length + ' מספרים מנותבים בקו כרגע.</p>' +
         '<pre dir="ltr" style="max-height:240px;overflow:auto;background:var(--bg2);padding:10px;border-radius:8px">' +
         esc(lines.join('\n')) + '</pre>';
