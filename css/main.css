@@ -293,8 +293,14 @@ body.mode-writeonly .toolbar.entry-ui .count-line{ display:block !important; }
 .teacher-btn i{font-size:2rem; color:var(--primary)}
 .teacher-btn:hover{transform:translateY(-3px); box-shadow:0 10px 26px rgba(0,0,0,.14)}
 /* דף חתימת הורים (sign.html) */
-.sign-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; background:var(--bg)}
-.sign-card{width:100%; max-width:460px; background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); padding:26px}
+/* ⚠️ align-items:center על מיכל בגובה 100vh חותך את ראש הכרטיס כשהוא גבוה
+   מהמסך — התוכן גולש מחוץ לאזור הגלילה ואי אפשר לגלול אליו למעלה.
+   flex-start + margin:auto על הילד ממרכז כשיש מקום, ולא חותך כשאין. */
+.sign-wrap{min-height:100vh; display:flex; align-items:flex-start; justify-content:center;
+  padding:20px; background:var(--bg)}
+/* טופס עם כותרות וסעיפים צריך רוחב של מסמך, לא של תיבת התחברות */
+.sign-card{width:100%; max-width:640px; margin:auto; background:var(--card); border:1px solid var(--line);
+  border-radius:18px; box-shadow:var(--shadow); padding:26px}
 .sign-logo{width:56px; height:56px; margin:0 auto 8px; border-radius:15px; display:flex; align-items:center; justify-content:center; font-size:1.7rem; color:#fff; background:linear-gradient(135deg,var(--primary),var(--primary-dark))}
 .sign-inst{text-align:center; color:var(--muted); font-weight:700; margin-bottom:14px}
 .sign-card h2{text-align:center; margin:.2rem 0 .6rem}
