@@ -29,3 +29,7 @@ video/out/
 # מסך הלובי — קונפיג מקומי של המחשב בלובי
 lobby/lobby_config.json
 lobby/__pycache__/
+
+# נתוני מייל שנשאבו לצורך הזמנת הספרים — שמות וכתובות של הורים
+_books_mail/
+_mail_index_*.json
