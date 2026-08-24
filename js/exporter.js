@@ -466,7 +466,11 @@
       const base = Number($('#exFont').value) || 13;
       const sheets = [...page.querySelectorAll('.ex-sheet')];
       const pw = $('#exPagesWrap'); if (pw) pw.style.display = mode === 'page' ? '' : 'none';
-      sheets.forEach(sh => { sh.style.fontSize = base + 'px'; sh.style.minHeight = ''; });
+      sheets.forEach(sh => {
+        sh.style.fontSize = base + 'px';
+        sh.style.minHeight = '';
+        sh.style.setProperty('--ex-pad', '6px');
+      });
       if (!mode) return;
 
       sheets.forEach(sh => {
@@ -514,6 +518,9 @@
           sh.style.minHeight = '0';
           const fits = px => {
             sh.style.fontSize = px + 'px';
+            // הריפוד מתכווץ יחד עם הטקסט — אחרת גובה השורה תקוע על ~19px
+            // וגם 4px פונט לא נכנס לעמוד אחד.
+            sh.style.setProperty('--ex-pad', Math.max(1, px * 0.45).toFixed(1) + 'px');
             return sh.scrollHeight <= pageH * want - 2;
           };
           let lo = 4, hi = 28;
@@ -533,6 +540,9 @@
         // שהתוכן יגלוש לעמוד נוסף אחרי שכבר נמדד כתקין.
         size = Math.max(4, Math.min(28, Math.floor(size * 10) / 10));
         sh.style.fontSize = size + 'px';
+        if (mode === 'page') {
+          sh.style.setProperty('--ex-pad', Math.max(1, size * 0.45).toFixed(1) + 'px');
+        }
       });
       const hint = page.querySelector('#exHint');
       if (hint && sheets[0]) {

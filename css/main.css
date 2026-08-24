@@ -507,8 +507,12 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .ex-table{width:100%; max-width:100%; border-collapse:collapse; table-layout:fixed}
 /* table-layout:fixed + שבירת מילים — אחרת בחירה של הרבה עמודות גולשת מחוץ לדף והעמודה השמאלית נחתכת בהדפסה */
 .ex-table th,.ex-table td{overflow-wrap:anywhere; word-break:break-word}
-.ex-table th{background:var(--primary,#003048); color:#fff; font-weight:700; padding:7px 8px; text-align:start; font-size:.95em}
-.ex-table td{padding:6px 8px; text-align:start}
+/* הריפוד נגזר מגודל הטקסט (--ex-pad), אחרת דחיסה לעמוד אחד לא עובדת:
+   הפונט קטן ל-4px אבל השורה נשארת בגובה 19px בגלל ריפוד קבוע. */
+.ex-sheet{--ex-pad:6px}
+.ex-table th{background:var(--primary,#003048); color:#fff; font-weight:700;
+  padding:calc(var(--ex-pad) + 1px) calc(var(--ex-pad) + 2px); text-align:start; font-size:.95em}
+.ex-table td{padding:var(--ex-pad) calc(var(--ex-pad) + 2px); text-align:start}
 .ex-table.grid th,.ex-table.grid td{border:1px solid #b9c4cd}
 .ex-table.zebra tbody tr:nth-child(even){background:#f2f5f8}
 .ex-sign{display:flex; justify-content:space-between; margin-top:28px; font-size:.95em; color:#333}
