@@ -615,7 +615,19 @@
         sel = null;
       }
       markSel();
+      // הוספה/מחיקה של שורה או עמודה משנה את גובה התוכן. בלי חישוב מחדש
+      // ההתאמה שנקבעה קודם כבר לא נכונה, והתוכן גולש מהדף.
+      fitToPage();
     }));
+
+    // גם עריכת טקסט ידנית בגיליון יכולה להוסיף שורות (טקסט שנשבר לשתי
+    // שורות), ולכן מחשבים מחדש אחרי שהמשתמש מסיים להקליד.
+    let _reflow = null;
+    page.addEventListener('input', e => {
+      if (!e.target.closest || !e.target.closest('.ex-sheet')) return;
+      clearTimeout(_reflow);
+      _reflow = setTimeout(fitToPage, 450);
+    });
 
     ['#exSrc'].forEach(s => $(s).addEventListener('change', async () => { await buildCols(); draw(); }));
     ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit', '#exFit', '#exSides', '#exPaper', '#exPages'].forEach(s => {
