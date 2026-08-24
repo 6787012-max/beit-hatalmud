@@ -182,45 +182,96 @@
     }
   }
 
-  /** מריץ את הניתוח. onStep מקבל טקסט התקדמות להצגה. */
+  /* ───────────────── ניתוח בקבוצות ───────────────── */
+  // 15 מסמכים בקריאה אחת חורגים מחלון הקלט, והמודל מחזיר שגיאה מבלבלת
+  // ("The document has no pages") שנראית כמו קובץ פגום. לכן: קבוצות
+  // קטנות, ואיחוד בקריאה נוספת. קבוצה שנכשלת נבדקת קובץ-קובץ, כך
+  // שקובץ בעייתי בודד מזוהה בשמו במקום להפיל את כולם.
+  const BATCH_MB = 6, BATCH_N = 4;
+
+  function emptyOut() {
+    return { 'רקע_ומגבלות': [], 'מנת_משכל': null, 'נתונים_סביבתיים': [],
+             'מוקדים_לחיזוק': [], 'מוקדי_כוח': [], 'מסמכים_שנסרקו': [], 'התראות': [] };
+  }
+
+  async function runBatch(header, items) {
+    const parts = [{ text: header }];
+    items.forEach(it => {
+      parts.push({ text: '\n=== קובץ: ' + it.name + ' ===\n' });
+      parts.push({ inline_data: { mime_type: it.mime, data: it.b64 } });
+    });
+    return callModel(parts);
+  }
+
   async function analyze(student, docs, onStep) {
-    const parts = [{ text: 'ת.ז: ' + (student.tz || '—') + '\nשם: ' + nm(student) +
-      '\nכיתה: ' + (student._cls || '') + '\n\nמסמכי האבחון:\n' }];
-    const failed = [], scanned = [];
-    for (const f of docs) {
-      onStep('קורא: ' + f.name);
+    const header = 'ת.ז: ' + (student.tz || '—') + '\nשם: ' + nm(student) +
+      '\nכיתה: ' + (student._cls || '') + '\n\nמסמכי האבחון:\n';
+    const failed = [], scanned = [], loaded = [];
+
+    for (let i = 0; i < docs.length; i++) {
+      const f = docs[i];
+      onStep('קורא (' + (i + 1) + '/' + docs.length + '): ' + f.name);
       try {
         const g = await grab(student, f);
-        parts.push({ text: '\n=== קובץ: ' + f.name + ' ===\n' });
-        parts.push({ inline_data: { mime_type: g.mime, data: g.b64 } });
-        scanned.push(f.name);
+        loaded.push({ name: f.name, mime: g.mime, b64: g.b64, mb: g.b64.length * 0.75 / 1024 / 1024 });
       } catch (e) {
-        // כישלון נרשם ומוצג — לא מדלגים בשקט
         failed.push({ name: f.name, why: e.message || String(e) });
       }
     }
-    if (!scanned.length) {
+    if (!loaded.length) {
       const e = new Error('אף מסמך לא ניתן לקריאה.'); e.code = 'ALL_FAILED'; e.failed = failed; throw e;
     }
-    onStep('מנתח ' + scanned.length + ' מסמכים…');
-    let out;
-    try {
-      out = await callModel(parts);
-    } catch (e) {
-      // ניסיון שני: לפעמים מסמך עובר את בדיקת החתימה ובכל זאת המודל דוחה
-      // אותו. במקום ליפול, שולחים רק את הקבצים הטקסטואליים והתמונות.
-      if (!/no pages|invalid|unsupported/i.test(e.message || '')) throw e;
-      onStep('מסמך אחד נדחה — מנסה שוב בלעדיו…');
-      const keep = [parts[0]];
-      for (let i = 1; i < parts.length; i += 2) {
-        const inl = parts[i + 1];
-        if (inl && inl.inline_data && /^image\//.test(inl.inline_data.mime_type)) {
-          keep.push(parts[i], inl);
+
+    // חלוקה לקבוצות לפי נפח ומספר
+    const batches = [];
+    let cur = [], mb = 0;
+    loaded.forEach(it => {
+      if (cur.length && (cur.length >= BATCH_N || mb + it.mb > BATCH_MB)) { batches.push(cur); cur = []; mb = 0; }
+      cur.push(it); mb += it.mb;
+    });
+    if (cur.length) batches.push(cur);
+
+    const partials = [];
+    for (let i = 0; i < batches.length; i++) {
+      onStep('מנתח קבוצה ' + (i + 1) + ' מתוך ' + batches.length + '…');
+      try {
+        partials.push(await runBatch(header, batches[i]));
+        batches[i].forEach(it => scanned.push(it.name));
+      } catch (_) {
+        // הקבוצה נכשלה — מנסים קובץ-קובץ כדי לבודד את הבעייתי
+        for (const it of batches[i]) {
+          onStep('בודק בנפרד: ' + it.name);
+          try { partials.push(await runBatch(header, [it])); scanned.push(it.name); }
+          catch (e2) { failed.push({ name: it.name, why: 'המודל לא הצליח לקרוא אותו' }); }
         }
       }
-      if (keep.length < 3) throw e;
-      out = await callModel(keep);
-      failed.push({ name: '(חלק מהמסמכים)', why: 'נדחו ע"י המודל' });
+    }
+    if (!partials.length) {
+      const e = new Error('אף מסמך לא ניתן לניתוח.'); e.code = 'ALL_FAILED'; e.failed = failed; throw e;
+    }
+
+    // מיזוג: קבוצה אחת — כמו שהיא. יותר מאחת — קריאת איחוד.
+    let out;
+    if (partials.length === 1) {
+      out = partials[0];
+    } else {
+      onStep('מאחד ' + partials.length + ' ניתוחים…');
+      const merged = emptyOut();
+      partials.forEach(pp => {
+        Object.keys(merged).forEach(k => {
+          if (Array.isArray(merged[k]) && Array.isArray(pp[k])) merged[k] = merged[k].concat(pp[k]);
+        });
+        if (!merged['מנת_משכל'] && pp['מנת_משכל']) merged['מנת_משכל'] = pp['מנת_משכל'];
+      });
+      try {
+        out = await callModel([{ text:
+          'לפניך כמה ניתוחים חלקיים של אותו תלמיד, שנעשו על קבוצות מסמכים נפרדות.\n' +
+          'אחד אותם לניתוח יחיד: הסר כפילויות, שמור על הניסוח, ואל תוסיף מידע חדש.\n' +
+          'שמור על אותו מבנה JSON.\n\n' + JSON.stringify(merged) }]);
+      } catch (_) {
+        out = merged;      // האיחוד נכשל — עדיף מיזוג פשוט מכלום
+        out['התראות'] = (out['התראות'] || []).concat(['האיחוד האוטומטי נכשל — ייתכנו כפילויות']);
+      }
     }
 
     // ולידציה: מנת משכל חייבת להופיע גם ברקע ומגבלות
