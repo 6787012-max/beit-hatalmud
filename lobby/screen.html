@@ -387,7 +387,10 @@ function paintAgenda(rows, idx) {
   // גלילה בתוך הרשימה בלבד (scrollIntoView היה גורר גם את העמוד), ואחרי שהפריסה התייצבה
   var cur = host.querySelector('.ag.now');
   if (cur) setTimeout(function () {
-    host.scrollTo({ top: Math.max(0, cur.offsetTop - host.clientHeight / 2 + cur.offsetHeight / 2), behavior:'smooth' });
+    var top = Math.max(0, cur.offsetTop - host.clientHeight / 2 + cur.offsetHeight / 2);
+    // כרום מדלג על גלילה חלקה בטאב שאינו גלוי — ואז הרשימה נשארת על השורה הראשונה
+    if (document.hidden) host.scrollTop = top;
+    else host.scrollTo({ top: top, behavior:'smooth' });
   }, 120);
 }
 
