@@ -275,6 +275,17 @@
       '<label class="fld"><span>תאריך</span><input type="date" class="inp mb0" id="tp_sgd" value="' + esc(plan.signed_at || '') + '"></label>' +
       '</div></div>' +
       '<div class="tla-save"><button class="btn-primary sm" id="tpSave"><i class="bi bi-check-lg"></i> שמירת דף ההכנה</button></div>';
+    // "מלא אוטומטית מהאבחונים" — ממלא את השדות כטיוטה בלבד. השמירה לתיק
+    // נשארת בידי המשתמש, דרך אותו כפתור "שמירת דף ההכנה" שלמטה.
+    if (window.cv3TlaAutofill && stud) {
+      window.cv3TlaAutofill.mount(host, stud, vals => {
+        Object.keys(vals).forEach(k => {
+          const t = host.querySelector('[data-pf="' + k + '"]');
+          if (t && vals[k]) { t.value = vals[k]; t.style.background = '#fbfaff'; }
+        });
+      });
+    }
+
     host.querySelector('#tpSave').addEventListener('click', async () => {
       const prof = {};
       host.querySelectorAll('[data-pf]').forEach(t => { prof[t.dataset.pf] = t.value.trim(); });
