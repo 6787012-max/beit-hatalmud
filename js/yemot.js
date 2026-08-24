@@ -24,7 +24,7 @@
   const gKey = () => { try { const k = localStorage.getItem(GKEY_LS) || ''; return /^AIza[\w-]{20,}$/.test(k) ? k : defaultKey(); } catch (_) { return defaultKey(); } };
   const setGKey = k => { try { k ? localStorage.setItem(GKEY_LS, k) : localStorage.removeItem(GKEY_LS); } catch (_) {} };
   const SS_KEY = 'cv3_yemot_token';
-  const DEFAULT_LINE = '033060570';
+  const DEFAULT_LINE = '0733518751';   // קו המכינה "תשע תלמוד". 033060570 הוא קו החיידר — לא כאן.
 
   // PCM16 (base64) → WAV Blob
   function pcmB64ToWav(b64, rate) {
@@ -84,12 +84,17 @@
     const res = await fetch(`${API}/UploadTextFile`, { method: 'POST', body: fd });
     return res.json();
   }
-  // העלאת קובץ/blob לשלוחה (יוצר גם את התיקייה אם אינה קיימת)
-  async function uploadBlob(ext, blob, filename) {
+  // העלאת קובץ/blob לשלוחה (יוצר גם את התיקייה אם אינה קיימת).
+  // ext = מספר שלוחה ("1") או נתיב מלא ("ivr2:/1/1").
+  // ברירת המחדל היא autoNumbering — בלעדיו כל העלאה דורסת את 000.wav,
+  // ושלוחת playfile נשארת לנצח עם הודעה אחת. overwrite:true לדריסה מכוונת.
+  async function uploadBlob(ext, blob, filename, opts) {
+    const folder = /^ivr2:/.test(ext) ? String(ext).replace(/\/$/, '') : 'ivr2:/' + ext;
     const fd = new FormData();
     fd.append('token', token());
-    fd.append('path', 'ivr2:/' + ext + '/000.wav');
+    fd.append('path', folder + '/000.wav');
     fd.append('convertAudio', '1');
+    if (!(opts && opts.overwrite)) fd.append('autoNumbering', 'true');
     fd.append('file', blob, filename || 'message.wav');
     const res = await fetch(`${API}/UploadFile`, { method: 'POST', body: fd });
     return res.json();
@@ -109,24 +114,27 @@
   // ----- מטא-דאטה של סוגי שלוחות + שדות ידידותיים -----
   const TYPE_META = {
     playfile:     { icon: 'bi-play-circle',       label: 'השמעת קובץ',   fields: [] },
-    menu:         { icon: 'bi-list',              label: 'תפריט',        fields: [] },
+    menu:         { icon: 'bi-list',              label: 'תפריט',        fields: [
+      { k: 'menu_voice', lbl: 'טקסט התפריט (נקרא בקול)', ph: 'לשמיעת ההודעות הקישו 1…' },
+      { k: 'password', lbl: 'סיסמת כניסה לשלוחה', ph: '1234' } ] },
     go_to_folder: { icon: 'bi-signpost-split',    label: 'ניתוב',        fields: [
       { k: 'go_to_folder', lbl: 'יעד הניתוב (נתיב)', ph: '/1/messages' } ] },
     record:       { icon: 'bi-mic',               label: 'הקלטה',        fields: [
-      { k: 'record_max_seconds', lbl: 'משך מקסימלי (שניות)', ph: '300', type: 'num' },
-      { k: 'record_no_review', lbl: 'ללא שמיעה חוזרת אחרי הקלטה', type: 'bool' },
-      { k: 'play_default_file', lbl: 'השמע הודעת פתיחה לפני הקלטה', type: 'bool' },
-      { k: 'folder_move', lbl: 'העבר את ההקלטה לתיקייה', ph: '/1/messages' },
-      { k: 'record_end_goto', lbl: 'בסיום ההקלטה עבור אל', ph: '/8' } ] },
-    tzintuk:      { icon: 'bi-bell',              label: 'צינתוק',       fields: [] },
+      { k: 'option_record', lbl: 'שתיקה-מינימום-מקסימום (שניות)', ph: '3-3-180' },
+      { k: 'record_ok', lbl: 'מקש לסיום ההקלטה', ph: '#' },
+      { k: 'folder_move', lbl: 'העבר את ההקלטה לתיקייה', ph: '/1/1' },
+      { k: 'record_end_goto', lbl: 'בסיום ההקלטה עבור אל', ph: '/8' },
+      { k: 'email_address', lbl: 'שליחת ההקלטה למייל', ph: 'a@b.com' } ] },
+    tzintuk:      { icon: 'bi-bell',              label: 'צינתוק',       fields: [
+      { k: 'list_tzintuk', lbl: 'שם רשימת התפוצה', ph: '1' } ] },
     last_play:    { icon: 'bi-star',              label: 'הודעה אחרונה', fields: [] },
     conference:   { icon: 'bi-people',            label: 'ועידה',        fields: [] },
-    transfer:     { icon: 'bi-telephone-forward', label: 'העברת שיחה',   fields: [
-      { k: 'transfer_phones', lbl: 'מספר/י יעד להעברה', ph: '0501234567' } ] },
+    routing:      { icon: 'bi-telephone-forward', label: 'העברת שיחה',   fields: [
+      { k: 'routing_to_phone', lbl: 'מספר/י יעד להעברה', ph: '0501234567' } ] },
     api:          { icon: 'bi-hdd-network',       label: 'קריאת API',    fields: [
-      { k: 'api_url', lbl: 'כתובת ה-API', ph: 'https://…' } ] },
+      { k: 'api_link', lbl: 'כתובת ה-API', ph: 'https://…' } ] },
   };
-  const TYPE_ORDER = ['playfile', 'menu', 'go_to_folder', 'record', 'transfer', 'tzintuk', 'conference', 'last_play', 'api'];
+  const TYPE_ORDER = ['playfile', 'menu', 'go_to_folder', 'record', 'routing', 'tzintuk', 'conference', 'last_play', 'api'];
   const typeInfo = t => TYPE_META[t] || { icon: 'bi-folder2', label: t || 'שלוחה' };
 
   // פרסום/סריאליזציה של ext.ini לשמירת שדות לא-ידועים
@@ -177,6 +185,8 @@
         '<button class="btn-ghost sm" id="ymLogout"><i class="bi bi-box-arrow-right"></i> ניתוק</button></div></div>' +
 
       '<div class="qr-card"><h3><i class="bi bi-telephone-fill"></i> מצב הקו</h3><div id="ymState" class="ym-stats">טוען…</div></div>' +
+
+      '<div id="ymLineCard"></div>' +
 
       // טקסט → שמע (Gemini) + הקלטה ישירה — הודעה חדשה לשלוחה
       '<div class="qr-card"><h3><i class="bi bi-megaphone"></i> הודעה חדשה לשלוחה</h3>' +
@@ -231,6 +241,7 @@
     page.querySelector('#ymNewExt').addEventListener('click', () => openCreate(page));
     wireTabs(page); wireTts(page); wireRec(page); wireSend(page);
     loadState(page); loadDir(page, state.path);
+    if (window.YemotLine) window.YemotLine.mount(page.querySelector('#ymLineCard'));
   }
 
   function wireTabs(page) {
@@ -555,7 +566,7 @@
   window.geminiKey = gKey;
   window.geminiSpeak = geminiSpeak;   // לשימוש עמוד הבדיקה/מודולים
   window.Yemot = {
-    API, token, call,
+    API, token, call, getText, putText, uploadBlob, parseIni, serializeIni,
     downloadUrl: path => `${API}/DownloadFile?token=${encodeURIComponent(token())}&path=${encodeURIComponent(path)}`
   };
 

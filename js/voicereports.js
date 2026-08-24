@@ -4,7 +4,8 @@
 (function () {
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const DEFAULT_FOLDER = 'ivr2:/4';   // שלוחת "דיווח מורים" הייעודית
+  const DEFAULT_FOLDER = 'ivr2:/9';   // שלוחת "דיווח קולי - צוות המכינה" בקו 0733518751.
+  // ⚠️ שלוחה 4 היא go_to_folder של קבוצת הצינתוק ואין בה הקלטות — אל תחזיר אותה.
   const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
   let students = [];
