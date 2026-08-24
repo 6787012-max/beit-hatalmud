@@ -448,12 +448,13 @@
         html = sheet(rows, title);
       }
       $('#exSheetWrap').innerHTML = html;
-      fitToPage();
       page._rows = rows; page._picked = picked; page._title = title;
       // עצה קטנה במקום שהמשתמש יגלה לבד שהדף צר מדי
       const hint = page.querySelector('#exHint');
       if (hint) hint.innerHTML = (picked.length > 7 && !land)
         ? '<i class="bi bi-lightbulb"></i> נבחרו ' + picked.length + ' עמודות — כדאי לעבור ל"דף לרוחב" כדי שיהיה מרווח.' : '';
+      // אחרון — כדי שהחיווי של ההתאמה לא יידרס ע"י ההערה על העמודות
+      fitToPage();
     }
 
     // ── התאמה אוטומטית לגודל A4 ──────────────────────────────────────────
@@ -505,7 +506,10 @@
           // הקטנה, כי צריך גם *להגדיל* כשיש מקום — טבלה קצרה ב-2 עמודים
           // אמורה למלא אותם, לא להישאר זעירה בפינה.
           const want = Math.max(1, Number(($('#exPages') || {}).value) || 1);
-          const pageH = sh.clientHeight;                 // גובה עמוד אחד
+          // ⚠️ אסור למדוד מול clientHeight: לגיליון יש min-height, והוא גדל
+          // יחד עם התוכן — כך scrollHeight תמיד שווה ל-clientHeight והספירה
+          // הייתה יוצאת "עמוד אחד" תמיד. גובה העמוד נלקח מ-min-height שב-CSS.
+          const pageH = parseFloat(getComputedStyle(sh).minHeight) || sh.clientHeight;
           const fits = px => {
             sh.style.fontSize = px + 'px';
             return sh.scrollHeight <= pageH * want + 2;
@@ -527,7 +531,8 @@
       if (hint && sheets[0]) {
         const got = Math.round(parseFloat(sheets[0].style.fontSize));
         const sh0 = sheets[0];
-        const pages = Math.max(1, Math.ceil(sh0.scrollHeight / (sh0.clientHeight || 1)));
+        const ph = parseFloat(getComputedStyle(sh0).minHeight) || sh0.clientHeight || 1;
+        const pages = Math.max(1, Math.ceil(sh0.scrollHeight / ph));
         hint.innerHTML = '<i class="bi bi-aspect-ratio"></i> גודל הטקסט ' +
           (got > base ? 'הוגדל' : got < base ? 'הוקטן' : 'נשאר') + ' מ-' + base + ' ל-' + got +
           (mode === 'page' ? (' · יוצא ' + pages + ' עמודים') : '') +
