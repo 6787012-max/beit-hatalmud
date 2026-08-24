@@ -365,7 +365,14 @@
       '.taf-fld label{display:block;font-weight:600;margin-bottom:4px;font-size:.9rem}' +
       '.taf-fld textarea{width:100%;padding:9px 11px;border:1px solid var(--line,#d1d5db);border-radius:8px;font:inherit;line-height:1.65}' +
       '.taf-actions{display:flex;gap:8px;margin-top:6px}' +
-      '.taf-busy{display:flex;align-items:center;gap:10px;padding:14px;color:var(--muted,#6b7280)}';
+      '.taf-busy{display:flex;align-items:center;gap:10px;padding:14px;color:var(--muted,#6b7280)}' +
+      '.taf-log{margin-top:12px;max-height:320px;overflow:auto;font-size:.86rem}' +
+      '.taf-bar{height:8px;background:var(--line,#e5e7eb);border-radius:6px;overflow:hidden;margin-bottom:6px}' +
+      '.taf-bar i{display:block;height:100%;background:var(--accent,#7c3aed);transition:width .3s}' +
+      '.taf-now{font-weight:600;margin-bottom:8px}' +
+      '.taf-row{padding:3px 0;border-bottom:1px solid var(--line,#eee)}' +
+      '.taf-row.bad{color:#b91c1c}' +
+      '.taf-done{background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;margin-bottom:8px}';
     document.head.appendChild(s);
   }
 
@@ -431,5 +438,124 @@
     });
   }
 
-  window.cv3TlaAutofill = { mount, findDiagnosticDocs, analyze, FIELD_MAP };
+  /* ───────────── הרצה על כל התלמידים ───────────── */
+  // ⚠️ התוצאה נשמרת כטיוטה ב-tla_profile_drafts, **לא** בתיק. אף שדה
+  // בכרטיס לא משתנה עד שאדם פותח, קורא, ומאשר. זה נכון גם בהרצה בודדת
+  // וגם כאן — אחרת 37 תיקים היו מתמלאים בטקסט שאיש לא קרא.
+  async function runForStudent(student) {
+    const found = await findDiagnosticDocs(student);
+    const res = await analyze(student, found.docs, () => {});
+    const row = {
+      student_id: student.id,
+      data: res.data,
+      scanned: res.scanned,
+      failed: res.failed,
+      skipped: found.skipped || [],
+      status: 'draft',
+    };
+    const cur = (await window.store.list('tla_profile_drafts'))
+      .find(d => d.student_id === student.id);
+    if (cur) await window.store.update('tla_profile_drafts', cur.id, row);
+    else await window.store.add('tla_profile_drafts', row);
+    return res;
+  }
+
+  /**
+   * מריץ על רשימת תלמידים, אחד-אחד. onProgress(i, total, name, status).
+   * סדרתי בכוונה: הרצה מקבילה מגיעה למגבלת הקצב של המודל, ואז *הכל* נכשל.
+   */
+  async function runAll(students, onProgress, shouldStop) {
+    const done = [], failed = [];
+    for (let i = 0; i < students.length; i++) {
+      if (shouldStop && shouldStop()) break;
+      const s = students[i];
+      onProgress(i + 1, students.length, nm(s), 'עובד…');
+      try {
+        const r = await runForStudent(s);
+        done.push({ name: nm(s), scanned: r.scanned.length });
+        onProgress(i + 1, students.length, nm(s), 'נוצרה טיוטה (' + r.scanned.length + ' מסמכים)');
+      } catch (e) {
+        failed.push({ name: nm(s), why: e.message || String(e) });
+        onProgress(i + 1, students.length, nm(s), 'נכשל: ' + (e.message || ''));
+      }
+      // נשימה בין תלמידים — מוריד את הסיכוי למגבלת קצב
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    return { done: done, failed: failed };
+  }
+
+  async function draftFor(studentId) {
+    const all = await window.store.list('tla_profile_drafts');
+    return all.find(d => d.student_id === studentId && d.status === 'draft') || null;
+  }
+
+  /* ───────────── מסך ההרצה הקבוצתית ───────────── */
+  async function batchModal() {
+    style();
+    const [students, classes, drafts] = await Promise.all([
+      window.cv3Students ? window.cv3Students.getStudents() : window.store.list('students'),
+      window.store.list('classes'),
+      window.store.list('tla_profile_drafts'),
+    ]);
+    const has = id => drafts.some(d => d.student_id === id && d.status === 'draft');
+    const clsName = id => { const c = classes.find(x => x.id == id); return c ? c.name : 'ללא שיעור'; };
+    const m = window.UI.modal({
+      title: 'מילוי אוטומטי לכל התלמידים', saveLabel: 'התחל',
+      bodyHTML:
+        '<p style="margin:0 0 10px">המערכת תעבור תלמיד-תלמיד, תקרא את האבחונים ' +
+        'שב"מסמך קביל", ותכין <b>טיוטה</b> לדף ההכנה.</p>' +
+        '<div class="taf-warn" style="margin-bottom:10px">' +
+        '<b><i class="bi bi-info-circle"></i> חשוב לדעת</b><ul>' +
+        '<li>שום דבר <b>לא</b> נכנס לתיק התלמיד. כל טיוטה טעונה אישור בנפרד.</li>' +
+        '<li>ההרצה אורכת כדקה עד שתיים לתלמיד. אין לסגור את החלון באמצע.</li>' +
+        '<li>תלמיד ללא אבחונים ב"מסמך קביל" יסומן ככישלון — וזה מידע שימושי.</li>' +
+        '</ul></div>' +
+        '<label class="fld fld-wide"><span>על מי להריץ</span><select class="inp mb0" id="tb_scope">' +
+          '<option value="new">רק מי שאין לו טיוטה (' + students.filter(s => !has(s.id)).length + ')</option>' +
+          '<option value="all">כל התלמידים (' + students.length + ')</option>' +
+          classes.map(c => '<option value="c' + c.id + '">' + esc(c.name) + ' (' +
+            students.filter(s => s.class_id == c.id).length + ')</option>').join('') +
+        '</select></label>' +
+        '<div id="tb_log" class="taf-log" hidden></div>',
+      onSave: async (el) => {
+        const v = el.querySelector('#tb_scope').value;
+        const list = v === 'all' ? students
+          : v === 'new' ? students.filter(s => !has(s.id))
+          : students.filter(s => String(s.class_id) === v.slice(1));
+        if (!list.length) { window.UI.toast('אין תלמידים לפי הבחירה', 'err'); return false; }
+
+        const log = el.querySelector('#tb_log');
+        log.hidden = false;
+        el.querySelector('#tb_scope').disabled = true;
+        const save = el.querySelector('[data-act="save"]');
+        let stop = false;
+        save.textContent = 'עצור';
+        save.onclick = e => { e.preventDefault(); e.stopPropagation(); stop = true; save.textContent = 'עוצר…'; };
+
+        const line = (i, n, name, st) => {
+          const p = Math.round((i / n) * 100);
+          log.innerHTML = '<div class="taf-bar"><i style="width:' + p + '%"></i></div>' +
+            '<div class="taf-now">' + i + '/' + n + ' · ' + esc(name) + ' — ' + esc(st) + '</div>' +
+            log.dataset.hist;
+          log.dataset.hist = (st.indexOf('עובד') === 0 ? '' :
+            '<div class="taf-row' + (st.indexOf('נכשל') === 0 ? ' bad' : '') + '">' +
+            esc(name) + ' — ' + esc(st) + '</div>') + (log.dataset.hist || '');
+        };
+        log.dataset.hist = '';
+        const res = await runAll(list, line, () => stop);
+        log.innerHTML = '<div class="taf-done"><b>הסתיים.</b> נוצרו ' + res.done.length +
+          ' טיוטות' + (res.failed.length ? ', ' + res.failed.length + ' נכשלו' : '') + '.</div>' +
+          (res.failed.length ? '<div class="taf-failed">' +
+            res.failed.map(f => esc(f.name) + ' — ' + esc(f.why)).join('<br>') + '</div>' : '') +
+          log.dataset.hist;
+        save.textContent = 'סגור';
+        save.onclick = () => m.close();
+        return false;                       // לא סוגרים — שיראו את הסיכום
+      },
+    });
+  }
+
+  window.cv3TlaAutofill = { mount, findDiagnosticDocs, analyze, FIELD_MAP,
+    runForStudent: runForStudent, runAll: runAll, draftFor: draftFor,
+    paint: paint, batchModal: batchModal };
 })();
