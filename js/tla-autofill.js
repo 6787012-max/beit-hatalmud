@@ -555,7 +555,115 @@
     });
   }
 
+  /* ───────────── פאנל הטיוטות הממתינות ───────────── */
+  // ⚠️ 10 מתוך 13 הטיוטות שייכות לתלמידים שאין להם עדיין תכנית תל"א,
+  // ולכן אין דף הכנה לפתוח והן היו בלתי נגישות. הפאנל הזה מציג את כולן
+  // במסך התל"א, ואישור יוצר את התכנית אם היא חסרה.
+  async function draftsPanel(host, onChange) {
+    style();
+    const [drafts, students, classes] = await Promise.all([
+      window.store.list('tla_profile_drafts'),
+      window.cv3Students ? window.cv3Students.getStudents() : window.store.list('students'),
+      window.store.list('classes'),
+    ]);
+    const open = (drafts || []).filter(d => d.status === 'draft');
+    const old = host.querySelector('#tafPanel');
+    if (old) old.remove();
+    if (!open.length) return;
+
+    const stuOf = id => students.find(s => s.id === id);
+    const clsOf = s => { const c = classes.find(x => x.id == (s || {}).class_id); return c ? c.name : ''; };
+    open.sort((x, y) => {
+      const A = stuOf(x.student_id) || {}, B = stuOf(y.student_id) || {};
+      return String(clsOf(A)).localeCompare(String(clsOf(B)), 'he') ||
+             String(A.family || '').localeCompare(String(B.family || ''), 'he');
+    });
+
+    const box = document.createElement('div');
+    box.id = 'tafPanel';
+    box.className = 'qr-card';
+    box.style.borderInlineStart = '4px solid var(--accent,#7c3aed)';
+    box.innerHTML =
+      '<h3><i class="bi bi-magic"></i> טיוטות ממתינות לאישור ' +
+      '<span class="det-badge">' + open.length + '</span></h3>' +
+      '<p class="tl-note" style="margin:.2rem 0 .7rem;font-size:.86rem">' +
+      'נוצרו אוטומטית מהאבחונים. שום דבר לא נכנס לתיק עד אישור.</p>' +
+      '<div class="table-wrap"><table class="tbl"><thead><tr>' +
+      '<th style="width:44px">#</th><th>תלמיד</th><th>שיעור</th><th>מסמכים</th>' +
+      '<th>מנת משכל</th><th>התראות</th><th></th></tr></thead><tbody>' +
+      open.map((d, i) => {
+        const s = stuOf(d.student_id) || {};
+        const iq = (d.data && d.data['מנת_משכל']) || '';
+        const w = ((d.data && d.data['התראות']) || []).length;
+        return '<tr><td class="idx">' + (i + 1) + '</td>' +
+          '<td><b>' + esc(nm(s)) + '</b></td><td>' + esc(clsOf(s)) + '</td>' +
+          '<td>' + ((d.scanned || []).length) + '</td>' +
+          '<td>' + esc(iq && iq !== 'null' ? iq : '—') + '</td>' +
+          '<td>' + (w ? '<span class="chip off">' + w + '</span>' : '—') + '</td>' +
+          '<td class="row-act"><button class="btn-ghost sm" data-tafopen="' + d.id + '">' +
+          '<i class="bi bi-eye"></i> בדיקה ואישור</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+    // מעל הרשימה עצמה, מתחת לסרגל הסינון — לא בראש הדף
+    const anchor = host.querySelector('#tlaList');
+    host.insertBefore(box, anchor || host.firstChild);
+
+    box.querySelectorAll('[data-tafopen]').forEach(b => b.addEventListener('click', () => {
+      const d = open.find(x => String(x.id) === b.dataset.tafopen);
+      reviewModal(d, stuOf(d.student_id), onChange);
+    }));
+  }
+
+  /** חלון בדיקה לטיוטה בודדת. אישור יוצר תכנית תל"א אם אין. */
+  function reviewModal(d, student, onChange) {
+    const res = { data: d.data, scanned: d.scanned || [], failed: d.failed || [], skipped: d.skipped || [] };
+    const m = window.UI.modal({
+      title: 'טיוטת דף הכנה — ' + nm(student),
+      bodyHTML: '<div id="tafHost"></div>',
+      saveLabel: null,
+    });
+    m.el.classList.add('modal-wide');
+    const host = m.el.querySelector('#tafHost');
+    const box = paint(host, res);
+    box.querySelector('[data-taf-cancel]').textContent = 'דחיית הטיוטה';
+    box.querySelector('[data-taf-cancel]').addEventListener('click', async () => {
+      if (!await window.UI.confirm('לדחות את הטיוטה? היא תימחק.')) return;
+      await window.store.update('tla_profile_drafts', d.id, { status: 'rejected' });
+      m.close(); if (onChange) onChange();
+    });
+    box.querySelector('[data-taf-ok]').addEventListener('click', async () => {
+      const vals = {};
+      box.querySelectorAll('[data-taf]').forEach(t => { vals[t.dataset.taf] = t.value.trim(); });
+      const btn = box.querySelector('[data-taf-ok]');
+      btn.disabled = true; btn.textContent = 'שומר…';
+      try {
+        // תכנית תל"א חסרה — יוצרים אחת, אחרת אין לאן לשמור את הפרופיל
+        const plans = await window.store.byStudent('tla_plans', student.id);
+        let plan = (plans || [])[0];
+        if (!plan) {
+          const year = window.UI.hebYear ? window.UI.hebYear() : '';
+          const r = await window.store.add('tla_plans', {
+            student_id: student.id, year_label: year, status: 'טיוטה',
+            profile: vals, slots: [],
+          });
+          plan = r && r.data && r.data[0];
+          if (!plan) throw new Error('יצירת התל"א נכשלה');
+        } else {
+          const prof = Object.assign({}, plan.profile || {}, vals);
+          const u = await window.store.update('tla_plans', plan.id, { profile: prof });
+          if (!u || u.ok === false) throw new Error('השמירה נכשלה');
+        }
+        await window.store.update('tla_profile_drafts', d.id,
+          { status: 'applied', applied_at: new Date().toISOString() });
+        window.UI.toast('נשמר לדף ההכנה של ' + nm(student));
+        m.close(); if (onChange) onChange();
+      } catch (e) {
+        window.UI.toast(e.message || 'נכשל', 'err');
+        btn.disabled = false; btn.textContent = 'אשר ושמור לתיק';
+      }
+    });
+  }
+
   window.cv3TlaAutofill = { mount, findDiagnosticDocs, analyze, FIELD_MAP,
     runForStudent: runForStudent, runAll: runAll, draftFor: draftFor,
-    paint: paint, batchModal: batchModal };
+    paint: paint, batchModal: batchModal, draftsPanel: draftsPanel };
 })();

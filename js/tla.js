@@ -166,6 +166,12 @@
     const bb = page.querySelector('#tlaBatch');
     if (bb && window.cv3TlaAutofill) bb.addEventListener('click', () => window.cv3TlaAutofill.batchModal());
     else if (bb) bb.style.display = 'none';
+    // פאנל הטיוטות — מוצג מעל הרשימה, כדי שיהיה נגיש גם לתלמידים
+    // שאין להם עדיין תכנית תל"א (רובם).
+    if (window.cv3TlaAutofill) {
+      const wrap = page.querySelector('#tlaList');
+      window.cv3TlaAutofill.draftsPanel(wrap.parentNode, () => renderPage(page)).catch(() => {});
+    }
     draw();
   }
 

@@ -596,3 +596,10 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .fb-p{margin:6px 0}
 .fb-ul{margin:6px 0;padding-inline-start:20px}
 .fb-ul li{margin:3px 0}
+
+/* טפסים — תקציר בכרטיס ואזהרת עריכה */
+.form-blurb{margin:.2rem 0 .6rem; display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden}
+.form-warn{background:#fff7ed; border:1px solid #fed7aa; border-radius:10px;
+  padding:10px 12px; font-size:.86rem; line-height:1.5; color:#7c2d12}
+.form-warn b{display:block; margin-bottom:2px}

@@ -78,17 +78,19 @@
         const rs = respOf(f.id), signed = rs.filter(r => r.status === 'signed').length, pct = rs.length ? Math.round(signed / rs.length * 100) : 0;
         return '<div class="qr-card form-card"><div class="card-h-row"><h3><i class="bi bi-file-earmark-text"></i> ' + esc(f.title) + '</h3>' +
           '<span class="det-badge">' + signed + '/' + rs.length + ' נחתמו</span></div>' +
-          (f.body ? '<p class="tl-note" style="margin:.2rem 0 .6rem">' + esc(f.body) + '</p>' : '') +
+          (f.body ? '<p class="tl-note form-blurb">' + esc(blurb(f.body)) + '</p>' : '') +
           '<div class="prog"><div class="prog-bar" style="width:' + pct + '%"></div></div>' +
           '<div class="det-actions" style="margin-top:10px">' +
             '<button class="btn-primary sm" data-open="' + f.id + '"><i class="bi bi-table"></i> מעקב וחתימות</button>' +
             '<button class="btn-ghost sm" data-link="' + f.id + '"><i class="bi bi-link-45deg"></i> קישור כללי</button>' +
+            '<button class="btn-ghost sm" data-edit="' + f.id + '"><i class="bi bi-pencil"></i> עריכה</button>' +
             '<button class="btn-ghost sm danger" data-del="' + f.id + '"><i class="bi bi-trash"></i> מחיקה</button>' +
           '</div></div>';
       }).join('');
       page.querySelector('#formsEmpty').hidden = forms.length > 0;
       page.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => detailView(forms.find(f => f.id == b.dataset.open))));
       page.querySelectorAll('[data-link]').forEach(b => b.addEventListener('click', () => publicLinkModal(forms.find(f => f.id == b.dataset.link))));
+      page.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editFormForm(forms.find(f => f.id == b.dataset.edit))));
       page.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
         const f = forms.find(x => x.id == b.dataset.del); if (!f) return;
         if (!(await window.UI.confirm('למחוק את הטופס "' + esc(f.title) + '" וכל החתימות שלו?'))) return;
@@ -127,7 +129,9 @@
         const type = row.querySelector('.fb-type').value;
         const optRaw = row.querySelector('.fb-options').value.trim();
         const options = type === 'select' ? optRaw.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : [];
-        out.push({ key: 'f' + i, label, type, options, required: row.querySelector('.fb-req').checked });
+        // ⚠️ המפתח הוא מה שמקשר תשובה שנחתמה לשדה. בעריכת טופס קיים חובה
+        // לשמר את המפתח המקורי — אחרת מחיקת שדה אחד מזיזה את כל התשובות.
+        out.push({ key: row.dataset.key || 'f' + i, label, type, options, required: row.querySelector('.fb-req').checked });
       });
       return out;
     }
@@ -173,6 +177,61 @@
       const addRow = fld => { host.insertAdjacentHTML('beforeend', fieldRowHTML(fld)); wireFieldRow(host.lastElementChild); };
       addRow({ label: 'חתימת הורה', type: 'signature', options: [], required: true });
       m.el.querySelector('#nf_addField').addEventListener('click', () => addRow(null));
+    }
+
+    /** תקציר גוף הטופס לכרטיס — הטפסים המוכנים ארוכים מאוד. */
+    function blurb(body) {
+      const t = String(body || '').split('\n').map(x => x.trim())
+        .filter(x => x && x.indexOf('##') !== 0)[0] || '';
+      return t.length > 150 ? t.slice(0, 150) + '…' : t;
+    }
+
+    /** עריכת טופס קיים — כותרת, תוכן ושדות. הנמענים לא משתנים. */
+    function editFormForm(f) {
+      if (!f) return;
+      const signed = respOf(f.id).filter(r => r.status === 'signed').length;
+      const flds = parseFields(f);
+      const m = window.UI.modal({
+        title: 'עריכת טופס', saveLabel: 'שמירת שינויים',
+        bodyHTML: '<div class="form-grid">' +
+          (signed ? '<div class="fld fld-wide"><div class="form-warn"><b>' +
+            '<i class="bi bi-exclamation-triangle"></i> ' + signed + ' הורים כבר חתמו</b>' +
+            '<div>שינוי נוסח או מחיקת שדה לא מוחקים חתימות קיימות, אבל התשובות שכבר ' +
+            'נמסרו יוצגו לפי הנוסח החדש. הוספת שדה תופיע ריקה אצל מי שכבר חתם.</div></div></div>' : '') +
+          '<label class="fld fld-wide"><span>כותרת הטופס *</span>' +
+            '<input class="inp mb0" id="ef_title" value="' + esc(f.title || '') + '"></label>' +
+          '<label class="fld fld-wide"><span>תוכן / הנחיה להורים</span>' +
+            '<textarea class="inp mb0" id="ef_body" rows="10">' + esc(f.body || '') + '</textarea>' +
+            '<small class="login-hint" style="margin:4px 0 0">שורה שמתחילה ב-## היא כותרת · שורה שמתחילה ב-• היא פריט רשימה</small></label>' +
+          '</div>' +
+          '<div class="fld fld-wide" style="margin-top:6px">' +
+            '<span style="display:block;margin-bottom:6px;font-weight:600">שדות למילוי</span>' +
+            '<div id="ef_fields"></div>' +
+            '<button type="button" class="btn-ghost sm" id="ef_addField">' +
+            '<i class="bi bi-plus-lg"></i> הוסף שדה</button></div>',
+        onSave: async (mel) => {
+          const title = mel.querySelector('#ef_title').value.trim();
+          if (!title) { window.UI.toast('כותרת חובה', 'err'); return false; }
+          const body = mel.querySelector('#ef_body').value.trim();
+          const fields = collectFields(mel.querySelector('#ef_fields'));
+          const r = await window.store.update('forms', f.id, { title: title, body: body, fields: fields });
+          if (r && r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
+          f.title = title; f.body = body; f.fields = fields;
+          window.UI.toast('הטופס עודכן'); drawList(); return true;
+        },
+      });
+      m.el.classList.add('modal-wide');
+      const host = m.el.querySelector('#ef_fields');
+      // מפתח חדש שלא מתנגש באף מפתח קיים
+      let next = flds.reduce((mx, x) => Math.max(mx, parseInt(String(x.key || '').replace('f', ''), 10) || 0), -1) + 1;
+      const addRow = (fld, keepKey) => {
+        host.insertAdjacentHTML('beforeend', fieldRowHTML(fld));
+        const row = host.lastElementChild;
+        row.dataset.key = keepKey || ('f' + (next++));
+        wireFieldRow(row);
+      };
+      flds.forEach(x => addRow(x, x.key));
+      m.el.querySelector('#ef_addField').addEventListener('click', () => addRow(null));
     }
 
     function detailView(f) {
