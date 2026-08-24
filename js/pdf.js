@@ -68,6 +68,7 @@
   }
 
   const A4 = { p: [210, 297], l: [297, 210] };   // מ"מ
+  const A3 = { p: [297, 420], l: [420, 297] };
 
   /**
    * @param {HTMLElement} el      האלמנט להמרה
@@ -102,12 +103,13 @@
     });
 
     const land = opts.orientation === 'landscape';
-    const [pw, ph] = land ? A4.l : A4.p;
+    const sz = opts.paper === 'a3' ? A3 : A4;
+    const [pw, ph] = land ? sz.l : sz.p;
     const margin = opts.margin == null ? 8 : opts.margin;
     const usableW = pw - margin * 2, usableH = ph - margin * 2;
 
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: land ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+    const pdf = new jsPDF({ orientation: land ? 'landscape' : 'portrait', unit: 'mm', format: opts.paper === 'a3' ? 'a3' : 'a4' });
 
     // הקנבס מחולק לפרוסות בגובה עמוד. חותכים על קנבס ביניים במקום למתוח
     // תמונה אחת ארוכה — כך אין דחיסה ואין שורות חתוכות בין העמודים.

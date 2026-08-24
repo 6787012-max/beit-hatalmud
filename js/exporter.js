@@ -238,6 +238,8 @@
         '<div class="head-actions">' +
           '<button class="btn-ghost sm" id="exCsv"><i class="bi bi-file-earmark-spreadsheet"></i> יצוא לאקסל</button>' +
           '<button class="btn-ghost sm" id="exPdf"><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
+          '<button class="btn-ghost sm" id="exSqueeze" title="מקטין את הטקסט עד שכל התוכן נכנס לעמוד אחד בגודל שנבחר">' +
+            '<i class="bi bi-arrows-angle-contract"></i> דחוס הכל לעמוד אחד</button>' +
           '<button class="btn-primary sm" id="exPrint"><i class="bi bi-printer"></i> הדפסה</button>' +
         '</div></div>' +
       '<div class="qr-card"><div class="qr-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">' +
@@ -246,6 +248,8 @@
         '</select></label>' +
         '<label class="fld"><span>מיון</span><select class="inp mb0" id="exSort">' +
           SORTS.map(s => '<option value="' + s[0] + '">' + esc(s[1]) + '</option>').join('') + '</select></label>' +
+        '<label class="fld"><span>גודל הדף</span><select class="inp mb0" id="exPaper">' +
+          '<option value="a4">A4</option><option value="a3">A3</option></select></label>' +
         '<label class="fld"><span>כיוון הדף</span><select class="inp mb0" id="exOrient">' +
           '<option value="portrait">לאורך</option><option value="landscape">לרוחב</option></select></label>' +
         '<label class="fld"><span>התאמה לדף</span><select class="inp mb0" id="exFit">' +
@@ -269,7 +273,10 @@
         '<label class="cb"><input type="checkbox" id="exDate" checked> תאריך בכותרת</label>' +
         '<label class="cb"><input type="checkbox" id="exSign"> שורת חתימה בתחתית</label>' +
         '<label class="cb"><input type="checkbox" id="exSplit"> עמוד נפרד לכל שיעור</label>' +
-        '<label class="cb"><input type="checkbox" id="exDuplex"> דו-צדדי — כל שיעור מתחיל בדף חדש</label>' +
+        '<label class="fld"><span>צדדים</span><select class="inp mb0" id="exSides">' +
+          '<option value="one">חד-צדדי</option>' +
+          '<option value="two">דו-צדדי — כל שיעור בדף חדש</option>' +
+        '</select></label>' +
         '<label class="fld" style="min-width:220px"><span>כותרת</span><input class="inp mb0" id="exTitle" placeholder="לדוגמה: רשימת תלמידים תשפ״ז"></label>' +
       '</div>' +
       '<div id="exBlankBar" style="display:none;border-top:1px dashed var(--line);margin-top:10px;padding-top:10px">' +
@@ -390,6 +397,7 @@
     function paint(rows, picked, src, isBlank) {
       const title = ($('#exTitle').value || '').trim() || src.label;
       const land = $('#exOrient').value === 'landscape';
+      const a3 = ($('#exPaper') || {}).value === 'a3';
       const fs = $('#exFont').value;
       const fv = $('#exFontVal'); if (fv) fv.textContent = fs;
       const zebra = $('#exZebra').checked, grid = $('#exGrid').checked;
@@ -406,7 +414,7 @@
       // כל אחד עם כותרת משלו ומספור שמתחיל מ-1 — בדיוק כמו הגיליונות
       // הנפרדים בקובץ האקסל ("שיעור א", "שיעור ב"...).
       const sheet = (rs, ttl) =>
-        '<div class="ex-sheet' + (land ? ' land' : '') + '" contenteditable="true" spellcheck="false" ' +
+        '<div class="ex-sheet' + (land ? ' land' : '') + (a3 ? ' a3' : '') + '" contenteditable="true" spellcheck="false" ' +
           'style="font-size:' + fs + 'px">' +
           ($('#exLogo').checked ? '<div class="ex-head">' +
             '<img src="img/logo.png" alt="" class="ex-logo">' +
@@ -565,7 +573,7 @@
     }));
 
     ['#exSrc'].forEach(s => $(s).addEventListener('change', async () => { await buildCols(); draw(); }));
-    ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit', '#exFit', '#exDuplex'].forEach(s => {
+    ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit', '#exFit', '#exSides', '#exPaper'].forEach(s => {
       $(s).addEventListener('input', draw);
       $(s).addEventListener('change', draw);   // select משנה דרך change, לא רק input
     });
@@ -574,6 +582,17 @@
     ['#exBcols', '#exBrows', '#exBdate', '#exBdays'].forEach(k => $(k).addEventListener('input', draw));
     ['#exBrowsMode', '#exBh'].forEach(k => $(k).addEventListener('change', draw));
 
+    // "דחוס הכל לעמוד אחד" — כפתור אחד שעושה את מה שרוב הפעמים רוצים:
+    // מבטל פיצול לשיעורים (אחרת זה כמה עמודים ממילא) ומכווץ עד שהכל נכנס.
+    $('#exSqueeze').addEventListener('click', () => {
+      const sp = $('#exSplit'); if (sp && sp.checked) sp.checked = false;
+      $('#exFit').value = 'page';
+      draw();
+      const sh = page.querySelector('.ex-sheet');
+      const got = sh ? Math.round(parseFloat(sh.style.fontSize) || 0) : 0;
+      window.UI.toast(got ? ('הכל נדחס לעמוד אחד · גודל טקסט ' + got) : 'נדחס לעמוד אחד');
+    });
+
     $('#exPrint').addEventListener('click', () => {
       const land = $('#exOrient').value === 'landscape';
       let st = document.getElementById('exPageStyle');
@@ -581,9 +600,10 @@
       // בהתאמה לעמוד מלא גודל הטקסט כבר לקח את השוליים בחשבון;
       // שוליים גדולים בהדפסה היו מכווצים שוב ומבטלים את ההתאמה.
       const mm = (($('#exFit') || {}).value === 'page') ? 8 : 12;
-      st.textContent = '@page { size: A4 ' + (land ? 'landscape' : 'portrait') + '; margin: ' + mm + 'mm; }';
-      const dup = $('#exDuplex');
-      document.body.classList.toggle('ex-duplex', !!(dup && dup.checked));
+      const paper = (($('#exPaper') || {}).value === 'a3') ? 'A3' : 'A4';
+      st.textContent = '@page { size: ' + paper + ' ' + (land ? 'landscape' : 'portrait') +
+        '; margin: ' + mm + 'mm; }';
+      document.body.classList.toggle('ex-duplex', (($('#exSides') || {}).value === 'two'));
       document.body.classList.add('printing-sheet');
       const done = () => document.body.classList.remove('printing-sheet');
       window.addEventListener('afterprint', done, { once: true });
@@ -596,7 +616,8 @@
       // עם פיצול לפי שיעור יש כמה גיליונות — מייצאים את כולם, לא רק את הראשון
       () => (page.querySelectorAll('.ex-sheet').length > 1 ? $('#exSheetWrap') : page.querySelector('.ex-sheet')),
       () => page._title || 'יצוא',
-      () => ({ orientation: $('#exOrient').value === 'landscape' ? 'landscape' : 'portrait', margin: 6 }));
+      () => ({ orientation: $('#exOrient').value === 'landscape' ? 'landscape' : 'portrait',
+               paper: (($('#exPaper') || {}).value === 'a3') ? 'a3' : 'a4', margin: 6 }));
 
     $('#exCsv').addEventListener('click', () => {
       // מייצאים מה-DOM ולא מהנתונים המקוריים — כך העריכות הידניות (שורות/עמודות
