@@ -21,9 +21,11 @@
   const MODEL = 'gemini-2.5-flash';
   const API = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
 
-  // התיקיות שמכילות חומר אבחוני. "מסמך קביל" היא העיקרית לפי מבנה
-  // רישום תשפ"ז; השאר נסרקות גם הן כי שם יושב לא פעם האבחון עצמו.
-  const DIAG_FOLDERS = ['מסמך קביל', 'אבחונים ורקע קודם', 'החלטת ועדה', 'היסטוריית טיפול'];
+  // ⚠️ **רק "מסמך קביל"** — בקשה מפורשת של נעמי לוי (24/08).
+  // קודם נסרקו גם "החלטת ועדה" ו"היסטוריית טיפול", ואצל אוליאל זה הביא
+  // 15 קבצים כולל טופס בחירת הורים והיסטוריה ישנה. באבחונים הקבילים יש
+  // קובץ או שניים — וזה מה שצריך. גם מייתר את החלוקה לקבוצות.
+  const DIAG_FOLDERS = ['מסמך קביל'];
   const MAX_MB = 18;
 
   const FIELD_MAP = {                       // מפתחות ה-JSON → שדות דף ההכנה
@@ -111,13 +113,13 @@
     const norm = s => String(s || '').replace(/["'`״׳]/g, '').replace(/\s+/g, ' ').trim();
     const wanted = subs.filter(f => DIAG_FOLDERS.some(w => norm(f.name).indexOf(norm(w)) > -1));
     if (!wanted.length) {
-      const e = new Error('לא נמצאה תיקיית "מסמך קביל" (או תיקיית אבחונים) בתיק של ' + nm(student) + '.');
+      const e = new Error('לא נמצאה תיקיית "מסמך קביל" בתיק של ' + nm(student) + '.');
       e.code = 'NO_DIAG_FOLDER'; e.have = subs.map(f => f.name); throw e;
     }
     const ids = wanted.map(f => f.id);
     const docs = all.filter(f => f.mimeType !== FOLDER && ids.indexOf(f.folderId) > -1);
     if (!docs.length) {
-      const e = new Error('התיקיות ' + wanted.map(f => '"' + f.name + '"').join(', ') + ' ריקות.');
+      const e = new Error('תיקיית "מסמך קביל" של ' + nm(student) + ' ריקה.');
       e.code = 'EMPTY'; throw e;
     }
     return { docs: docs, foldersFound: wanted.map(f => f.name) };
@@ -219,7 +221,9 @@
       }
     }
     if (!loaded.length) {
-      const e = new Error('אף מסמך לא ניתן לקריאה.'); e.code = 'ALL_FAILED'; e.failed = failed; throw e;
+      const why = failed.length ? (' — ' + failed.map(f => f.name + ': ' + f.why).join(' · ')) : '';
+      const e = new Error('לא הצלחתי לקרוא אף מסמך' + why);
+      e.code = 'ALL_FAILED'; e.failed = failed; throw e;
     }
 
     // חלוקה לקבוצות לפי נפח ומספר

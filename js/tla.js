@@ -261,8 +261,9 @@
   const PROF_FIELDS = [
     { k: 'background', label: 'רקע ומגבלות', ph: 'אבחונים, רקע רפואי/לימודי, מגבלות…' },
     { k: 'env', label: 'נתונים סביבתיים', ph: 'מבנה משפחה, אחים, שפה בבית, נתונים רלוונטיים…' },
-    { k: 'focus', label: 'מוקדים לחיזוק', ph: 'תפקודים אקדמיים, רגשיים וחברתיים הדורשים חיזוק…' },
+    // הסדר כאן קובע גם את הצדדים ברשת הדו-טורית: הראשון מימין.
     { k: 'strengths', label: 'מוקדי כח', ph: 'תחומי חוזק, כישרונות, נקודות אור…' },
+    { k: 'focus', label: 'מוקדים לחיזוק', ph: 'תפקודים אקדמיים, רגשיים וחברתיים הדורשים חיזוק…' },
   ];
   async function tabProfile(host, plan, stud) {
     const pr = profOf(plan);
@@ -668,8 +669,10 @@
     h += '<section class="page">' + hdr('דף הכנה לתל"א — פרופיל תלמיד') + meta +
       '<table class="grid prof"><tr><th>רקע ומגבלות</th><th>נתונים סביבתיים</th></tr>' +
       '<tr><td class="tall">' + esc(pr.background || '') + '</td><td class="tall">' + esc(pr.env || '') + '</td></tr>' +
-      '<tr><th>מוקדים לחיזוק</th><th>מוקדי כח</th></tr>' +
-      '<tr><td class="tall">' + esc(pr.focus || '') + '</td><td class="tall">' + esc(pr.strengths || '') + '</td></tr></table></section>';
+      // נעמי ביקשה (24/08): מוקדי כח מימין, מוקדים לחיזוק משמאל.
+      // ב-RTL העמודה הראשונה היא הימנית.
+      '<tr><th>מוקדי כח</th><th>מוקדים לחיזוק</th></tr>' +
+      '<tr><td class="tall">' + esc(pr.strengths || '') + '</td><td class="tall">' + esc(pr.focus || '') + '</td></tr></table></section>';
 
     // ── הטבלה הרשמית: יעדים | הזדמנויות עבודה (עמודה לכל איש צוות) | מעקב והערכה ──
     // הסדר מימין לשמאל, ומתחת שורת המלצות + הערות ושינויים. זה בדיוק המבנה
