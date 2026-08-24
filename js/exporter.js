@@ -239,7 +239,7 @@
           '<button class="btn-ghost sm" id="exCsv"><i class="bi bi-file-earmark-spreadsheet"></i> יצוא לאקסל</button>' +
           '<button class="btn-ghost sm" id="exPdf"><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
           '<button class="btn-ghost sm" id="exSqueeze" title="מקטין את הטקסט עד שכל התוכן נכנס לעמוד אחד בגודל שנבחר">' +
-            '<i class="bi bi-arrows-angle-contract"></i> דחוס הכל לעמוד אחד</button>' +
+            '<i class="bi bi-arrows-angle-contract"></i> דחוס לעמוד אחד</button>' +
           '<button class="btn-primary sm" id="exPrint"><i class="bi bi-printer"></i> הדפסה</button>' +
         '</div></div>' +
       '<div class="qr-card"><div class="qr-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">' +
@@ -255,8 +255,12 @@
         '<label class="fld"><span>התאמה לדף</span><select class="inp mb0" id="exFit">' +
           '<option value="">ללא — גודל הטקסט שבחרתי</option>' +
           '<option value="width">התאם לרוחב הדף</option>' +
-          '<option value="page">התאם לעמוד מלא (רוחב וגובה)</option>' +
+          '<option value="page">התאם למספר עמודים קבוע</option>' +
         '</select></label>' +
+        '<label class="fld" id="exPagesWrap" style="display:none"><span>כמה עמודים</span>' +
+          '<select class="inp mb0" id="exPages">' +
+            [1, 2, 3, 4, 5, 6, 8, 10].map(n => '<option value="' + n + '">' + n + '</option>').join('') +
+          '</select></label>' +
         '<label class="fld"><span>גודל טקסט <b id="exFontVal">13</b></span>' +
           '<input class="inp mb0" id="exFont" type="range" min="8" max="24" step="1" value="13" style="padding:6px 0"></label>' +
       '</div>' +
@@ -460,7 +464,8 @@
       const mode = ($('#exFit') || {}).value || '';
       const base = Number($('#exFont').value) || 13;
       const sheets = [...page.querySelectorAll('.ex-sheet')];
-      sheets.forEach(sh => { sh.style.fontSize = base + 'px'; });
+      const pw = $('#exPagesWrap'); if (pw) pw.style.display = mode === 'page' ? '' : 'none';
+      sheets.forEach(sh => { sh.style.fontSize = base + 'px'; sh.style.minHeight = ''; });
       if (!mode) return;
 
       sheets.forEach(sh => {
@@ -493,25 +498,40 @@
         // כמו שלט ולא כמו רשימה. עד פי 1.6 מהבחירה של המשתמש, ולא מעל 20px.
         let size = base * (availW / Math.max(1, natural));
         size = Math.min(size, base * 1.6, 20);
+
         if (mode === 'page') {
-          // גם לגובה: מכווצים עד שהתוכן נכנס לעמוד אחד, בלי להגדיל מעבר לרוחב
-          sh.style.fontSize = size + 'px';
-          let guard = 0;
-          while (sh.scrollHeight > sh.clientHeight && size > 5 && guard++ < 40) {
-            size -= 0.4;
-            sh.style.fontSize = size + 'px';
+          // התאמה למספר עמודים שהמשתמש בחר: מחפשים בחיפוש בינארי את גודל
+          // הטקסט **הגדול ביותר** שעדיין נכנס ב-N עמודים. חיפוש ולא לולאת
+          // הקטנה, כי צריך גם *להגדיל* כשיש מקום — טבלה קצרה ב-2 עמודים
+          // אמורה למלא אותם, לא להישאר זעירה בפינה.
+          const want = Math.max(1, Number(($('#exPages') || {}).value) || 1);
+          const pageH = sh.clientHeight;                 // גובה עמוד אחד
+          const fits = px => {
+            sh.style.fontSize = px + 'px';
+            return sh.scrollHeight <= pageH * want + 2;
+          };
+          let lo = 4, hi = 28;
+          if (!fits(lo)) { size = lo; }                  // אפילו 4px לא נכנס
+          else {
+            for (let i = 0; i < 22; i++) {
+              const mid = (lo + hi) / 2;
+              if (fits(mid)) lo = mid; else hi = mid;
+            }
+            size = lo;
           }
         }
-        size = Math.max(5, Math.min(20, size));
+        size = Math.max(4, Math.min(28, size));
         sh.style.fontSize = size.toFixed(1) + 'px';
       });
       const hint = page.querySelector('#exHint');
       if (hint && sheets[0]) {
         const got = Math.round(parseFloat(sheets[0].style.fontSize));
-        if (got !== base) {
-          hint.innerHTML = '<i class="bi bi-aspect-ratio"></i> הותאם לדף: גודל הטקסט ' +
-            (got > base ? 'הוגדל' : 'הוקטן') + ' מ-' + base + ' ל-' + got + '.';
-        }
+        const sh0 = sheets[0];
+        const pages = Math.max(1, Math.ceil(sh0.scrollHeight / (sh0.clientHeight || 1)));
+        hint.innerHTML = '<i class="bi bi-aspect-ratio"></i> גודל הטקסט ' +
+          (got > base ? 'הוגדל' : got < base ? 'הוקטן' : 'נשאר') + ' מ-' + base + ' ל-' + got +
+          (mode === 'page' ? (' · יוצא ' + pages + ' עמודים') : '') +
+          (got <= 6 ? ' — קטן מאוד לקריאה, שקלו A3 או יותר עמודים.' : '');
       }
     }
 
@@ -573,7 +593,7 @@
     }));
 
     ['#exSrc'].forEach(s => $(s).addEventListener('change', async () => { await buildCols(); draw(); }));
-    ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit', '#exFit', '#exSides', '#exPaper'].forEach(s => {
+    ['#exSort', '#exOrient', '#exFont', '#exTitle', '#exSplit', '#exFit', '#exSides', '#exPaper', '#exPages'].forEach(s => {
       $(s).addEventListener('input', draw);
       $(s).addEventListener('change', draw);   // select משנה דרך change, לא רק input
     });
@@ -587,6 +607,7 @@
     $('#exSqueeze').addEventListener('click', () => {
       const sp = $('#exSplit'); if (sp && sp.checked) sp.checked = false;
       $('#exFit').value = 'page';
+      const pg = $('#exPages'); if (pg) pg.value = '1';
       draw();
       const sh = page.querySelector('.ex-sheet');
       const got = sh ? Math.round(parseFloat(sh.style.fontSize) || 0) : 0;
