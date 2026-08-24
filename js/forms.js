@@ -185,7 +185,7 @@
           '<button class="btn-primary sm" id="fCards"><i class="bi bi-person-vcard"></i> צור/עדכן כרטיסי תלמיד</button>' +
           '<button class="btn-ghost sm" id="fPrintAll"><i class="bi bi-printer"></i> הדפס את כל החתומים</button>' +
           '<button class="btn-ghost sm" id="fCsv"><i class="bi bi-download"></i> ייצוא CSV</button></div></div>' +
-        (f.body ? '<div class="qr-card"><p style="margin:0">' + esc(f.body) + '</p></div>' : '') +
+        (f.body ? '<div class="qr-card">' + window.cv3FormTemplates.fmtBody(f.body) + '</div>' : '') +
         '<div class="stat-row">' +
           '<div class="stat-card"><div class="stat-ic"><i class="bi bi-people-fill"></i></div><div class="stat-num">' + rs.length + '</div><div class="stat-lbl">נמענים</div></div>' +
           '<div class="stat-card"><div class="stat-ic"><i class="bi bi-check2-circle"></i></div><div class="stat-num">' + signed + '</div><div class="stat-lbl">נחתמו</div></div>' +
@@ -270,7 +270,7 @@
           '<div class="det-actions" style="margin-top:14px"><button class="btn-ghost sm" data-print><i class="bi bi-printer"></i> הדפסה</button></div>',
       });
       const pb = m.el.querySelector('[data-print]');
-      if (pb) pb.addEventListener('click', () => printHTML(esc(f.title), '<h2>' + esc(f.title) + '</h2>' + (f.body ? '<p>' + esc(f.body) + '</p>' : '') + signedBlockHTML(f, r)));
+      if (pb) pb.addEventListener('click', () => printHTML(esc(f.title), '<h2>' + esc(f.title) + '</h2>' + (f.body ? window.cv3FormTemplates.fmtBody(f.body) : '') + signedBlockHTML(f, r)));
     }
 
     // ---------- הדפסה ----------
@@ -292,7 +292,7 @@
     function printAll(f) {
       const rs = respOf(f.id).filter(r => r.status === 'signed');
       if (!rs.length) { window.UI.toast('אין חתומים להדפסה', 'err'); return; }
-      const inner = '<h2>' + esc(f.title) + '</h2>' + (f.body ? '<p>' + esc(f.body) + '</p>' : '') +
+      const inner = '<h2>' + esc(f.title) + '</h2>' + (f.body ? window.cv3FormTemplates.fmtBody(f.body) : '') +
         '<p style="color:#666">סה"כ ' + rs.length + ' חתומים</p>' +
         rs.map(r => '<div class="rec">' + signedBlockHTML(f, r) + '</div>').join('');
       printHTML(esc(f.title), inner);

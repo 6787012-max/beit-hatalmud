@@ -47,6 +47,28 @@
       return (a && typeof a === 'object') ? a : {};
     }
 
+
+  // ── עיצוב גוף הטופס ──────────────────────────────────────────────────
+  // קודם הגוף נדחס ל-<p> אחד, ולכן טופס בן שבעה סעיפים נראה כמו גוש טקסט.
+  // כאן שורה שמתחילה ב-## היא כותרת, שורה שמתחילה בתבליט היא פריט רשימה,
+  // ושורה ריקה מפרידה פסקאות. הכל עובר escape — אין הזרקת HTML.
+  function fmtBody(t) {
+    if (!t) return '';
+    var e2 = function (s) { return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+    var out = '', list = [];
+    var flush = function () { if (list.length) { out += '<ul class="fb-ul">' + list.join('') + '</ul>'; list = []; } };
+    String(t).split(/\n/).forEach(function (ln) {
+      var s = ln.trim();
+      if (!s) { flush(); return; }
+      if (s.indexOf('##') === 0) { flush(); out += '<h3 class="fb-h">' + e2(s.replace(/^#+\s*/, '')) + '</h3>'; return; }
+      if (s.charAt(0) === '•' || s.charAt(0) === '-') { list.push('<li>' + e2(s.replace(/^[•\-]\s*/, '')) + '</li>'); return; }
+      flush(); out += '<p class="fb-p">' + e2(s) + '</p>';
+    });
+    flush();
+    return '<div class="fb">' + out + '</div>';
+  }
+
     if (!token && !gtok) { content.innerHTML = '<h2>קישור לא תקין</h2><p>הקישור אינו תקין או שפג תוקפו. פנו למכינה לקבלת קישור מעודכן.</p>'; return; }
     if (!sb) {
       content.innerHTML = '<h2>מצב הדגמה</h2><p>המערכת נמצאת במצב הדגמה. חתימת הורים פעילה במערכת החיה של המוסד (לאחר חיבור Supabase ע״י המנהל).</p>';
@@ -144,7 +166,7 @@
           : '';
         content.innerHTML =
           '<h2>' + esc(form.title) + '</h2>' +
-          (form.body ? '<p class="sign-body">' + esc(form.body) + '</p>' : '') +
+          (form.body ? fmtBody(form.body) : '') +
           '<div class="sign-done"><i class="bi bi-check2-circle"></i><div>התקבלה חתימה בתאריך ' + esc(resp.signed_at || '') + ' על-ידי ' + esc(resp.signer_name || '') + '.<br>תודה רבה!</div></div>' +
           (ansHTML ? '<div class="det-grid" style="margin-top:10px">' + ansHTML + '</div>' : '') + sig;
         return;
@@ -152,7 +174,7 @@
 
       content.innerHTML =
         '<h2>' + esc(form.title) + '</h2>' +
-        (form.body ? '<p class="sign-body">' + esc(form.body) + '</p>' : '') +
+        (form.body ? fmtBody(form.body) : '') +
         '<label class="fld fld-wide"><span>שם החותם (הורה) *</span><input class="inp" id="sname" placeholder="שם מלא"></label>' +
         fields.map(fieldInputHTML).join('') +
         '<button class="btn-primary" id="signBtn" style="width:100%;margin-top:8px"><i class="bi bi-pencil-square"></i> אני מאשר/ת וחותם/ת</button>';

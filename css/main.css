@@ -582,3 +582,11 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
   body.printing-sheet.ex-duplex .ex-sheet{break-before:page; page-break-before:always}
   body.printing-sheet.ex-duplex .ex-sheet:first-child{break-before:auto; page-break-before:auto}
 }
+
+/* ===== גוף טופס מעוצב (כותרות/פסקאות/רשימות) ===== */
+.fb{line-height:1.75}
+.fb-h{margin:16px 0 6px;font-size:1.02rem;font-weight:700;color:var(--primary,#003048);
+  border-bottom:2px solid #b7791f;padding-bottom:4px;display:inline-block}
+.fb-p{margin:6px 0}
+.fb-ul{margin:6px 0;padding-inline-start:20px}
+.fb-ul li{margin:3px 0}
