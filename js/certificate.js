@@ -16,7 +16,7 @@
   function hebLine(d) {
     let wd = '', heb = '';
     try { wd = new Intl.DateTimeFormat('he-IL', { weekday: 'long' }).format(d); } catch (_) {}
-    try { heb = new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' }).format(d); } catch (_) {}
+    try { heb = window.UI.hebDate(d); } catch (_) {}
     const greg = pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
     return (wd ? wd + ' ' : '') + (heb ? heb + '  ' : '') + greg;
   }

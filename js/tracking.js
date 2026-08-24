@@ -198,7 +198,7 @@
   // ----- לוח שנה עברי (תאריך היום) -----
   async function renderCalendar(page) {
     let heb = '';
-    try { heb = new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()); } catch (_) {}
+    try { heb = window.UI.hebDate(new Date()); } catch (_) {}
     const greg = new Intl.DateTimeFormat('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>לוח שנה</h2></div>' +

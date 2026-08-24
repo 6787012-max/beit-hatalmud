@@ -49,7 +49,7 @@
       icon: 'bi-capsule',
       about: 'העדכון החודשי שההורים ממלאים. מזין את לשונית "נטילת תרופות" במסך הרפואי.',
       title: () => 'עדכון נטילת תרופות — ' +
-        new Intl.DateTimeFormat('he-u-ca-hebrew', { month: 'long', year: 'numeric' }).format(new Date()),
+        (function () { const p = new Intl.DateTimeFormat('he-u-ca-hebrew', { month: 'long' }).format(new Date()); return p + ' ' + window.UI.hebYear(); })(),
       body: 'נא לעדכן את פרטי נטילת התרופות של בנכם. העדכון נדרש מדי חודש.',
       fields: [
         F('האם הבן נוטל תרופה כרגע?', 'select', ['כן', 'לא'], true),

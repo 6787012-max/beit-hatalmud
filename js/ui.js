@@ -59,5 +59,52 @@
     return nm.indexOf(fam) > -1 ? nm : fam + ' ' + nm;
   }
 
-  window.UI = { modal, toast, confirm, el: elc, fullName: fullName };
+  // ── תאריך עברי ─────────────────────────────────────────────────────────
+  // ⚠️ Intl מחזיר יום ושנה כספרות: "11 באלול 5786" במקום "י״א באלול תשפ״ו".
+  // תשעה מקומות בקוד קראו ל-Intl ישירות וכולם הציגו ספרות. זהו המקור
+  // היחיד לתאריך עברי — אין לקרוא ל-Intl עם he-u-ca-hebrew בקוד חדש.
+  function gematria(n) {
+    const H = [[400, 'ת'], [300, 'ש'], [200, 'ר'], [100, 'ק'], [90, 'צ'], [80, 'פ'], [70, 'ע'],
+      [60, 'ס'], [50, 'נ'], [40, 'מ'], [30, 'ל'], [20, 'כ'], [10, 'י'], [9, 'ט'], [8, 'ח'],
+      [7, 'ז'], [6, 'ו'], [5, 'ה'], [4, 'ד'], [3, 'ג'], [2, 'ב'], [1, 'א']];
+    n = Number(n) % 1000;                       // 5786 → 786
+    if (n === 15) return 'ט״ו';                 // לא "י״ה" — שם הוי״ה
+    if (n === 16) return 'ט״ז';
+    let out = '';
+    for (const [v, ch] of H) while (n >= v) { out += ch; n -= v; }
+    if (!out) return '';
+    return out.length > 1 ? out.slice(0, -1) + '״' + out.slice(-1) : out + '׳';
+  }
+
+  /** iso → "י״א באלול תשפ״ו". opts.year=false משמיט את השנה. */
+  function hebDate(iso, opts) {
+    if (!iso) return '';
+    const withYear = !opts || opts.year !== false;
+    let d;
+    try {
+      d = (iso instanceof Date) ? iso : new Date(String(iso).slice(0, 10) + 'T00:00:00');
+      if (isNaN(d.getTime())) return String(iso);
+    } catch (_) { return String(iso); }
+    try {
+      const parts = new Intl.DateTimeFormat('he-u-ca-hebrew',
+        { day: 'numeric', month: 'long', year: 'numeric' }).formatToParts(d);
+      const get = t => (parts.find(p => p.type === t) || {}).value || '';
+      const day = gematria(parseInt(get('day'), 10));
+      const month = get('month');
+      const year = gematria(parseInt(String(get('year')).replace(/\D/g, ''), 10));
+      return day + ' ' + month + (withYear && year ? ' ' + year : '');
+    } catch (_) { return String(iso); }
+  }
+
+  /** שנת הלימודים הנוכחית, למשל תשפ״ו. */
+  function hebYear(date) {
+    try {
+      const y = new Intl.DateTimeFormat('en-u-ca-hebrew', { year: 'numeric' })
+        .format(date || new Date());
+      return gematria(parseInt(String(y).replace(/\D/g, ''), 10));
+    } catch (_) { return ''; }
+  }
+
+  window.UI = { modal, toast, confirm, el: elc, fullName: fullName,
+    hebDate: hebDate, hebYear: hebYear, gematria: gematria };
 })();

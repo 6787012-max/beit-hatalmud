@@ -4,7 +4,7 @@
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-  const hebDate = iso => { if (!iso) return ''; try { return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long' }).format(new Date(iso + 'T00:00:00')); } catch (_) { return ''; } };
+  const hebDate = iso => window.UI.hebDate(iso, { year: false });
   const safe = async p => { try { return await p; } catch (_) { return []; } };
   // מזהה: מספר בדמו, מחרוזת (uuid) בחי — שומר את הצורה המתאימה כדי שהשוואות == יעבדו בשני המצבים.
   const idVal = v => (v == null || v === '') ? null : (/^\d+$/.test(String(v)) ? Number(v) : v);

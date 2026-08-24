@@ -7,7 +7,7 @@
   // תאריך עברי מוגן — מקבל ISO/תאריך חלקי, נופל חזרה למחרוזת המקורית אם לא תקין
   const hebDate = iso => {
     if (!iso) return '';
-    try { const d = new Date(String(iso).slice(0, 10) + 'T00:00:00'); return isNaN(d.getTime()) ? String(iso) : new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long' }).format(d); }
+    try { return window.UI.hebDate(iso, { year: false }); }
     catch (_) { return String(iso); }
   };
   const initials = name => String(name || '?').trim().slice(0, 2) || '?';

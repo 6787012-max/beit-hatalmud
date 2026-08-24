@@ -102,7 +102,7 @@
   const _esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function hebDate(iso) {
     if (!iso) return '';
-    try { return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long' }).format(new Date(iso + 'T00:00:00')); } catch (_) { return ''; }
+    try { return window.UI.hebDate(iso, { year: false }); } catch (_) { return ''; }
   }
   async function renderHomeReports() {
     const box = $('#homeReports'); if (!box || !window.store) return;
