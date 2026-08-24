@@ -506,14 +506,14 @@
           // הקטנה, כי צריך גם *להגדיל* כשיש מקום — טבלה קצרה ב-2 עמודים
           // אמורה למלא אותם, לא להישאר זעירה בפינה.
           const want = Math.max(1, Number(($('#exPages') || {}).value) || 1);
-          // ⚠️ אסור למדוד מול clientHeight: לגיליון יש min-height, והוא גדל
-          // יחד עם התוכן — כך scrollHeight תמיד שווה ל-clientHeight והספירה
-          // הייתה יוצאת "עמוד אחד" תמיד. גובה העמוד נלקח מ-min-height שב-CSS.
-          const pageH = parseFloat(getComputedStyle(sh).minHeight) || sh.clientHeight;
+          // גובה עמוד אחד מגיע מ-min-height שב-CSS (A4/A3, לאורך/לרוחב).
+          const pageH = parseFloat(getComputedStyle(sh).minHeight) || sh.clientHeight || 1;
+          // ⚠️ חייבים לאפס את min-height בזמן המדידה. אחרת scrollHeight לא
+          // יורד מתחת לגובה עמוד אחד — גם כשהתוכן זעיר — ו"נכנס לעמוד אחד"
+          // לא היה מתקיים לעולם. זה היה הבאג: כל בחירה יצאה עמוד אחד יותר.
+          sh.style.minHeight = '0';
           const fits = px => {
             sh.style.fontSize = px + 'px';
-            // בלי מרווח ביטחון שלילי הגובה נוחת בדיוק על הגבול, ו-ceil
-            // בעיגול מחזיר עמוד נוסף — בחירה של 2 הייתה יוצאת 3.
             return sh.scrollHeight <= pageH * want - 2;
           };
           let lo = 4, hi = 28;
@@ -525,6 +525,8 @@
             }
             size = lo;
           }
+          // הגיליון מוצג בגובה של בדיוק N עמודים, כדי שמה שרואים = מה שיודפס
+          sh.style.minHeight = (pageH * want) + 'px';
         }
         size = Math.max(4, Math.min(28, size));
         sh.style.fontSize = size.toFixed(1) + 'px';
@@ -533,8 +535,11 @@
       if (hint && sheets[0]) {
         const got = Math.round(parseFloat(sheets[0].style.fontSize));
         const sh0 = sheets[0];
-        const ph = parseFloat(getComputedStyle(sh0).minHeight) || sh0.clientHeight || 1;
-        const pages = Math.max(1, Math.ceil(sh0.scrollHeight / ph));
+        // ספירת העמודים לפי גובה עמוד *בודד*, לא לפי הגובה שהוגדר לגיליון
+        const want1 = Math.max(1, Number(($('#exPages') || {}).value) || 1);
+        const ph = (parseFloat(getComputedStyle(sh0).minHeight) || sh0.clientHeight || 1)
+                   / (mode === 'page' ? want1 : 1);
+        const pages = Math.max(1, Math.ceil((sh0.scrollHeight - 2) / ph));
         hint.innerHTML = '<i class="bi bi-aspect-ratio"></i> גודל הטקסט ' +
           (got > base ? 'הוגדל' : got < base ? 'הוקטן' : 'נשאר') + ' מ-' + base + ' ל-' + got +
           (mode === 'page' ? (' · יוצא ' + pages + ' עמודים') : '') +
