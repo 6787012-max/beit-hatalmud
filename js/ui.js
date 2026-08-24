@@ -90,7 +90,10 @@
         { day: 'numeric', month: 'long', year: 'numeric' }).formatToParts(d);
       const get = t => (parts.find(p => p.type === t) || {}).value || '';
       const day = gematria(parseInt(get('day'), 10));
-      const month = get('month');
+      // formatToParts מחזיר את שם החודש בלי ה-ב׳ (היא מפריד ולא חלק מהחלק),
+      // ולכן מוסיפים אותה כאן: "י״א באלול" ולא "י״א אלול".
+      let month = get('month');
+      if (month && month.charAt(0) !== 'ב') month = 'ב' + month;
       const year = gematria(parseInt(String(get('year')).replace(/\D/g, ''), 10));
       return day + ' ' + month + (withYear && year ? ' ' + year : '');
     } catch (_) { return String(iso); }
