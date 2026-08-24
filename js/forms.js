@@ -59,11 +59,18 @@
     function listView() {
       page.innerHTML =
         '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>טפסים וחתימות הורים</h2>' +
-        '<div class="head-actions"><button class="btn-primary sm" id="fNew"><i class="bi bi-plus-lg"></i> טופס חדש</button></div></div>' +
+        '<div class="head-actions">' +
+          '<button class="btn-ghost sm" id="fTpl"><i class="bi bi-file-earmark-medical"></i> טופס מוכן</button> ' +
+          '<button class="btn-primary sm" id="fNew"><i class="bi bi-plus-lg"></i> טופס חדש</button></div></div>' +
         '<div id="formsList"></div>' +
         '<div id="formsEmpty" class="empty-state" hidden><i class="bi bi-file-earmark-check"></i><div>אין טפסים עדיין — צור טופס חדש לשליחה להורים</div></div>';
       drawList();
       page.querySelector('#fNew').addEventListener('click', () => newFormForm());
+      // טפסים מוכנים (אישור יציאות שנתי, עדכון תרופות) — ראה js/form-templates.js
+      const tb = page.querySelector('#fTpl');
+      if (tb && window.cv3FormTemplates) {
+        tb.addEventListener('click', () => window.cv3FormTemplates.pick(() => listView()));
+      } else if (tb) { tb.style.display = 'none'; }
     }
     function drawList() {
       const rows = forms.slice().reverse();

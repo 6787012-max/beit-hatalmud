@@ -253,33 +253,12 @@
           const scope = mel.querySelector('#md_scope').value;
           const targets = scope === 'stale' ? ids : studs.map(s => s.id);
           if (!targets.length) { window.UI.toast('אין למי לשלוח', 'err'); return false; }
-          const fields = [
-            { label: 'האם הבן נוטל תרופה כרגע?', type: 'select', options: ['כן', 'לא'], required: true },
-            { label: 'מטרת נטילת הכדור', type: 'text' },
-            { label: 'סוג הכדור', type: 'text' },
-            { label: 'מינון', type: 'text' },
-            { label: 'מספר שעות השפעה', type: 'text' },
-            { label: 'זמן נטילת הכדור', type: 'text' },
-            { label: 'אופן נטילת הכדור', type: 'select', options: ['עצמאי', 'נוכחות אחד ההורים', 'במכינה'] },
-            { label: 'תופעות לוואי בזמן השפעת הכדור', type: 'text' },
-            { label: 'תופעות לוואי לאחר השפעת הכדור', type: 'text' },
-            { label: 'האם לוקח כדור נוסף בשעות הצהריים', type: 'select', options: ['לא', 'כן'] },
-            { label: 'מינון הכדור השני', type: 'text' },
-            { label: 'הערות / בקשות', type: 'text' },
-          ];
-          const title = 'עדכון נטילת תרופות — ' + new Intl.DateTimeFormat('he-u-ca-hebrew', { month: 'long', year: 'numeric' }).format(new Date());
-          const fr = await window.store.add('forms', {
-            title: title,
-            body: 'נא לעדכן את פרטי נטילת התרופות של בנכם. העדכון נדרש מדי חודש.',
-            fields: fields, created_at: today(),
-          });
-          const form = (fr.data && fr.data[0]);
-          if (!form) { window.UI.toast('יצירת הטופס נכשלה', 'err'); return false; }
-          const tok = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-          for (const sid of targets) {
-            await window.store.add('form_responses', { form_id: form.id, student_id: sid, token: tok(), status: 'pending' });
-          }
-          window.UI.toast('נוצר טופס ל-' + targets.length + ' תלמידים');
+          // שדות הטופס יושבים ב-js/form-templates.js — מקור אחד, לא שכפול
+          if (!window.cv3FormTemplates) { window.UI.toast('מודול התבניות לא נטען', 'err'); return false; }
+          let r;
+          try { r = await window.cv3FormTemplates.create('meds', targets); }
+          catch (e) { window.UI.toast(e.message || 'יצירת הטופס נכשלה', 'err'); return false; }
+          window.UI.toast('נוצר טופס ל-' + r.sent + ' תלמידים');
           if (window.showPage) showPage('forms');
           return true;
         },
