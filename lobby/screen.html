@@ -72,11 +72,28 @@ footer{grid-column:1/-1}
   font-size:clamp(.92rem,2.1vh,1.12rem);opacity:.62;transition:all .35s}
 .ag .t{color:var(--gold-lt);font-weight:700;font-variant-numeric:tabular-nums;min-width:52px}
 .ag.done{opacity:.32}
-.ag.now{opacity:1;background:linear-gradient(90deg,rgba(168,120,48,.32),rgba(168,120,48,.06));
+.ag.now{opacity:1;background:linear-gradient(90deg,rgba(168,120,48,.34),rgba(168,120,48,.06));
   border-inline-start:4px solid var(--gold);font-weight:700;padding-inline-start:10px;
-  box-shadow:0 6px 18px rgba(0,0,0,.35);font-size:clamp(1rem,2.4vh,1.25rem)}
+  box-shadow:0 6px 20px rgba(0,0,0,.4);font-size:clamp(1.05rem,2.6vh,1.35rem);
+  animation:pop .5s ease-out}
+/* המשבצת שהתחלפה קופצת רגע, כדי שמי שמרים את העיניים יראה שהשעה התחלפה */
+@keyframes pop{0%{transform:scale(.96);box-shadow:0 0 0 rgba(168,120,48,0)}
+  55%{transform:scale(1.035);box-shadow:0 0 26px rgba(168,120,48,.55)}
+  100%{transform:scale(1)}}
 .ag.next{opacity:.9}
 .ag .k{margin-inline-start:auto;font-size:.7rem;color:var(--muted);opacity:.8}
+/* ספירה לאחור בשורה הפעילה */
+.ag .cd{margin-inline-start:auto;font-variant-numeric:tabular-nums;font-weight:800;
+  font-size:.95em;color:var(--gold-lt);white-space:nowrap}
+.ag.now .k{display:none}
+.ag.warn{background:linear-gradient(90deg,rgba(168,120,48,.5),rgba(168,120,48,.12))}
+.ag.warn .cd{color:#ffd98a}
+.ag.last{background:linear-gradient(90deg,rgba(190,70,60,.55),rgba(190,70,60,.12));
+  border-inline-start-color:#e0705f}
+.ag.last .cd{color:#ffb3a7;animation:blink 1s infinite}
+#agBar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:8px;overflow:hidden;display:none}
+#agBar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--gold),var(--gold-lt));transition:width 1s linear}
 
 /* וידאו */
 video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;
@@ -102,6 +119,14 @@ main:hover #vinfo{opacity:1}
   overflow:hidden;margin-top:14px;display:none}
 #ovBar{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-lt));
   border-radius:99px;transition:width 1s linear}
+/* חמש הדקות האחרונות: המסך עובר לספירה לאחור, ובדקה האחרונה היא נצבעת ופועמת */
+#ovCd{display:none;font-size:clamp(4.5rem,15vw,13rem);font-weight:800;line-height:.95;
+  letter-spacing:-4px;font-variant-numeric:tabular-nums;color:var(--gold-lt);
+  text-shadow:0 0 70px rgba(168,120,48,.45)}
+#ov.cd-on #ovClock{display:none}
+#ov.cd-on #ovCd{display:block}
+#ov.cd-last #ovCd{color:#ff9f8d;text-shadow:0 0 80px rgba(224,112,95,.5);animation:blink 1s infinite}
+#ov.cd-last #ovTitle{color:#ff9f8d}
 
 /* קרוסלת המידע במסך הגדול */
 /* המעבר עובר דרך רקע כהה: השקופית היוצאת דוהה, ורק אז הנכנסת עולה. בלי ההשהיה
@@ -115,7 +140,7 @@ main:hover #vinfo{opacity:1}
 /* מזל טוב */
 #slBirth .cake{font-size:clamp(3rem,7vw,6rem);line-height:1}
 #slBirth .names{display:flex;flex-wrap:wrap;gap:10px 26px;justify-content:center;margin-top:6px}
-#slBirth .nm{font-size:clamp(1.6rem,4vw,3.4rem);font-weight:800;color:#fff}
+#slBirth .nm{font-size:clamp(1.35rem,3.2vw,2.8rem);font-weight:800;color:#fff;max-width:15ch}
 #slBirth .nm small{display:block;font-size:.42em;font-weight:600;color:var(--gold-lt);margin-top:2px}
 #slBirth .soon{margin-top:20px;font-size:clamp(.95rem,1.6vw,1.35rem);color:var(--muted);
   border-top:1px solid var(--line);padding-top:12px;max-width:80%}
@@ -132,7 +157,8 @@ main:hover #vinfo{opacity:1}
 
 /* כרטיס ימי הולדת בסרגל */
 #birthCard{display:none}
-#birthToday{font-size:1.35rem;font-weight:800;line-height:1.25}
+#birthToday{font-size:1.12rem;font-weight:800;line-height:1.3}
+#birthToday div+div{margin-top:5px}
 #birthToday small{color:var(--gold-lt);font-weight:600;font-size:.7em}
 #birthNext{margin-top:8px;font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:3px}
 #birthNext b{color:#dbe7ee;font-weight:600}
@@ -198,6 +224,7 @@ body.fs #fsBtn{display:none}
     <div class="card" id="agendaCard">
       <h3><i class="bi bi-clock-history"></i> סדר היום</h3>
       <div id="agenda"></div>
+      <div id="agBar"><i></i></div>
     </div>
   </aside>
 
@@ -208,6 +235,7 @@ body.fs #fsBtn{display:none}
     <div id="ov" class="on">
       <div class="slide on" id="slClock">
         <div id="ovClock">--:--</div>
+        <div id="ovCd">00:00</div>
         <div id="ovTitle"></div>
         <div id="ovSub"></div>
         <div id="ovBarWrap"><div id="ovBar"></div></div>
@@ -404,16 +432,75 @@ function paintMenu() {
 }
 
 // ── ימי הולדת ────────────────────────────────────────────────────────────
-// מגיעים מוכנים מהפאנל (שם פרטי + תאריך החגיגה). המסך רק בוחר מי רלוונטי היום.
+// מהפאנל מגיע רק התאריך העברי (יום/חודש/שנת לידה). את התאריך הלועזי של החגיגה
+// הקרובה המסך מחשב בעצמו ומרענן כל יממה — כך הרשימה לא מתיישנת לעולם.
+var HMON_HE = { Tishrei:'תשרי', Heshvan:'חשוון', Kislev:'כסלו', Tevet:'טבת', Shevat:'שבט',
+  Adar:'אדר', 'Adar I':'אדר א׳', 'Adar II':'אדר ב׳', Nisan:'ניסן', Iyar:'אייר', Sivan:'סיוון',
+  Tamuz:'תמוז', Av:'אב', Elul:'אלול' };
+var GEM = [[400,'ת'],[300,'ש'],[200,'ר'],[100,'ק'],[90,'צ'],[80,'פ'],[70,'ע'],[60,'ס'],[50,'נ'],
+  [40,'מ'],[30,'ל'],[20,'כ'],[10,'י'],[9,'ט'],[8,'ח'],[7,'ז'],[6,'ו'],[5,'ה'],[4,'ד'],[3,'ג'],[2,'ב'],[1,'א']];
+function gematria(n) {
+  n = Number(n) % 1000;
+  if (n === 15) return 'ט״ו';
+  if (n === 16) return 'ט״ז';
+  var out = '';
+  for (var i = 0; i < GEM.length; i++) while (n >= GEM[i][0]) { out += GEM[i][1]; n -= GEM[i][0]; }
+  if (!out) return '';
+  return out.length > 1 ? out.slice(0, -1) + '״' + out.slice(-1) : out + '׳';
+}
+var hebMapCache = null, hebMapDay = null;
+function hebMap() {
+  var key = isoOf(new Date());
+  if (hebMapCache && hebMapDay === key) return hebMapCache;
+  var t0 = new Date(); t0.setHours(12, 0, 0, 0);
+  var map = [];
+  for (var i = 0; i < 400; i++) {
+    var dt = new Date(t0); dt.setDate(dt.getDate() + i);
+    var p = new Intl.DateTimeFormat('en-u-ca-hebrew', { day:'numeric', month:'long', year:'numeric' }).formatToParts(dt);
+    var g = function (t) { var x = p.find(function (q) { return q.type === t; }); return x ? x.value : ''; };
+    map.push({ iso: isoOf(dt), d: parseInt(g('day'), 10), m: g('month'),
+      y: parseInt(String(g('year')).replace(/\D/g, ''), 10) });
+  }
+  hebMapCache = map; hebMapDay = key;
+  return map;
+}
+// אותם כללים כמו בפאנל: בשנה מעוברת אדר ב׳, ויום שאינו קיים בחודש נופל ליום האחרון שבו.
+function nextHeb(map, day, mon) {
+  var base = String(mon).replace(/ I+$/, '');
+  var pool = map.filter(function (x) { return String(x.m).replace(/ I+$/, '') === base; });
+  if (base === 'Adar') {
+    var two = pool.filter(function (x) { return x.m === 'Adar II'; });
+    if (two.length) pool = two;
+  }
+  var hit = null;
+  for (var i = 0; i < pool.length; i++) if (pool[i].d === day) { hit = pool[i]; break; }
+  if (!hit && pool.length) hit = pool.slice().sort(function (a, b) { return b.d - a.d; })[0];
+  return hit;
+}
 function birthdays() {
   if (!cfg.display.showBirthdays) return { today: [], soon: [] };
   var today = isoOf(new Date()), horizon = new Date();
   horizon.setDate(horizon.getDate() + 14);
-  var lim = isoOf(horizon);
-  var items = (cfg.birthdays.items || []).filter(function (b) { return b && b.date && b.first; });
+  var lim = isoOf(horizon), map = hebMap(), out = [];
+  (cfg.birthdays.items || []).forEach(function (b) {
+    if (!b || !b.first) return;
+    var iso = b.date, heb = b.heb, age = b.age;
+    if (b.d && b.m) {
+      var hit = nextHeb(map, b.d, b.m);
+      if (!hit) return;
+      iso = hit.iso;
+      heb = gematria(b.d) + ' ב' + (HMON_HE[b.m] || b.m);
+      age = b.by ? hit.y - b.by : null;
+    }
+    if (!iso) return;
+    // גיל 13 = בר מצווה. זו הכותרת שמוצגת במקום "יום הולדת".
+    // "שיעור ג1 - הרב יודלוב" → "שיעור ג1"; שם המלמד מיותר על הקיר
+    out.push({ first: b.first, name: b.name || b.first, cls: String(b.cls || '').split(' - ')[0].trim(),
+      date: iso, heb: heb, age: age, bar: age === 13 });
+  });
   return {
-    today: items.filter(function (b) { return b.date === today; }),
-    soon: items.filter(function (b) { return b.date > today && b.date <= lim; })
+    today: out.filter(function (b) { return b.date === today; }),
+    soon: out.filter(function (b) { return b.date > today && b.date <= lim; })
       .sort(function (a, b) { return a.date < b.date ? -1 : 1; }),
   };
 }
@@ -422,13 +509,15 @@ function paintBirthCard() {
   if (!cfg.display.showBirthdays || (!b.today.length && !b.soon.length)) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   $('birthToday').innerHTML = b.today.length
-    ? '🎂 ' + b.today.map(function (x) {
-        return esc(x.first) + (x.age ? ' <small>בן ' + x.age + '</small>' : '');
-      }).join(' · ')
+    ? b.today.map(function (x) {
+        return '<div>' + (x.bar ? '📜' : '🎂') + ' ' + esc(x.name) +
+          '<small> · ' + (x.bar ? 'בר מצווה' : (x.age ? 'בן ' + x.age : '')) +
+          (x.cls ? ' · ' + esc(x.cls) : '') + '</small></div>';
+      }).join('')
     : '<span style="color:var(--muted);font-size:.95rem;font-weight:600">אין חוגגים היום</span>';
   $('birthNext').innerHTML = b.soon.slice(0, 4).map(function (x) {
-    var d = new Date(x.date + 'T00:00:00');
-    return '<span><b>' + esc(x.first) + '</b> · ' + esc(x.heb || hebDate(d)) + ' (יום ' + DAYS[d.getDay()] + ')</span>';
+    return '<span><b>' + esc(x.name) + '</b> · ' + esc(x.heb || '') +
+      (x.bar ? ' · בר מצווה' : '') + '</span>';
   }).join('');
 }
 var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;' })[c]; }); };
@@ -479,11 +568,46 @@ function tick() {
   var allow = d.videosEnabled && srv.videos.length > 0 && !dayOver &&
               !(d.videosOnlyOnBreaks && (inLesson || idx < 0 || !rows.length));
   if (allow !== lastVideoAllowed) { lastVideoAllowed = allow; allow ? startVideo() : stopVideo(); }
+  // כמה נשאר למשבצת הבאה, בשניות — הבסיס לכל הספירות שבמסך
+  var left = null, total = null;
+  if (nxt && !dayOver) {
+    left = mins(nxt.t) * 60 - (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds());
+    total = cur ? (mins(nxt.t) - mins(cur.t)) * 60 : null;   // cur=null = עוד לא התחיל היום
+  }
+  paintCountdown(left, total, nxt);
   $('ov').className = allow ? '' : 'on';
   if (!allow) {
-    paintOverlay(now, rows, idx, cur, nxt, dayOver);
-    rotate(now, inLesson);
+    paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total);
+    rotate(now, inLesson, left);
   }
+}
+
+var mmss = function (sec) {
+  sec = Math.max(0, Math.round(sec));
+  return pad(Math.floor(sec / 60)) + ':' + pad(sec % 60);
+};
+// חמש הדקות האחרונות = ספירה בשניות; הדקה האחרונה נצבעת ומהבהבת.
+var CD_WARN = 5 * 60, CD_LAST = 60;
+
+function paintCountdown(left, total, nxt) {
+  // לפני 08:15 אין שורה "נוכחית", ולכן הספירה לפתיחת היום נתלית בשורה הראשונה
+  var host = $('agenda'), row = host.querySelector('.ag.now') || host.querySelector('.ag.next'), bar = $('agBar');
+  if (!row) { bar.style.display = 'none'; return; }
+  var cd = row.querySelector('.cd');
+  if (!cd) { cd = document.createElement('span'); cd.className = 'cd'; row.appendChild(cd); }
+  row.classList.remove('warn', 'last');
+  if (left == null) { cd.textContent = ''; bar.style.display = 'none'; return; }
+  if (left <= CD_WARN) {
+    cd.textContent = mmss(left);
+    row.classList.add(left <= CD_LAST ? 'last' : 'warn');
+  } else {
+    cd.textContent = 'עוד ' + Math.ceil(left / 60) + ' דק׳';
+  }
+  if (total > 0) {
+    bar.style.display = 'block';
+    bar.firstElementChild.style.width = Math.max(0, Math.min(100, ((total - left) / total) * 100)) + '%';
+  } else bar.style.display = 'none';
+  if (!row.classList.contains('now')) row.classList.remove('warn', 'last');   // לא לצבוע שורה עתידית
 }
 
 // ── קרוסלת המידע ─────────────────────────────────────────────────────────
@@ -500,10 +624,12 @@ function slideHasContent(name, now) {
   if (name === 'message') return activeMessages().length > 0;
   return false;
 }
-function rotate(now, inLesson) {
+function rotate(now, inLesson, left) {
   var d = cfg.display, mode = d.lessonScreen || 'clock';
   var pool = (d.slides || ['clock']).filter(function (n) { return slideHasContent(n, now); });
   if (inLesson && mode !== 'rotate') pool = [mode === 'menu' ? 'menu' : (mode === 'agenda' ? 'agenda' : 'clock')];
+  // הספירה האחרונה חשובה מכל שקופית אחרת — היא נשארת על המסך עד המעבר
+  if (left != null && left <= CD_WARN) pool = ['clock'];
   if (!pool.length) pool = ['clock'];
   var sec = Math.max(5, Number(d.slideSec) || 18);
   var t = now.getTime();
@@ -520,14 +646,20 @@ function showSlide(name, now) {
   if (name === 'birthdays') {
     var b = birthdays();
     var list = b.today.length ? b.today : b.soon.slice(0, 3);
-    $('slBirth').querySelector('.sl-kicker').textContent = b.today.length ? 'מזל טוב' : 'ימי הולדת קרובים';
+    var anyBar = list.some(function (x) { return x.bar; });
+    $('slBirth').querySelector('.cake').textContent = anyBar ? '📜' : '🎂';
+    $('slBirth').querySelector('.sl-kicker').textContent = b.today.length
+      ? (anyBar ? 'מזל טוב — בר מצווה' : 'מזל טוב')
+      : (anyBar ? 'בר מצווה בקרוב' : 'ימי הולדת קרובים');
     $('birthNames').innerHTML = list.map(function (x) {
-      var d = new Date(x.date + 'T00:00:00');
-      return '<span class="nm">' + esc(x.first) + '<small>' +
-        (b.today.length ? (x.age ? 'היום · בן ' + x.age : 'היום') : esc(x.heb || hebDate(d))) + '</small></span>';
+      var sub = b.today.length
+        ? (x.bar ? 'בר מצווה' : (x.age ? 'בן ' + x.age : 'היום'))
+        : (x.heb || '') + (x.bar ? ' · בר מצווה' : '');
+      return '<span class="nm">' + esc(x.name) + '<small>' + esc(sub) +
+        (x.cls ? ' · ' + esc(x.cls) : '') + '</small></span>';
     }).join('');
     $('birthSoon').innerHTML = (b.today.length && b.soon.length)
-      ? 'בקרוב: ' + b.soon.slice(0, 4).map(function (x) { return '<b>' + esc(x.first) + '</b> ' + esc(x.heb || ''); }).join(' · ')
+      ? 'בקרוב: ' + b.soon.slice(0, 4).map(function (x) { return '<b>' + esc(x.name) + '</b> ' + esc(x.heb || ''); }).join(' · ')
       : '';
   } else if (name === 'menu') {
     var mm = menuForDisplay();
@@ -574,20 +706,25 @@ function paintAgenda(rows, idx) {
   }, 120);
 }
 
-function paintOverlay(now, rows, idx, cur, nxt, dayOver) {
+function paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total) {
   $('ovClock').innerHTML = pad(now.getHours()) + '<span class="bl">:</span>' + pad(now.getMinutes());
   $('ovBarWrap').style.display = 'none';
+  var ov = $('ov'), cdOn = left != null && left <= CD_WARN;
+  ov.classList.toggle('cd-on', cdOn && curSlide === 'clock');
+  ov.classList.toggle('cd-last', cdOn && left <= CD_LAST && curSlide === 'clock');
+  if (cdOn) $('ovCd').textContent = mmss(left);
 
   if (!rows.length) { $('ovTitle').textContent = 'אין לימודים היום'; $('ovSub').textContent = hebDate(now); }
   else if (idx < 0) { $('ovTitle').textContent = 'בוקר טוב'; $('ovSub').textContent = 'תחילת היום בשעה ' + rows[0].t; }
   else if (dayOver) { $('ovTitle').textContent = 'סיום היום'; $('ovSub').textContent = 'להתראות מחר'; }
   else {
-    $('ovTitle').textContent = cur.title || '';
+    // ניסוח ניטרלי במין — "הפסקה מתחיל" מול "שיעור מתחילה" תמיד ייצא שגוי לאחד מהם
+    $('ovTitle').textContent = cdOn ? nxt.title : (cur.title || '');
     if (nxt) {
-      var left = mins(nxt.t) - (now.getHours() * 60 + now.getMinutes());
-      var total = mins(nxt.t) - mins(cur.t);
-      $('ovSub').textContent = nxt.title + ' בשעה ' + nxt.t + (left > 0 ? ' · עוד ' + left + ' דק׳' : '');
-      if (total > 0) {
+      $('ovSub').textContent = cdOn
+        ? 'בשעה ' + nxt.t + ' · סוף ' + (cur.title || '')
+        : nxt.title + ' בשעה ' + nxt.t + (left > 0 ? ' · עוד ' + Math.ceil(left / 60) + ' דק׳' : '');
+      if (total > 0 && left != null) {
         $('ovBarWrap').style.display = 'block';
         $('ovBar').style.width = Math.max(0, Math.min(100, ((total - left) / total) * 100)) + '%';
       }

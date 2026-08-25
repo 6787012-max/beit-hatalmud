@@ -331,11 +331,13 @@
   const firstName = full => String(full || '').trim().split(/\s+/)[0] || '';
 
   async function computeBirthdays() {
-    const res = await window.store.list('students');
+    const [res, cls] = await Promise.all([window.store.list('students'), window.store.list('classes')]);
     const rows = (res || []).filter(r => !r.status || r.status === 'פעיל');
+    const clsName = {};
+    (cls || []).forEach(c => { clsName[c.id] = c.name || c.title || ''; });
     const map = buildHebMap();
     const manual = {};
-    (cfg.birthdays.items || []).forEach(b => { if (b.sid) manual[b.sid] = b; });
+    (cfg.birthdays.items || []).forEach(b => { if (b.sid != null) manual[b.sid] = b; });
     return rows.map(r => {
       const prev = manual[r.id] || {};
       let src = 'רשום', p = parseHebText(r.birthdate_heb);
@@ -343,10 +345,14 @@
         const h = hebPartsOf(new Date(String(r.birthdate).slice(0, 10) + 'T12:00:00'));
         p = { day: h.d, mon: h.m }; src = 'מחושב מהלועזי';
       }
-      if (!p) return { sid: r.id, name: window.UI.fullName(r), first: firstName(r.name), miss: true, show: false, src: 'חסר' };
+      const cname = clsName[r.class_id] || '';
+      if (!p) return { sid: r.id, name: window.UI.fullName(r), first: firstName(r.name), cls: cname, miss: true, show: false, src: 'חסר' };
+      // שנת הלידה העברית — הבסיס לחישוב הגיל במסך. אם ידוע רק התאריך העברי
+      // (בלי לועזי) נשארת null, והמסך פשוט לא יציג גיל.
       const by = r.birthdate ? hebPartsOf(new Date(String(r.birthdate).slice(0, 10) + 'T12:00:00')).y : null;
       const n = nextHebBirthday(map, p.day, p.mon, by);
-      return { sid: r.id, name: window.UI.fullName(r), first: firstName(r.name),
+      return { sid: r.id, name: window.UI.fullName(r), first: firstName(r.name), cls: cname,
+        hebD: p.day, hebM: p.mon, hebY: by,
         hebTxt: window.UI.gematria(p.day) + ' ב' + (HMON_HE[p.mon] || p.mon),
         date: n && n.date, age: n && n.age, src: src,
         show: prev.show !== false, miss: false };
@@ -357,8 +363,9 @@
     const saved = cfg.birthdays.items || [];
     pane.innerHTML =
       '<div class="qr-card"><h3><i class="bi bi-balloon-heart"></i> ימי הולדת שמוצגים במסך</h3>' +
-      '<p class="ym-note" style="margin:0 0 10px">מחושב לפי התאריך העברי הרשום בכרטיס התלמיד. ' +
-      'למסך נשמרים <b>שם פרטי ותאריך בלבד</b> — לא שם משפחה, לא שנת לידה ולא שום פרט נוסף.</p>' +
+      '<p class="ym-note" style="margin:0 0 10px">מחושב לפי התאריך העברי הרשום בכרטיס התלמיד; ' +
+      'מלאו 13 — מוצג <b>בר מצווה</b>. למסך נשמרים שם, שיעור ותאריך עברי — ' +
+      'והמסך שבלובי נקרא בלי התחברות, כך שזה מידע גלוי.</p>' +
       '<div class="tla-bar">' +
         '<button class="btn-primary sm" id="lbCalc"><i class="bi bi-arrow-repeat"></i> חשב מחדש מהתלמידים</button>' +
         '<span class="ym-note" id="lbBdayInfo">' +
@@ -367,9 +374,10 @@
         '<button class="btn-primary sm" id="lbSaveBday" style="margin-inline-start:auto" disabled><i class="bi bi-check-lg"></i> שמור למסך</button>' +
       '</div>' +
       '<div class="table-wrap" style="margin-top:10px"><table class="tbl"><thead><tr>' +
-      '<th>תלמיד</th><th style="width:170px">תאריך עברי</th><th style="width:160px">החגיגה הקרובה</th>' +
-      '<th style="width:70px">גיל</th><th style="width:130px">מקור</th><th style="width:100px">מוצג</th>' +
-      '</tr></thead><tbody id="lbBdayBody"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">' +
+      '<th>תלמיד</th><th style="width:110px">שיעור</th><th style="width:160px">תאריך עברי</th>' +
+      '<th style="width:150px">החגיגה הקרובה</th><th style="width:110px">גיל</th>' +
+      '<th style="width:120px">מקור</th><th style="width:90px">מוצג</th>' +
+      '</tr></thead><tbody id="lbBdayBody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">' +
       (saved.length ? 'לחץ "חשב מחדש" כדי לראות ולעדכן' : 'עוד לא חושבו ימי הולדת') + '</td></tr></tbody></table></div></div>';
 
     pane.querySelector('#lbCalc').addEventListener('click', async () => {
@@ -379,10 +387,13 @@
       b.disabled = false; b.innerHTML = '<i class="bi bi-arrow-repeat"></i> חשב מחדש מהתלמידים';
     });
     pane.querySelector('#lbSaveBday').addEventListener('click', async () => {
+      // נשמר תאריך עברי בלבד (יום/חודש/שנה) — המסך גוזר ממנו כל יום את החגיגה
+      // הקרובה ואת הגיל, ולכן הרשימה נשארת נכונה גם בלי לחשב אותה מחדש.
       cfg.birthdays = {
         updatedAt: new Date().toISOString(),
         items: (bdayCalc || []).filter(b => b.show && !b.miss)
-          .map(b => ({ sid: b.sid, first: b.first, date: b.date, heb: b.hebTxt, age: b.age, show: true })),
+          .map(b => ({ sid: b.sid, name: b.name, first: b.first, cls: b.cls,
+            d: b.hebD, m: b.hebM, by: b.hebY, heb: b.hebTxt, show: true })),
       };
       if (await save('birthdays')) drawBday(pane, page);
     });
@@ -396,14 +407,15 @@
       const soon = b.date && b.date <= iso(addDays(new Date(), 14));
       return '<tr' + (b.miss ? ' style="opacity:.55"' : (soon ? ' style="background:rgba(168,120,48,.10)"' : '')) + '>' +
         '<td><b>' + esc(b.name) + '</b></td>' +
+        '<td class="ym-note">' + esc(b.cls || '—') + '</td>' +
         '<td>' + (b.miss ? '<span style="color:#8c2f2f">חסר תאריך עברי</span>' : esc(b.hebTxt)) + '</td>' +
-        '<td>' + (b.date ? heb(b.date, { year: false }) + '<div class="ym-note">' +
-          (b.date === today ? 'היום!' : new Date(b.date + 'T00:00:00').toLocaleDateString('he-IL')) + '</div>' : '—') + '</td>' +
-        '<td>' + (b.age != null ? b.age : '—') + '</td>' +
+        '<td>' + (b.date ? (b.date === today ? '<b style="color:#a87830">היום!</b>' : 'יום ' + DAYS[new Date(b.date + 'T00:00:00').getDay()]) +
+          '<div class="ym-note">' + new Date(b.date + 'T00:00:00').toLocaleDateString('he-IL') + '</div>' : '—') + '</td>' +
+        '<td>' + (b.age == null ? '—' : (b.age === 13 ? '<b style="color:#a87830">בר מצווה</b>' : b.age)) + '</td>' +
         '<td class="ym-note">' + esc(b.src) + '</td>' +
         '<td>' + (b.miss ? '—' : '<label class="ym-check"><input type="checkbox" data-bshow="' + i + '"' +
           (b.show ? ' checked' : '') + '> הצג</label>') + '</td></tr>';
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">אין תלמידים</td></tr>';
+    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">אין תלמידים</td></tr>';
     pane.querySelectorAll('[data-bshow]').forEach(el => el.addEventListener('change', () => {
       list[Number(el.dataset.bshow)].show = el.checked;
     }));
