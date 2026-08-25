@@ -151,7 +151,8 @@ footer{display:flex;align-items:center;gap:14px;background:var(--card);border:1p
 #dot.ok{background:var(--ok);box-shadow:0 0 10px var(--ok)}
 #dot.err{background:#e05a5a}
 
-#hint{position:fixed;inset-inline-start:14px;bottom:14px;z-index:9;font-size:.78rem;color:var(--muted);
+/* לא בתחתית — שם הוא חפף את הפס התחתון */
+#hint{position:fixed;inset-inline-start:16px;top:16px;z-index:9;font-size:.78rem;color:var(--muted);
   background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:10px;padding:7px 11px;
   opacity:0;transition:opacity .3s;pointer-events:none;max-width:46vw}
 #hint.on{opacity:1}
