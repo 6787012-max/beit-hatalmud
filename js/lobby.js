@@ -123,7 +123,11 @@
       (schedDay !== 'all' && !custom
         ? '<div class="table-wrap" style="padding:16px;text-align:center;color:var(--muted)">יום ' + DAYS[schedDay] + ' משתמש בסדר היום הכללי.' +
           '<div style="margin-top:10px"><button class="btn-primary sm" id="lbMakeDay"><i class="bi bi-pencil"></i> קבע סדר יום מיוחד ליום ' + DAYS[schedDay] + '</button></div></div>'
-        : '<div class="table-wrap"><table class="tbl"><thead><tr><th style="width:110px">שעה</th><th>מה קורה</th><th style="width:130px">סוג</th><th style="width:44px"></th></tr></thead><tbody id="lbSchedBody"></tbody></table></div>' +
+        : '<div class="table-wrap"><table class="tbl"><thead><tr><th style="width:110px">משעה</th>' +
+          '<th style="width:110px">עד שעה</th><th>מה קורה</th><th style="width:130px">סוג</th><th style="width:44px"></th></tr></thead>' +
+          '<tbody id="lbSchedBody"></tbody></table></div>' +
+          '<p class="ym-note" style="margin-top:8px">"עד שעה" הוא רשות. כשהוא ריק המשבצת נמשכת עד תחילת הבאה; ' +
+          'כשהוא מלא — הספירה במסך רצה עד הסיום האמיתי, והזמן שביניהם מוצג כהמתנה למשבצת הבאה.</p>' +
           '<div class="tla-bar" style="margin-top:10px"><button class="btn-ghost sm" id="lbAddRow"><i class="bi bi-plus-lg"></i> הוסף שורה</button>' +
           (custom ? '<button class="btn-ghost sm" id="lbDropDay"><i class="bi bi-trash"></i> בטל את המיוחד ליום ' + DAYS[schedDay] + '</button>' : '') +
           '<button class="btn-primary sm" id="lbSaveSched" style="margin-inline-start:auto"><i class="bi bi-check-lg"></i> שמירה</button></div>') +
@@ -156,12 +160,13 @@
       const list = activeRows() || [];
       pane.querySelector('#lbSchedBody').innerHTML = list.map((r, i) =>
         '<tr><td><input class="inp mb0" type="time" value="' + esc(r.t || '') + '" data-f="t" data-i="' + i + '"></td>' +
+        '<td><input class="inp mb0" type="time" value="' + esc(r.end || '') + '" data-f="end" data-i="' + i + '"></td>' +
         '<td><input class="inp mb0" value="' + esc(r.title || '') + '" data-f="title" data-i="' + i + '" placeholder="שם המשבצת"></td>' +
         '<td><select class="inp mb0" data-f="kind" data-i="' + i + '">' +
           KINDS.map(k => '<option value="' + k.v + '"' + ((r.kind || 'lesson') === k.v ? ' selected' : '') + '>' + k.t + '</option>').join('') +
         '</select></td>' +
         '<td class="row-act"><button class="mini danger" data-del="' + i + '"><i class="bi bi-trash"></i></button></td></tr>').join('') ||
-        '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">אין משבצות — הוסף שורה</td></tr>';
+        '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">אין משבצות — הוסף שורה</td></tr>';
       pane.querySelectorAll('#lbSchedBody [data-f]').forEach(el => el.addEventListener('input', () => {
         const l = activeRows(); l[Number(el.dataset.i)][el.dataset.f] = el.value;
       }));
@@ -172,7 +177,7 @@
     paint();
     pane.querySelector('#lbAddRow').addEventListener('click', () => {
       const l = activeRows(); const last = l[l.length - 1];
-      l.push({ t: last ? bump(last.t) : '08:15', title: '', kind: 'lesson' }); paint();
+      l.push({ t: last ? (last.end || bump(last.t)) : '08:15', end: '', title: '', kind: 'lesson' }); paint();
     });
     pane.querySelector('#lbSaveSched').addEventListener('click', async () => {
       const l = activeRows();

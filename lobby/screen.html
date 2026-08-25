@@ -28,59 +28,63 @@ html,body{width:100%;height:100%;overflow:hidden;background:#00131e;color:var(--
 
 #stage{position:relative;z-index:2;display:grid;grid-template-columns:minmax(300px,23%) 1fr;
   grid-template-rows:1fr auto;gap:16px;height:100vh;padding:16px}
-aside{grid-row:1/2;display:flex;flex-direction:column;gap:12px;min-height:0}
+aside{grid-row:1/2;display:flex;flex-direction:column;gap:calc(12px*var(--side,1));min-height:0;--side:1}
 main{grid-row:1/2;position:relative;border-radius:20px;overflow:hidden;background:#000;
   border:1px solid var(--line);box-shadow:0 24px 70px rgba(0,0,0,.6)}
 footer{grid-column:1/-1}
 
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;
-  backdrop-filter:blur(14px)}
-.card h3{font-size:.82rem;font-weight:700;letter-spacing:.04em;color:var(--gold-lt);
-  margin-bottom:9px;display:flex;align-items:center;gap:7px;text-transform:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:calc(14px*var(--side,1)) calc(16px*var(--side,1));backdrop-filter:blur(14px)}
+.card h3{font-size:calc(.82rem*var(--side,1));font-weight:700;letter-spacing:.04em;color:var(--gold-lt);
+  margin-bottom:calc(9px*var(--side,1));display:flex;align-items:center;gap:7px;text-transform:none}
 
 /* שעון */
-#clockCard{text-align:center;container-type:inline-size;padding-bottom:10px}
-#clock{font-size:clamp(2.6rem,26cqi,5.4rem);font-weight:800;line-height:1;letter-spacing:-2px;
+#clockCard{text-align:center;container-type:inline-size;padding-bottom:calc(10px*var(--side,1))}
+#clock{font-size:calc(clamp(2.6rem,26cqi,5.4rem)*var(--side,1));font-weight:800;line-height:1;letter-spacing:-2px;
   font-variant-numeric:tabular-nums;text-shadow:0 0 40px rgba(255,255,255,.25)}
 #clock .sc{opacity:.45;font-size:.45em;font-weight:600;margin-inline-start:6px;letter-spacing:0}
-#dHeb{color:var(--gold-lt);font-size:1.15rem;font-weight:600;margin-top:6px}
-#dGreg{color:var(--muted);font-size:.86rem;margin-top:2px}
-#meta{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin-top:10px;
-  color:var(--muted);font-size:.86rem}
+#dHeb{color:var(--gold-lt);font-size:calc(1.15rem*var(--side,1));font-weight:600;margin-top:6px}
+#dGreg{color:var(--muted);font-size:calc(.86rem*var(--side,1));margin-top:2px}
+#meta{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;margin-top:calc(10px*var(--side,1));
+  color:var(--muted);font-size:calc(.86rem*var(--side,1))}
 #meta b{color:#dbe7ee;font-weight:600}
-#parasha{margin-top:9px;font-size:.95rem;color:var(--gold-lt);background:rgba(168,120,48,.14);
+#parasha{margin-top:calc(9px*var(--side,1));font-size:calc(.95rem*var(--side,1));color:var(--gold-lt);background:rgba(168,120,48,.14);
   border:1px solid rgba(168,120,48,.3);border-radius:10px;padding:5px 9px;display:none}
-#zmanim{display:none;gap:4px 10px;flex-wrap:wrap;justify-content:center;margin-top:9px;
-  font-size:.8rem;color:var(--muted)}
+#zmanim{display:none;gap:4px 10px;flex-wrap:wrap;justify-content:center;margin-top:calc(9px*var(--side,1));
+  font-size:calc(.8rem*var(--side,1));color:var(--muted)}
 #zmanim span b{color:#cfe0ea;font-weight:600}
 
 /* תפריט */
 #menuCard{display:none}
-#menuDay{font-size:.8rem;color:var(--muted);margin-bottom:6px}
-#menuMain{font-size:1.5rem;font-weight:800;line-height:1.15}
-#menuSide{font-size:1.05rem;color:#d7e6ee;margin-top:3px}
-#menuVeg{font-size:.95rem;color:var(--muted);margin-top:2px}
-#menuNote{font-size:.85rem;color:var(--gold-lt);margin-top:6px}
+#menuDay{font-size:calc(.8rem*var(--side,1));color:var(--muted);margin-bottom:6px}
+#menuMain{font-size:calc(1.5rem*var(--side,1));font-weight:800;line-height:1.15}
+#menuSide{font-size:calc(1.05rem*var(--side,1));color:#d7e6ee;margin-top:3px}
+#menuVeg{font-size:calc(.95rem*var(--side,1));color:var(--muted);margin-top:2px}
+#menuNote{font-size:calc(.85rem*var(--side,1));color:var(--gold-lt);margin-top:6px}
 
 /* סדר יום */
-#agendaCard{flex:1;display:flex;flex-direction:column;min-height:0}
-/* הרשימה ארוכה מהמקום שיש לה; המסכה מסמנת שיש המשך במקום לחתוך שורה באמצע */
-#agenda{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;
+#agendaCard{flex:1;display:flex;flex-direction:column;min-height:0;--ag-font:1.05rem;--ag-pad:9px;--ag-gap:3px}
+/* המסכה נשארת רק כרשת ביטחון: ההתאמה בזמן ריצה אמורה להכניס את כל השורות */
+#agenda{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--ag-gap);
   -webkit-mask-image:linear-gradient(180deg,transparent,#000 5%,#000 92%,transparent);
   mask-image:linear-gradient(180deg,transparent,#000 5%,#000 92%,transparent)}
-.ag{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;
-  font-size:clamp(.92rem,2.1vh,1.12rem);opacity:.62;transition:all .35s}
+.ag{display:flex;align-items:center;gap:10px;padding:var(--ag-pad) 10px;border-radius:11px;
+  font-size:var(--ag-font);opacity:.62;transition:opacity .35s,background .35s;line-height:1.25}
 .ag .t{color:var(--gold-lt);font-weight:700;font-variant-numeric:tabular-nums;min-width:52px}
 .ag.done{opacity:.32}
 .ag.now{opacity:1;background:linear-gradient(90deg,rgba(168,120,48,.34),rgba(168,120,48,.06));
   border-inline-start:4px solid var(--gold);font-weight:700;padding-inline-start:10px;
-  box-shadow:0 6px 20px rgba(0,0,0,.4);font-size:clamp(1.05rem,2.6vh,1.35rem);
+  box-shadow:0 6px 20px rgba(0,0,0,.4);font-size:calc(var(--ag-font)*1.14);
   animation:pop .5s ease-out}
 /* המשבצת שהתחלפה קופצת רגע, כדי שמי שמרים את העיניים יראה שהשעה התחלפה */
 @keyframes pop{0%{transform:scale(.96);box-shadow:0 0 0 rgba(168,120,48,0)}
   55%{transform:scale(1.035);box-shadow:0 0 26px rgba(168,120,48,.55)}
   100%{transform:scale(1)}}
 .ag.next{opacity:.9}
+/* משבצת שממתינה להתחלה (אחרי צלצול הסיום של הקודמת) — מודגשת אך לא "רצה" */
+.ag.now.waiting{background:linear-gradient(90deg,rgba(120,160,190,.28),rgba(120,160,190,.05));
+  border-inline-start-color:#7fa8c4}
+.ag.now.waiting .cd{color:#bcd7e8}
 .ag .k{margin-inline-start:auto;font-size:.7rem;color:var(--muted);opacity:.8}
 /* ספירה לאחור בשורה הפעילה */
 .ag .cd{margin-inline-start:auto;font-variant-numeric:tabular-nums;font-weight:800;
@@ -109,18 +113,18 @@ main:hover #vinfo{opacity:1}
   gap:8px;padding:30px;text-align:center;opacity:0;pointer-events:none;transition:opacity 1s;
   background:radial-gradient(ellipse at center,#00243a 0%,#00131e 75%)}
 #ov.on{opacity:1;pointer-events:auto}
-#ovClock{font-size:clamp(5rem,17vw,15rem);font-weight:800;line-height:.95;letter-spacing:-5px;
+#ovClock{font-size:calc(clamp(5rem,17vw,15rem)*var(--s,1));font-weight:800;line-height:.95;letter-spacing:-5px;
   font-variant-numeric:tabular-nums;text-shadow:0 0 70px rgba(255,255,255,.22)}
 #ovClock .bl{animation:bl 1.1s infinite}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
-#ovTitle{font-size:clamp(1.6rem,3.6vw,3.2rem);font-weight:700;color:var(--gold-lt)}
-#ovSub{font-size:clamp(1rem,1.8vw,1.5rem);color:var(--muted)}
+#ovTitle{font-size:calc(clamp(1.6rem,3.6vw,3.2rem)*var(--s,1));font-weight:700;color:var(--gold-lt)}
+#ovSub{font-size:calc(clamp(1rem,1.8vw,1.5rem)*var(--s,1));color:var(--muted)}
 #ovBarWrap{width:min(560px,70%);height:8px;border-radius:99px;background:rgba(255,255,255,.12);
   overflow:hidden;margin-top:14px;display:none}
 #ovBar{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-lt));
   border-radius:99px;transition:width 1s linear}
 /* חמש הדקות האחרונות: המסך עובר לספירה לאחור, ובדקה האחרונה היא נצבעת ופועמת */
-#ovCd{display:none;font-size:clamp(4.5rem,15vw,13rem);font-weight:800;line-height:.95;
+#ovCd{display:none;font-size:calc(clamp(4.5rem,15vw,13rem)*var(--s,1));font-weight:800;line-height:.95;
   letter-spacing:-4px;font-variant-numeric:tabular-nums;color:var(--gold-lt);
   text-shadow:0 0 70px rgba(168,120,48,.45)}
 #ov.cd-on #ovClock{display:none}
@@ -132,35 +136,36 @@ main:hover #vinfo{opacity:1}
 /* המעבר עובר דרך רקע כהה: השקופית היוצאת דוהה, ורק אז הנכנסת עולה. בלי ההשהיה
    שתי שכבות הטקסט נראו זו מבעד לזו באמצע ה-fade. */
 .slide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:10px;padding:36px;text-align:center;opacity:0;pointer-events:none;transition:opacity .55s ease-in}
+  gap:10px;padding:36px;text-align:center;opacity:0;pointer-events:none;transition:opacity .55s ease-in;
+  overflow:hidden}
 .slide.on{opacity:1;transition:opacity .55s ease-out .55s}
-.sl-kicker{font-size:clamp(.9rem,1.5vw,1.3rem);letter-spacing:.22em;color:var(--gold);opacity:.85}
-.sl-title{font-size:clamp(2rem,5.5vw,4.6rem);font-weight:800;line-height:1.1}
-.sl-sub{font-size:clamp(1.05rem,2vw,1.8rem);color:var(--muted)}
+.sl-kicker{font-size:calc(clamp(.9rem,1.5vw,1.3rem)*var(--s,1));letter-spacing:.22em;color:var(--gold);opacity:.85}
+.sl-title{font-size:calc(clamp(2rem,5.5vw,4.6rem)*var(--s,1));font-weight:800;line-height:1.1}
+.sl-sub{font-size:calc(clamp(1.05rem,2vw,1.8rem)*var(--s,1));color:var(--muted)}
 /* מזל טוב */
-#slBirth .cake{font-size:clamp(3rem,7vw,6rem);line-height:1}
+#slBirth .cake{font-size:calc(clamp(3rem,7vw,6rem)*var(--s,1));line-height:1}
 #slBirth .names{display:flex;flex-wrap:wrap;gap:10px 26px;justify-content:center;margin-top:6px}
-#slBirth .nm{font-size:clamp(1.35rem,3.2vw,2.8rem);font-weight:800;color:#fff;max-width:15ch}
+#slBirth .nm{font-size:calc(clamp(1.35rem,3.2vw,2.8rem)*var(--s,1));font-weight:800;color:#fff;max-width:15ch}
 #slBirth .nm small{display:block;font-size:.42em;font-weight:600;color:var(--gold-lt);margin-top:2px}
-#slBirth .soon{margin-top:20px;font-size:clamp(.95rem,1.6vw,1.35rem);color:var(--muted);
+#slBirth .soon{margin-top:20px;font-size:calc(clamp(.95rem,1.6vw,1.35rem)*var(--s,1));color:var(--muted);
   border-top:1px solid var(--line);padding-top:12px;max-width:80%}
 #slBirth .soon b{color:#dbe7ee;font-weight:600}
 /* תפריט גדול */
-#slMenu .dish{font-size:clamp(2.2rem,6vw,5rem);font-weight:800}
-#slMenu .side{font-size:clamp(1.3rem,3vw,2.4rem);color:#d7e6ee;margin-top:4px}
-#slMenu .veg{font-size:clamp(1.05rem,2.2vw,1.7rem);color:var(--muted)}
+#slMenu .dish{font-size:calc(clamp(2.2rem,6vw,5rem)*var(--s,1));font-weight:800}
+#slMenu .side{font-size:calc(clamp(1.3rem,3vw,2.4rem)*var(--s,1));color:#d7e6ee;margin-top:4px}
+#slMenu .veg{font-size:calc(clamp(1.05rem,2.2vw,1.7rem)*var(--s,1));color:var(--muted)}
 /* סדר יום מלא */
 #slAgenda .list{width:min(860px,92%);max-height:76%;overflow:hidden;display:flex;flex-direction:column;gap:4px;text-align:start}
-#slAgenda .ag{font-size:clamp(1rem,2.2vh,1.4rem)}
+#slAgenda .ag{font-size:calc(clamp(1rem,2.2vh,1.4rem)*var(--s,1))}
 /* הודעה */
-#slMsg .msg{font-size:clamp(1.6rem,4vw,3.4rem);font-weight:700;line-height:1.3;max-width:88%}
+#slMsg .msg{font-size:calc(clamp(1.6rem,4vw,3.4rem)*var(--s,1));font-weight:700;line-height:1.3;max-width:88%}
 
 /* כרטיס ימי הולדת בסרגל */
 #birthCard{display:none}
-#birthToday{font-size:1.12rem;font-weight:800;line-height:1.3}
+#birthToday{font-size:calc(1.12rem*var(--side,1));font-weight:800;line-height:1.3}
 #birthToday div+div{margin-top:5px}
 #birthToday small{color:var(--gold-lt);font-weight:600;font-size:.7em}
-#birthNext{margin-top:8px;font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+#birthNext{margin-top:calc(8px*var(--side,1));font-size:calc(.88rem*var(--side,1));color:var(--muted);display:flex;flex-direction:column;gap:3px}
 #birthNext b{color:#dbe7ee;font-weight:600}
 
 /* פס תחתון */
@@ -190,6 +195,10 @@ body:hover #fsBtn,#fsBtn.show{opacity:.9}
 body.fs #fsBtn{display:none}
 @media (max-width:900px){#stage{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
   aside{grid-row:1/2}main{grid-row:2/3;min-height:40vh}}
+/* מסך נמוך: סדר היום קודם לכל השאר. מה שיורד כאן ממשיך להופיע בקרוסלה. */
+@media (max-height:860px){ #birthCard{display:none !important} }
+@media (max-height:740px){ #menuCard{display:none !important} #zmanim{display:none !important} }
+@media (max-height:640px){ #parasha{display:none !important} }
 </style>
 </head>
 <body>
@@ -383,6 +392,19 @@ function slotAt(rows, now) {
   for (var i = 0; i < rows.length; i++) if (cur >= mins(rows[i].t)) idx = i;
   return idx;
 }
+/** מצב היום: איפה אנחנו, עד מתי, והאם אנחנו בפער שאחרי סיום משבצת. */
+function dayState(rows, now) {
+  var cur = now.getHours() * 60 + now.getMinutes();
+  var idx = slotAt(rows, now);
+  var slot = idx >= 0 ? rows[idx] : null;
+  var nxt = (idx + 1) < rows.length ? rows[idx + 1] : null;
+  var endM = slot && slot.end ? mins(slot.end) : (nxt ? mins(nxt.t) : null);
+  // "פער" = המשבצת כבר נגמרה לפי שעת הסיום שלה, והבאה עוד לא התחילה
+  var gap = !!(slot && slot.end && nxt && cur >= mins(slot.end));
+  var over = !!(slot && !nxt && endM != null && cur >= endM);
+  if (!slot && rows.length) gap = true;            // לפני פתיחת היום
+  return { idx: idx, slot: slot, nxt: nxt, endM: endM, gap: gap, over: over };
+}
 
 // ── ציור סטטי (משתנה רק כשההגדרות משתנות) ────────────────────────────────
 function paintStatic() {
@@ -394,6 +416,7 @@ function paintStatic() {
   if (!d.showParasha) $('parasha').style.display = 'none';
   $('tick').style.animationDuration = Math.max(20, Number(d.tickerSpeed) || 60) + 's';
   paintMenu(); paintTicker(); paintBirthCard();
+  fitAll();
 }
 
 function menuFor(dateIso) { return (cfg.menu.days || {})[dateIso] || null; }
@@ -551,33 +574,41 @@ function tick() {
   $('dHeb').textContent = hebDate(now);
   $('dGreg').textContent = 'יום ' + DAYS[now.getDay()] + ' · ' + now.getDate() + '.' + (now.getMonth() + 1) + '.' + now.getFullYear();
 
-  var rows = todayRows(now), idx = slotAt(rows, now);
-  var key = rows.map(function (r) { return r.t + r.title; }).join('|') + '#' + idx;
-  if (key !== lastAgendaKey) { lastAgendaKey = key; paintAgenda(rows, idx); }
+  var rows = todayRows(now), st = dayState(rows, now);
+  var idx = st.idx, cur = st.slot, nxt = st.nxt;
+  // בפער מדגישים את המשבצת הבאה — היא מה שממתינים לו
+  var hi = (st.gap && nxt) ? idx + 1 : idx;
+  var key = rows.map(function (r) { return r.t + r.title; }).join('|') + '#' + hi + '#' + (st.gap ? 'g' : '');
+  if (key !== lastAgendaKey) { lastAgendaKey = key; paintAgenda(rows, hi, st.gap); }
 
-  var cur = idx >= 0 ? rows[idx] : null;
-  var nxt = idx + 1 < rows.length ? rows[idx + 1] : null;
   var kind = cur ? (cur.kind || 'lesson') : 'none';
-  var dayOver = rows.length && idx >= 0 && !nxt && (now.getHours() * 60 + now.getMinutes()) > mins(cur.t) + 60;
-  // אחרי שהמשבצת האחרונה נגמרה כבר לא "בשיעור" — אחרת המסך היה נשאר נעול על
-  // השעון כל הערב, בלי להתחלף בין שקופיות המידע.
-  var inLesson = kind === 'lesson' && !dayOver;
+  var dayOver = st.over || (rows.length && idx >= 0 && !nxt && !cur.end &&
+    (now.getHours() * 60 + now.getMinutes()) > mins(cur.t) + 60);
+  // בפער (וגם אחרי סיום היום) לא מפעילים את מצב־השיעור — אחרת המסך היה נעול
+  // על השעון גם בהפסקה שבין הצלצול לשיעור הבא.
+  var inLesson = kind === 'lesson' && !dayOver && !st.gap;
 
   // "בלי סרטונים באמצע": בזמן שיעור המסך עובר לשעון, ומחוץ לשעות הלימוד הוא נשאר שקט.
   var d = cfg.display;
   var allow = d.videosEnabled && srv.videos.length > 0 && !dayOver &&
               !(d.videosOnlyOnBreaks && (inLesson || idx < 0 || !rows.length));
   if (allow !== lastVideoAllowed) { lastVideoAllowed = allow; allow ? startVideo() : stopVideo(); }
-  // כמה נשאר למשבצת הבאה, בשניות — הבסיס לכל הספירות שבמסך
+  // הבסיס לכל הספירות: עד סוף המשבצת הפעילה, או — בפער — עד תחילת הבאה
+  var nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
   var left = null, total = null;
-  if (nxt && !dayOver) {
-    left = mins(nxt.t) * 60 - (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds());
-    total = cur ? (mins(nxt.t) - mins(cur.t)) * 60 : null;   // cur=null = עוד לא התחיל היום
+  if (!dayOver) {
+    if (st.gap && nxt) {
+      left = mins(nxt.t) * 60 - nowSec;
+      total = cur && cur.end ? (mins(nxt.t) - mins(cur.end)) * 60 : null;
+    } else if (cur && st.endM != null) {
+      left = st.endM * 60 - nowSec;
+      total = (st.endM - mins(cur.t)) * 60;
+    }
   }
-  paintCountdown(left, total, nxt);
+  paintCountdown(left, total, nxt, st.gap);
   $('ov').className = allow ? '' : 'on';
   if (!allow) {
-    paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total);
+    paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total, st.gap);
     rotate(now, inLesson, left);
   }
 }
@@ -589,7 +620,7 @@ var mmss = function (sec) {
 // חמש הדקות האחרונות = ספירה בשניות; הדקה האחרונה נצבעת ומהבהבת.
 var CD_WARN = 5 * 60, CD_LAST = 60;
 
-function paintCountdown(left, total, nxt) {
+function paintCountdown(left, total, nxt, gap) {
   // לפני 08:15 אין שורה "נוכחית", ולכן הספירה לפתיחת היום נתלית בשורה הראשונה
   var host = $('agenda'), row = host.querySelector('.ag.now') || host.querySelector('.ag.next'), bar = $('agBar');
   if (!row) { bar.style.display = 'none'; return; }
@@ -599,7 +630,7 @@ function paintCountdown(left, total, nxt) {
   if (left == null) { cd.textContent = ''; bar.style.display = 'none'; return; }
   // הזמן שנותר הוא עד *סוף* המשבצת הפעילה — "עוד 11 דק׳" ליד שם השיעור נקרא
   // כאילו הוא עוד לא התחיל. בשורה עתידית (לפני פתיחת היום) המשמעות הפוכה.
-  var isNow = row.classList.contains('now');
+  var isNow = row.classList.contains('now') && !gap;
   if (left <= CD_WARN) {
     cd.textContent = (isNow ? 'נותרו ' : 'בעוד ') + mmss(left);
     row.classList.add(left <= CD_LAST ? 'last' : 'warn');
@@ -647,6 +678,7 @@ function rotate(now, inLesson, left) {
 }
 function showSlide(name, now) {
   for (var k in SLIDE_EL) { var el = $(SLIDE_EL[k]); if (el) el.className = 'slide' + (k === name ? ' on' : ''); }
+  setTimeout(fitSlide, 30);      // אחרי שהתוכן החדש נכנס ל-DOM
   if (name === 'birthdays') {
     var b = birthdays();
     var list = b.today.length ? b.today : b.soon.slice(0, 3);
@@ -691,26 +723,57 @@ function showSlide(name, now) {
   }
 }
 
-function paintAgenda(rows, idx) {
-  var host = $('agenda');
-  if (!rows.length) { host.innerHTML = '<div class="ag">אין לימודים היום</div>'; return; }
+var agRows = [], agIdx = -1, agGap = false;
+var AG_MINF = 16, AG_MAXF = 30, AG_GAP = 3;      // גופן מינימלי שעוד נקרא מרחוק
+
+function paintAgenda(rows, idx, gap) { agRows = rows; agIdx = idx; agGap = !!gap; drawAgenda(); }
+
+function drawAgenda() {
+  var host = $('agenda'), card = $('agendaCard'), rows = agRows, idx = agIdx, n = rows.length;
+  if (!n) { host.innerHTML = '<div class="ag">אין לימודים היום</div>'; return; }
+  var H = host.clientHeight || 320;
   var KIND = { lesson:'שיעור', break:'הפסקה', meal:'ארוחה', tefila:'תפילה', other:'' };
-  host.innerHTML = rows.map(function (r, i) {
-    var cls = i === idx ? 'now' : (i === idx + 1 ? 'next' : (i < idx ? 'done' : ''));
+
+  // כמה שורות נכנסות בגודל המינימלי — ומשם כמה באמת מציגים
+  var minRow = AG_MINF * 1.5 + 4 + AG_GAP;
+  var show = Math.max(2, Math.min(n, Math.floor((H + AG_GAP) / minRow)));
+  var from = 0;
+  if (show < n) {
+    // חלון שמתחיל שורה אחת לפני הנוכחית, כדי שרואים גם מה הרגע נגמר
+    from = Math.max(0, Math.min(n - show, (idx < 0 ? 0 : idx) - 1));
+  }
+  // המגבלות (גופן מקסימלי, ריפוד מקסימלי) עלולות להקפיץ את גובה השורה מעל
+  // המנה שחושבה, ולכן מצמצמים עוד שורה עד שהגובה בפועל באמת נכנס.
+  var per, font, pad, rowH;
+  for (;;) {
+    per = (H - (show - 1) * AG_GAP) / show;
+    font = clamp(per * 0.40, AG_MINF, AG_MAXF);
+    pad = clamp((per - font * 1.5) / 2, 2, 14);
+    rowH = font * 1.5 + pad * 2;
+    if (show <= 2 || show * rowH + (show - 1) * AG_GAP <= H) break;
+    show--;
+    if (show < n) from = Math.max(0, Math.min(n - show, (idx < 0 ? 0 : idx) - 1));
+  }
+  card.style.setProperty('--ag-font', font.toFixed(1) + 'px');
+  card.style.setProperty('--ag-pad', pad.toFixed(1) + 'px');
+  card.style.setProperty('--ag-gap', AG_GAP + 'px');
+
+  host.innerHTML = rows.slice(from, from + show).map(function (r, i) {
+    var real = from + i;
+    var cls = real === idx ? (agGap ? 'now waiting' : 'now') : (real === idx + 1 ? 'next' : (real < idx ? 'done' : ''));
     return '<div class="ag ' + cls + '"><span class="t">' + r.t + '</span><span>' +
-      String(r.title || '').replace(/[&<>]/g, '') + '</span><span class="k">' + (KIND[r.kind] || '') + '</span></div>';
+      esc(r.title) + '</span><span class="k">' + (KIND[r.kind] || '') + '</span></div>';
   }).join('');
-  // גלילה בתוך הרשימה בלבד (scrollIntoView היה גורר גם את העמוד), ואחרי שהפריסה התייצבה
+
   var cur = host.querySelector('.ag.now');
   if (cur) setTimeout(function () {
     var top = Math.max(0, cur.offsetTop - host.clientHeight / 2 + cur.offsetHeight / 2);
-    // כרום מדלג על גלילה חלקה בטאב שאינו גלוי — ואז הרשימה נשארת על השורה הראשונה
     if (document.hidden) host.scrollTop = top;
     else host.scrollTo({ top: top, behavior:'smooth' });
   }, 120);
 }
 
-function paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total) {
+function paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total, gap) {
   $('ovClock').innerHTML = pad(now.getHours()) + '<span class="bl">:</span>' + pad(now.getMinutes());
   $('ovBarWrap').style.display = 'none';
   var ov = $('ov'), cdOn = left != null && left <= CD_WARN;
@@ -721,9 +784,13 @@ function paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total) {
   if (!rows.length) { $('ovTitle').textContent = 'אין לימודים היום'; $('ovSub').textContent = hebDate(now); }
   else if (idx < 0) { $('ovTitle').textContent = 'בוקר טוב'; $('ovSub').textContent = 'תחילת היום בשעה ' + rows[0].t; }
   else if (dayOver) { $('ovTitle').textContent = 'סיום היום'; $('ovSub').textContent = 'להתראות מחר'; }
-  else {
+  else if (gap && nxt) {
+    // המשבצת נגמרה לפי שעת הסיום שלה, והבאה עוד לא התחילה
+    $('ovTitle').textContent = nxt.title;
+    $('ovSub').textContent = 'מתחיל בשעה ' + nxt.t;
+  } else {
     // ניסוח ניטרלי במין — "הפסקה מתחיל" מול "שיעור מתחילה" תמיד ייצא שגוי לאחד מהם
-    $('ovTitle').textContent = cdOn ? nxt.title : (cur.title || '');
+    $('ovTitle').textContent = cdOn && nxt ? nxt.title : (cur.title || '');
     if (nxt) {
       $('ovSub').textContent = cdOn
         ? 'בשעה ' + nxt.t + ' · סוף ' + (cur.title || '')
@@ -743,8 +810,11 @@ function shuffle(a) { var b = a.slice(); for (var i = b.length - 1; i > 0; i--) 
 var vurl = function (rel) { return (LOCAL || '') + '/video/' + rel.split('/').map(encodeURIComponent).join('/'); };
 
 async function syncVideoSource() {
-  if (LOCAL === null) { hint('תצוגה מקדימה — סרטונים מנוגנים רק ממחשב הלובי'); return; }
   var d = cfg.display;
+  // סרטונים כבויים = לוח מידע בלבד. אין טעם לפנות לשרת המקומי, ובוודאי לא
+  // להציג הודעה על תיקיות שלא נבחרו.
+  if (!d.videosEnabled) { srv.videos = []; hint(''); reportRuntime(); return; }
+  if (LOCAL === null) { hint('תצוגה מקדימה — סרטונים מנוגנים רק ממחשב הלובי'); return; }
   try {
     var cur = await (await fetch((LOCAL || '') + '/api/config', { cache:'no-store' })).json();
     // ההגדרות בפאנל הן מקור האמת: אם הן שונות ממה שהשרת המקומי מחזיק — מיישרים אותו.
@@ -861,11 +931,142 @@ async function fetchZmanim() {
   } catch (e) {}
 }
 
+
+// ── התאמת גודל לתוכן ─────────────────────────────────────────────────────
+// המסך תלוי על קירות שונים ובכמות תוכן משתנה (16 משבצות או 4, שם קצר או ארוך).
+// במקום גדלים קבועים שגולשים או משאירים חצי מסך ריק, כל אזור נמדד ומכוויץ
+// או נמתח עד שהוא ממלא בדיוק את המקום שיש לו.
+var clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };
+
+/** מקטין אלמנט בצעדים עד שהתוכן שלו נכנס בגובה שהוקצה לו. */
+function shrinkToFit(el, varName, min) {
+  if (!el || !el.clientHeight) return;
+  el.style.setProperty(varName, 1);
+  var s = 1, guard = 0;
+  while (el.scrollHeight > el.clientHeight + 2 && s > min && guard++ < 24) {
+    s -= 0.06;
+    el.style.setProperty(varName, s.toFixed(2));
+  }
+}
+
+function fitSlide() {
+  var el = document.querySelector('.slide.on');
+  if (el) shrinkToFit(el, '--s', 0.45);
+}
+// הכרטיסים העליונים בגובה קבוע; אם מה שנשאר לסדר היום קטן מדי — מכווצים את
+// כל הסרגל בבת אחת (גופנים וריפודים), עד שנשאר מקום לכמה שורות אמיתיות.
+var MIN_AGENDA = 190;      // כותרת + פס התקדמות + כמה שורות אמיתיות
+
+function asideFree() {
+  var aside = document.querySelector('aside');
+  var used = 0, shown = 0;
+  ['clockCard', 'menuCard', 'birthCard'].forEach(function (id) {
+    var el = $(id);
+    if (el && getComputedStyle(el).display !== 'none') { used += el.getBoundingClientRect().height; shown++; }
+  });
+  return aside.clientHeight - used - shown * 12;
+}
+
+// כיווץ עדין של הסרגל (גופנים וריפודים) עד שנשאר מקום אמיתי לסדר היום.
+// מה שמעבר לזה מטופל ב-media query שמוריד כרטיסים במסך נמוך.
+function fitAside() {
+  var aside = document.querySelector('aside');
+  if (!aside.clientHeight) return;
+  var scale = 1;
+  aside.style.setProperty('--side', 1);
+  for (var i = 0; i < 14 && scale > 0.62; i++) {
+    if (asideFree() >= MIN_AGENDA) return;
+    scale -= 0.05;
+    aside.style.setProperty('--side', scale.toFixed(2));
+  }
+}
+
+/** מקטין אלמנט בצעדים עד שהתוכן שלו נכנס בגובה שהוקצה לו. */
+function shrinkToFit(el, varName, min) {
+  if (!el || !el.clientHeight) return;
+  el.style.setProperty(varName, 1);
+  var s = 1, guard = 0;
+  while (el.scrollHeight > el.clientHeight + 2 && s > min && guard++ < 24) {
+    s -= 0.06;
+    el.style.setProperty(varName, s.toFixed(2));
+  }
+}
+
+function fitSlide() {
+  var el = document.querySelector('.slide.on');
+  if (el) shrinkToFit(el, '--s', 0.45);
+}
+// הכרטיסים העליונים בגובה קבוע; אם מה שנשאר לסדר היום קטן מדי — מכווצים את
+// כל הסרגל בבת אחת (גופנים וריפודים), עד שנשאר מקום לכמה שורות אמיתיות.
+var MIN_AGENDA = 150;
+// סדר הוויתור: קודם ימי הולדת, אחריהם התפריט. שניהם מוצגים גם בקרוסלה,
+// בעוד שסדר היום הוא הדבר שמסתכלים עליו במעבר במסדרון.
+var DROP_ORDER = ['birthCard', 'menuCard'];
+
+function asideFree() {
+  var aside = document.querySelector('aside');
+  var used = 0, shown = 0;
+  ['clockCard', 'menuCard', 'birthCard'].forEach(function (id) {
+    var el = $(id);
+    if (el && el.dataset.hidden !== '1' && getComputedStyle(el).display !== 'none') {
+      used += el.getBoundingClientRect().height; shown++;
+    }
+  });
+  return aside.clientHeight - used - shown * 12;
+}
+
+function fitAside() {
+  var aside = document.querySelector('aside');
+  if (!aside.clientHeight) return;
+  // מחזירים למצב מלא לפני כל מדידה, אחרת ההסתרה מהפעם הקודמת נדבקת
+  DROP_ORDER.forEach(function (id) {
+    var el = $(id);
+    if (el && el.dataset.hidden === '1') { el.dataset.hidden = ''; el.style.display = el.dataset.want || ''; }
+  });
+  var scale = 1;
+  aside.style.setProperty('--side', 1);
+  for (var i = 0; i < 14 && scale > 0.62; i++) {
+    if (asideFree() >= MIN_AGENDA) return;
+    scale -= 0.05;
+    aside.style.setProperty('--side', scale.toFixed(2));
+  }
+  // עדיין צפוף — מורידים כרטיסים לפי סדר
+  for (var j = 0; j < DROP_ORDER.length; j++) {
+    if (asideFree() >= MIN_AGENDA) return;
+    var el = $(DROP_ORDER[j]);
+    if (el && getComputedStyle(el).display !== 'none') {
+      el.dataset.want = el.style.display || '';
+      el.dataset.hidden = '1';
+      el.style.display = 'none';
+    }
+  }
+}
+
+var fitPending = null;
+function fitAll() {
+  if (fitPending) cancelAnimationFrame(fitPending);
+  fitPending = requestAnimationFrame(function () {
+    fitPending = null;
+    fitAside();
+    requestAnimationFrame(function () { drawAgenda(); fitSlide(); });
+  });
+}
+window.addEventListener('resize', fitAll);
+document.addEventListener('fullscreenchange', function () { setTimeout(fitAll, 120); });
+if (window.ResizeObserver) {
+  try {
+    var ro = new ResizeObserver(fitAll);
+    ro.observe(document.getElementById('stage'));
+  } catch (e) {}
+}
+
 // ── הפעלה ────────────────────────────────────────────────────────────────
 applyCache();
 paintStatic();
 tick();
+setTimeout(fitAll, 200);
 setInterval(tick, 1000);
+setInterval(fitAll, 30000);     // רשת ביטחון: גופנים שנטענו מאוחר, שינוי תוכן
 setInterval(paintMenu, 60000);
 setInterval(paintTicker, 60000);
 setInterval(paintBirthCard, 60000);
