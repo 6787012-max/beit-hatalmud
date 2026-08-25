@@ -4,9 +4,13 @@
 // העברות. קופה קטנה היא קניות יומיומיות, ושלוש השאלות עליה הן אחרות לגמרי:
 // **מי קנה**, **האם מגיע לו החזר**, ו**איפה החשבונית**.
 //
-// **הקופות נפרדות לחלוטין.** "משמרת חיים" היא גוף אחר — הכסף, החשבוניות
-// והיתרה שלה אינם של המכינה. כל מספר במסך הזה מסונן לפי הקופה הנבחרת, ואין
-// שום סיכום שחוצה קופות. אם אי פעם יתווסף "סה\"כ הכל" — זו תהיה טעות.
+// **הכסף הוא קופה אחת משותפת; רק ההוצאות מיוחסות לגוף.** (יוסף, 25/08 —
+// תיקון לגרסה הראשונה שהפרידה גם את הכסף.) יש ארנק אחד: ההכנסות נכנסות
+// אליו, וכל ההוצאות יוצאות ממנו. ה"גוף" (בית התלמוד / משמרת חיים) הוא
+// **תיוג של ההוצאה** — כדי לדעת כמה כל אחד הוציא ולאן הלכו החשבוניות.
+// ⚠️ **יתרת המזומן, ההכנסות והחוב לצוות הם תמיד מספרים משותפים** ואינם
+// מסוננים לפי הלשונית. הפרדת הכסף גרמה לכך שהעברת הוצאות למשמרת חיים
+// הראתה לה קופה בלי שום הכנסה — כלומר תמונה שקרית.
 //
 // **מודל היתרה — שלושה מספרים בכוונה** (זהה לגיליונות הקופה הקטנה, ראה
 // C:\projects\kupa-katana):
@@ -33,7 +37,8 @@
   const STATUSES = ['שולם', 'ממתין להחזר'];
   const PENDING = 'ממתין להחזר';
 
-  const state = { fund: null, funds: [], rows: [], q: '', from: '', to: '', onlyPending: false };
+  const ALL = 'all';   // הלשונית "הכל" — ברירת המחדל
+  const state = { fund: ALL, funds: [], rows: [], q: '', from: '', to: '', onlyPending: false };
   const isAdmin = () => ((window.currentUser || {}).role === 'מנהל');
   const canEdit = () => !window.Auth || !window.Auth.isReadonly();
 
@@ -42,15 +47,17 @@
     const f = await window.store.list('petty_funds');
     return (f || []).filter(x => x.active !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id);
   }
-  async function loadRows(fundId) {
+  // תמיד טוענים את **כל** הרישומים: היתרה משותפת ולכן היא חייבת לראות את
+  // כולם, גם כשהטבלה מסוננת ללשונית אחת.
+  async function loadRows() {
     const all = await window.store.list('petty_entries');
-    return (all || []).filter(r => String(r.fund_id) === String(fundId))
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.id - a.id);
+    return (all || []).sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.id - a.id);
   }
 
   // ── חישוב היתרות ──────────────────────────────────────────────────────
-  function totals(rows, fund) {
-    const opening = Number((fund || {}).opening) || 0;
+  // opening של כל הקופות מצטבר — הארנק אחד.
+  function totals(rows, funds) {
+    const opening = (funds || []).reduce((x, f) => x + (Number(f.opening) || 0), 0);
     let income = 0, paid = 0, pending = 0;
     rows.forEach(r => {
       const a = Number(r.amount) || 0;
@@ -60,11 +67,21 @@
     });
     return {
       opening: opening, income: income, paid: paid, pending: pending,
-      cash: opening + income - paid,          // מה שבאמת יש בקופה עכשיו
+      cash: opening + income - paid,          // מה שבאמת יש בארנק עכשיו
       net: opening + income - paid - pending, // אחרי שכל ההחזרים ישולמו
       spend: paid + pending,
     };
   }
+  // כמה כל גוף הוציא — זה כל מה שהחלוקה בין הקופות אומרת
+  function spendByFund(rows) {
+    const m = {};
+    rows.filter(r => r.kind !== 'income').forEach(r => {
+      m[r.fund_id] = (m[r.fund_id] || 0) + (Number(r.amount) || 0);
+    });
+    return m;
+  }
+  const fundName = id => (state.funds.find(f => String(f.id) === String(id)) || {}).name || '—';
+  const fundOf = id => state.funds.find(f => String(f.id) === String(id)) || {};
 
   // ── מסך ───────────────────────────────────────────────────────────────
   async function render(page) {
@@ -75,7 +92,7 @@
       wireHead(page);
       return;
     }
-    if (!state.fund || !state.funds.some(f => f.id === state.fund)) state.fund = state.funds[0].id;
+    if (state.fund !== ALL && !state.funds.some(f => f.id === state.fund)) state.fund = ALL;
     await draw(page);
   }
 
@@ -89,31 +106,46 @@
   }
 
   async function draw(page) {
-    const fund = state.funds.find(f => f.id === state.fund) || {};
-    state.rows = await loadRows(state.fund);
-    const t = totals(state.rows, fund);
+    state.rows = await loadRows();
+    // ⚠️ היתרה מחושבת על **כל** הרישומים ולא על הלשונית — הארנק אחד.
+    const t = totals(state.rows, state.funds);
+    const byFund = spendByFund(state.rows);
 
     page.innerHTML = head() +
-      // לשוניות הקופות — כל אחת עולם בפני עצמו
+      // הלשוניות מסננות את **הטבלה** בלבד; המספרים למעלה משותפים תמיד.
       '<div class="toolbar" style="gap:8px">' +
-        '<div class="pc-tabs">' + state.funds.map(f =>
-          '<button class="pc-tab' + (f.id === state.fund ? ' on' : '') + '" data-fund="' + f.id + '"' +
-          (f.color ? ' style="--fc:' + esc(f.color) + '"' : '') + '>' +
-          '<i class="bi bi-wallet2"></i> ' + esc(f.name) + '</button>').join('') +
+        '<div class="pc-tabs">' +
+          '<button class="pc-tab' + (state.fund === ALL ? ' on' : '') + '" data-fund="' + ALL + '">' +
+          '<i class="bi bi-list-ul"></i> הכל</button>' +
+          state.funds.map(f =>
+            '<button class="pc-tab' + (f.id === state.fund ? ' on' : '') + '" data-fund="' + f.id + '"' +
+            (f.color ? ' style="--fc:' + esc(f.color) + '"' : '') + '>' +
+            '<i class="bi bi-tag"></i> ' + esc(f.name) +
+            ' <span class="det-badge">' + esc(ILS(byFund[f.id] || 0)) + '</span></button>').join('') +
         '</div>' +
       '</div>' +
       '<div class="demo-note" style="margin:0 2px 12px"><i class="bi bi-info-circle"></i> ' +
-        'הקופות נפרדות לחלוטין — כל המספרים כאן הם של <b>' + esc(fund.name || '') + '</b> בלבד.' +
-        (fund.drive_folder ? ' החשבוניות נשמרות בתיקיית הדרייב של הקופה.' : ' <b>לא הוגדרה תיקיית חשבוניות בדרייב.</b>') +
+        '<b>הכסף הוא קופה אחת משותפת.</b> ההכנסות, יתרת המזומן והחוב לצוות הם של הקופה כולה. ' +
+        'החלוקה לגופים היא <b>ייחוס של ההוצאות</b> — כמה כל אחד הוציא, ולאיזו תיקיית חשבוניות בדרייב.' +
       '</div>' +
 
       '<div class="stat-row">' +
-        statCard('bi-cash-stack', ILS(t.cash), 'יתרת מזומן בקופה', 'var(--primary)', '#fff') +
+        statCard('bi-cash-stack', ILS(t.cash), 'יתרת מזומן בקופה (משותפת)', 'var(--primary)', '#fff') +
         statCard('bi-arrow-counterclockwise', ILS(t.pending), 'חוב לצוות (ממתין להחזר)', t.pending ? '#b45309' : '', t.pending ? '#fff' : '') +
         statCard('bi-calculator', ILS(t.net), 'יתרה נטו') +
-        statCard('bi-plus-circle', ILS(t.income), 'הכנסות') +
-        statCard('bi-dash-circle', ILS(t.spend), 'הוצאות') +
+        statCard('bi-plus-circle', ILS(t.income), 'הכנסות (משותפות)') +
+        statCard('bi-dash-circle', ILS(t.spend), 'סך ההוצאות') +
       '</div>' +
+
+      // פילוח ההוצאות לפי גוף — זה כל מה שהחלוקה אומרת
+      '<div class="qr-card"><h3><i class="bi bi-pie-chart"></i> הוצאות לפי גוף</h3>' +
+        '<div class="pc-split">' + state.funds.map(f =>
+          '<div class="pc-split-item"' + (f.color ? ' style="--fc:' + esc(f.color) + '"' : '') + '>' +
+          '<div class="pcs-name">' + esc(f.name) + '</div>' +
+          '<div class="pcs-amt">' + esc(ILS(byFund[f.id] || 0)) + '</div>' +
+          '<div class="pcs-pct">' + (t.spend ? Math.round(((byFund[f.id] || 0) / t.spend) * 100) : 0) + '% מההוצאות</div>' +
+          '</div>').join('') +
+        '</div></div>' +
 
       (canEdit() ? '<div class="qr-card"><div class="card-h-row"><h3><i class="bi bi-plus-lg"></i> רישום חדש</h3>' +
         '<div style="display:flex;gap:6px">' +
@@ -129,11 +161,14 @@
       '</div>' +
       '<div class="count-line" id="pcCount"></div>' +
       '<div class="table-wrap" id="pcWrap"></div>' +
-      '<div id="pcEmpty" class="empty-state" hidden><i class="bi bi-receipt"></i><div>אין רישומים בקופה הזו</div></div>';
+      '<div id="pcEmpty" class="empty-state" hidden><i class="bi bi-receipt"></i><div>אין רישומים מתאימים</div></div>';
 
     wireHead(page);
-    page.querySelectorAll('.pc-tab').forEach(b => b.addEventListener('click', async () => {
-      state.fund = Number(b.dataset.fund); await draw(page);
+    page.querySelectorAll('.pc-tab').forEach(b => b.addEventListener('click', () => {
+      // סינון תצוגה בלבד — אין צורך לטעון מחדש מהשרת
+      state.fund = b.dataset.fund === ALL ? ALL : Number(b.dataset.fund);
+      page.querySelectorAll('.pc-tab').forEach(x => x.classList.toggle('on', x === b));
+      drawTable(page);
     }));
     if (canEdit()) {
       page.querySelector('#pcAddExp').addEventListener('click', () => form(page, null, 'expense'));
@@ -168,6 +203,7 @@
   function visible() {
     const q = (state.q || '').trim();
     return state.rows.filter(r => {
+      if (state.fund !== ALL && String(r.fund_id) !== String(state.fund)) return false;
       if (state.from && String(r.date) < state.from) return false;
       if (state.to && String(r.date) > state.to) return false;
       if (state.onlyPending && r.status !== PENDING) return false;
@@ -181,9 +217,15 @@
     const rowHtml = r => {
       const isExp = r.kind !== 'income';
       const pend = isExp && r.status === PENDING;
+      const fc = fundOf(r.fund_id).color || '#475569';
       return '<tr' + (pend ? ' class="pc-pending"' : '') + '>' +
         '<td>' + esc(dmy(r.date)) + '</td>' +
         '<td><span class="chip ' + (isExp ? 'off' : 'ok') + '">' + (isExp ? 'הוצאה' : 'הכנסה') + '</span></td>' +
+        // הגוף שאליו מיוחסת ההוצאה. להכנסה זה חסר משמעות — הכסף נכנס לארנק
+        // המשותף — ולכן מוצג בעמעום ולא כתגית צבעונית.
+        '<td>' + (isExp
+          ? '<span class="pc-fchip" style="--fc:' + esc(fc) + '">' + esc(fundName(r.fund_id)) + '</span>'
+          : '<span class="au-none">משותפת</span>') + '</td>' +
         '<td><b>' + esc(r.party || '—') + '</b></td>' +
         '<td>' + esc(r.category || '—') + '</td>' +
         '<td>' + esc(r.buyer || '—') + '</td>' +
@@ -200,16 +242,17 @@
           '<button class="mini danger" data-del="' + r.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></td>' : '<td></td>') +
         '</tr>';
     };
-    const head = ['תאריך', 'סוג', 'ספק / מקור', 'קטגוריה', 'מי קנה', 'סכום', 'אמצעי', 'סטטוס', 'חשבונית', 'הערה', ''];
+    const head = ['תאריך', 'סוג', 'גוף', 'ספק / מקור', 'קטגוריה', 'מי קנה', 'סכום', 'אמצעי', 'סטטוס', 'חשבונית', 'הערה', ''];
     page.querySelector('#pcWrap').innerHTML = list.length
       ? '<table class="tbl"><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' +
         list.map(rowHtml).join('') + '</tbody></table>'
       : '';
     page.querySelector('#pcEmpty').hidden = list.length > 0;
 
-    const sub = totals(list, { opening: 0 });
+    const sub = totals(list, []);
     const noReceipt = list.filter(r => r.kind !== 'income' && !r.receipt_id).length;
     page.querySelector('#pcCount').innerHTML =
+      (state.fund === ALL ? '' : '<b>' + esc(fundName(state.fund)) + '</b> · ') +
       list.length + ' רישומים · הכנסות ' + esc(ILS(sub.income)) + ' · הוצאות ' + esc(ILS(sub.spend)) +
       (sub.pending ? ' · <b style="color:#b45309">ממתין להחזר ' + esc(ILS(sub.pending)) + '</b>' : '') +
       (noReceipt ? ' · <b style="color:#b91c1c">' + noReceipt + ' ללא חשבונית</b>' : '');
@@ -236,14 +279,15 @@
     const isExp = kind !== 'income';
     const opts = (arr, cur) => arr.map(o => '<option' + (String(cur) === o ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
     const mm = window.UI.modal({
-      title: (rec ? 'עריכת ' : '') + (isExp ? 'הוצאה' : 'הכנסה') + ' — ' + esc((state.funds.find(f => f.id === state.fund) || {}).name || ''),
+      title: (rec ? 'עריכת ' : '') + (isExp ? 'הוצאה' : 'הכנסה'),
       saveLabel: 'שמירה',
       bodyHTML: '<div class="form-grid">' +
         // העברה בין קופות: הרישום נרשם בקופה הלא נכונה, וזה קורה. הבורר כאן
         // מזיז גם את השורה וגם את קובץ החשבונית שלה בדרייב — ראה onSave.
         '<label class="fld"><span>קופה *</span><select class="inp mb0" id="pf_fund">' +
           state.funds.map(f => '<option value="' + f.id + '"' +
-            (String(f.id) === String(r.fund_id || state.fund) ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('') +
+            (String(f.id) === String(r.fund_id || (state.fund === ALL ? (state.funds[0] || {}).id : state.fund)) ? ' selected' : '') +
+            '>' + esc(f.name) + '</option>').join('') +
         '</select></label>' +
         '<label class="fld"><span>תאריך *</span><input class="inp mb0" id="pf_date" type="date" value="' + esc(r.date || today()) + '"></label>' +
         '<label class="fld"><span>סכום ₪ *</span><input class="inp mb0" id="pf_amt" type="number" step="0.01" min="0" value="' + esc(r.amount == null ? '' : r.amount) + '"></label>' +
@@ -265,8 +309,8 @@
         const party = mel.querySelector('#pf_party').value.trim();
         if (!(amount > 0)) { window.UI.toast('סכום חייב להיות גדול מאפס', 'err'); return false; }
         if (!party) { window.UI.toast(isExp ? 'שם הספק חובה' : 'מקור ההכנסה חובה', 'err'); return false; }
-        const toFund = Number(mel.querySelector('#pf_fund').value) || state.fund;
-        const from = Number(r.fund_id || state.fund);
+        const toFund = Number(mel.querySelector('#pf_fund').value);
+        const from = Number(r.fund_id || toFund);
         // אם הרישום עובר קופה ויש לו חשבונית — מעבירים קודם את הקובץ בדרייב,
         // ורק אם זה הצליח שומרים. אחרת השורה תצביע על קובץ בתיקייה של הקופה
         // השנייה, וה-RLS יחסום אותה — החשבונית תיראה כאילו נעלמה.
@@ -295,10 +339,7 @@
         const res = rec ? await window.store.update('petty_entries', rec.id, row)
                         : await window.store.add('petty_entries', row);
         if (!res || res.ok === false) { window.UI.toast('השמירה נכשלה: ' + ((res && res.error) || ''), 'err'); return false; }
-        const fundName = f => (state.funds.find(x => x.id === f) || {}).name || '';
-        window.UI.toast(toFund !== from
-          ? 'הועבר לקופת ' + fundName(toFund)
-          : (rec ? 'עודכן' : 'נשמר'));
+        window.UI.toast(rec && toFund !== from ? 'הועבר ל' + fundName(toFund) : (rec ? 'עודכן' : 'נשמר'));
         await draw(page);
         return true;
       },
@@ -320,8 +361,11 @@
 
   function uploadReceipt(page, r) {
     if (!r) return;
-    const fund = state.funds.find(f => f.id === state.fund) || {};
-    if (!fund.drive_folder) { window.UI.toast('לא הוגדרה תיקיית חשבוניות לקופה הזו', 'err'); return; }
+    // ⚠️ **הגוף של השורה**, לא הלשונית הנבחרת. בתצוגת "הכל" מוצגות שורות של
+    // שני הגופים יחד, ולכן שימוש ב-state.fund היה שולח את החשבונית לתיקייה
+    // של הגוף הלא נכון — או נכשל ב-403.
+    const fund = fundOf(r.fund_id);
+    if (!fund.drive_folder) { window.UI.toast('לא הוגדרה תיקיית חשבוניות ל' + fundName(r.fund_id), 'err'); return; }
     const inp = document.createElement('input');
     inp.type = 'file';
     inp.accept = 'image/*,application/pdf';
@@ -335,7 +379,7 @@
       const name = r.date + '_' + safe + '_' + (Number(r.amount) || 0) + ext;
       window.UI.toast('מעלה חשבונית…');
       try {
-        const res = await fetch(driveUrl({ action: 'upload', fundId: state.fund, folderId: fund.drive_folder, name: name }), {
+        const res = await fetch(driveUrl({ action: 'upload', fundId: r.fund_id, folderId: fund.drive_folder, name: name }), {
           method: 'POST',
           headers: Object.assign({ 'Content-Type': file.type || 'application/octet-stream' }, await driveAuth()),
           body: file,
@@ -367,7 +411,7 @@
     });
     let blobUrl = null, fileName = r.receipt_name || 'receipt';
     try {
-      const res = await fetch(driveUrl({ action: 'preview', fundId: state.fund, fileId: r.receipt_id }), {
+      const res = await fetch(driveUrl({ action: 'preview', fundId: r.fund_id, fileId: r.receipt_id }), {
         method: 'POST', headers: await driveAuth(),
       });
       const d = await res.json();
@@ -396,7 +440,7 @@
     if (del) del.addEventListener('click', async () => {
       if (!(await window.UI.confirm('להסיר את החשבונית? הקובץ יעבור לפח האשפה של הדרייב.'))) return;
       try {
-        const res = await fetch(driveUrl({ action: 'delete', fundId: state.fund, fileId: r.receipt_id }), {
+        const res = await fetch(driveUrl({ action: 'delete', fundId: r.fund_id, fileId: r.receipt_id }), {
           method: 'POST', headers: await driveAuth(),
         });
         const d = await res.json();
@@ -413,15 +457,16 @@
     const list = () => state.funds.map(f =>
       '<div class="tl-item"><span class="sev-dot ' + (f.drive_folder ? 'lo' : 'hi') + '"></span>' +
       '<div class="tl-main"><strong>' + esc(f.name) + '</strong>' +
-      (f.opening ? ' <span class="tl-note">פתיחה ' + esc(ILS(f.opening)) + '</span>' : '') +
+      (f.opening ? ' <span class="tl-note">תורם ' + esc(ILS(f.opening)) + ' ליתרת הפתיחה</span>' : '') +
       '<div class="tl-note" style="font-size:.78rem">' +
         (f.drive_folder ? 'תיקיית חשבוניות: ' + esc(f.drive_folder) : 'אין תיקיית חשבוניות — לא ניתן להעלות') +
       '</div></div>' +
       '<button class="mini" data-fedit="' + f.id + '" title="עריכה"><i class="bi bi-pencil"></i></button></div>').join('');
     const mm = window.UI.modal({
       title: 'ניהול קופות',
-      bodyHTML: '<p class="login-hint" style="margin:0 0 10px">כל קופה היא עולם נפרד — יתרה, רישומים ותיקיית ' +
-        'חשבוניות משלה. אין שום סיכום שחוצה קופות.</p>' +
+      bodyHTML: '<p class="login-hint" style="margin:0 0 10px">הכסף הוא קופה אחת משותפת. ' +
+        'הגופים כאן משמשים ל<b>ייחוס ההוצאות</b> ולתיקיית החשבוניות בדרייב. ' +
+        'יתרות הפתיחה של כל הגופים מצטברות ליתרת הפתיחה של הקופה.</p>' +
         '<div id="fmList">' + list() + '</div>' +
         '<div class="qr-grid" style="grid-template-columns:1fr auto;margin-top:12px">' +
         '<input class="inp mb0" id="fmNew" placeholder="שם קופה חדשה">' +
@@ -439,7 +484,7 @@
           title: 'עריכת קופה — ' + esc(f.name), saveLabel: 'שמירה',
           bodyHTML: '<div class="form-grid">' +
             '<label class="fld"><span>שם *</span><input class="inp mb0" id="fe_name" value="' + esc(f.name) + '"></label>' +
-            '<label class="fld"><span>יתרת פתיחה ₪</span><input class="inp mb0" id="fe_open" type="number" step="0.01" value="' + esc(f.opening || 0) + '"></label>' +
+            '<label class="fld"><span>תרומה ליתרת הפתיחה ₪</span><input class="inp mb0" id="fe_open" type="number" step="0.01" value="' + esc(f.opening || 0) + '"></label>' +
             '<label class="fld"><span>צבע</span><input class="inp mb0" id="fe_color" type="color" value="' + esc(f.color || '#003048') + '"></label>' +
             '<label class="fld"><span>פעילה</span><select class="inp mb0" id="fe_active"><option value="1"' + (f.active !== false ? ' selected' : '') + '>כן</option><option value="0"' + (f.active === false ? ' selected' : '') + '>לא</option></select></label>' +
             '<label class="fld fld-wide"><span>מזהה תיקיית החשבוניות בדרייב</span>' +
@@ -479,31 +524,46 @@
 
   // ── ייצוא ─────────────────────────────────────────────────────────────
   function exportCsv() {
-    const fund = state.funds.find(f => f.id === state.fund) || {};
     const list = visible();
-    const t = totals(list, { opening: 0 });
+    const sub = totals(list, []);
+    // המצב הכספי של הקופה נגזר תמיד מ**כל** הרישומים, גם כשמייצאים תצוגה
+    // מסוננת — אחרת הקובץ מציג "יתרה" שלא קיימת בשום מקום.
+    const t = totals(state.rows, state.funds);
+    const byFund = spendByFund(state.rows);
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const rows = [
-      ['קופה קטנה — ' + (fund.name || '')],
+      ['קופה קטנה — מכינה בית התלמוד'],
       ['הופק', dmy(today())],
+      ['תצוגה', state.fund === ALL ? 'כל הגופים' : fundName(state.fund)],
       [],
-      ['תאריך', 'סוג', 'ספק / מקור', 'קטגוריה', 'מי קנה', 'סכום', 'אמצעי', 'סטטוס', 'חשבונית', 'הערה'],
+      ['תאריך', 'סוג', 'גוף', 'ספק / מקור', 'קטגוריה', 'מי קנה', 'סכום', 'אמצעי', 'סטטוס', 'חשבונית', 'הערה'],
     ];
-    list.forEach(r => rows.push([dmy(r.date), r.kind === 'income' ? 'הכנסה' : 'הוצאה', r.party, r.category,
+    list.forEach(r => rows.push([dmy(r.date), r.kind === 'income' ? 'הכנסה' : 'הוצאה',
+      r.kind === 'income' ? 'משותפת' : fundName(r.fund_id), r.party, r.category,
       r.buyer, r.amount, r.method, r.kind === 'income' ? '' : (r.status || 'שולם'),
       r.receipt_name || '', r.note]));
+    if (state.fund !== ALL) {
+      rows.push([]);
+      rows.push(['סיכום התצוגה — ' + fundName(state.fund)]);
+      rows.push(['הכנסות', sub.income]);
+      rows.push(['הוצאות', sub.spend]);
+    }
     rows.push([]);
+    rows.push(['מצב הקופה (משותף לכל הגופים)']);
+    rows.push(['יתרת פתיחה', t.opening]);
     rows.push(['הכנסות', t.income]);
     rows.push(['הוצאות ששולמו', t.paid]);
     rows.push(['ממתין להחזר', t.pending]);
-    rows.push(['יתרת פתיחה', Number(fund.opening) || 0]);
-    rows.push(['יתרת מזומן בקופה', (Number(fund.opening) || 0) + t.income - t.paid]);
-    rows.push(['יתרה נטו', (Number(fund.opening) || 0) + t.income - t.paid - t.pending]);
+    rows.push(['יתרת מזומן בקופה', t.cash]);
+    rows.push(['יתרה נטו', t.net]);
+    rows.push([]);
+    rows.push(['הוצאות לפי גוף']);
+    state.funds.forEach(f => rows.push([f.name, byFund[f.id] || 0]));
     const blob = new Blob([String.fromCharCode(0xFEFF) + rows.map(r => r.map(q).join(',')).join('\n')],
       { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'קופה קטנה — ' + (fund.name || '') + '.csv';
+    a.download = 'קופה קטנה' + (state.fund === ALL ? '' : ' — ' + fundName(state.fund)) + '.csv';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 20000);
   }
@@ -523,6 +583,15 @@
       '.pc-amt{font-weight:800;white-space:nowrap}' +
       '.pc-amt.neg{color:#b91c1c}.pc-amt.pos{color:#15803d}' +
       'tr.pc-pending td{background:color-mix(in srgb,#f59e0b 12%,transparent)}' +
+      '.pc-fchip{--fc:#475569;display:inline-block;padding:2px 10px;border-radius:999px;font-size:.76rem;' +
+        'font-weight:800;white-space:nowrap;color:var(--fc);background:color-mix(in srgb,var(--fc) 13%,transparent);' +
+        'border:1px solid color-mix(in srgb,var(--fc) 35%,transparent)}' +
+      '.pc-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}' +
+      '.pc-split-item{--fc:#475569;border:1px solid var(--line);border-inline-start:4px solid var(--fc);' +
+        'border-radius:10px;padding:10px 14px;background:var(--bg)}' +
+      '.pcs-name{font-weight:800;font-size:.88rem}' +
+      '.pcs-amt{font-weight:800;font-size:1.25rem;color:var(--fc);margin-top:2px}' +
+      '.pcs-pct{font-size:.76rem;color:var(--muted)}' +
       '.mini.danger{color:#b91c1c}';
     document.head.appendChild(st);
   }
