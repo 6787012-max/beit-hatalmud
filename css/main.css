@@ -225,7 +225,10 @@ textarea.inp.ta-auto{overflow-y:auto}
 .det-photo-btn:hover .det-photo-zoom,.det-photo-btn:focus-visible .det-photo-zoom{opacity:1}
 
 /* תצוגת התמונה המוגדלת */
-.photo-ov{position:fixed; inset:0; z-index:120; background:rgba(8,14,20,.92);
+/* ⚠️ מעל .modal-ov (200): התמונה נפתחת **מתוך** כרטיס התלמיד, שהוא עצמו
+   מודאל. ב-z-index נמוך יותר היא נפתחה מאחוריו ולא נראתה כלל.
+   מתחת ל-.toast-host (300) בכוונה — הודעות מערכת נשארות מעל הכל. */
+.photo-ov{position:fixed; inset:0; z-index:250; background:rgba(8,14,20,.92);
   display:grid; place-items:center; padding:24px; cursor:zoom-out;
   animation:photoIn .14s ease-out}
 @keyframes photoIn{from{opacity:0}to{opacity:1}}
