@@ -195,8 +195,10 @@ table.tbl tbody tr:hover{background:var(--bg)}
 .fld input,.fld select,.fld textarea{font-weight:400}
 /* שדות טקסט חופשי בדיווחים — כמה שורות במקום פס אחד, וגלילה כשצריך.
    `field-sizing` נותן גדילה אוטומטית בדפדפנים שתומכים; לשאר יש ta-auto ב-JS. */
+/* max-height בפיקסלים ולא ב-vh: יחידת vh תלויה בגובה החלון, ובמסגרת/חלון
+   בגובה 0 היא נפתרת ל-0 והשדה לא יכול לגדול בכלל. */
 textarea.inp{width:100%; resize:vertical; min-height:calc(1.5em * 2 + 18px);
-  line-height:1.5; font-family:inherit; field-sizing:content; max-height:40vh}
+  line-height:1.5; font-family:inherit; field-sizing:content; max-height:340px}
 textarea.inp.ta-auto{overflow-y:auto}
 
 /* ===== student detail ===== */
