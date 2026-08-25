@@ -58,6 +58,7 @@
         { k: 'cls', t: 'כיתה', def: true },
         { k: 'present', t: 'נוכח', def: true, w: 60 },
         { k: 'late', t: 'איחור', def: true, w: 60 },
+        { k: 'leftMid', t: 'יצא', def: true, w: 60 },
         { k: 'absent', t: 'חיסור', def: true, w: 60 },
         { k: 'pct', t: '% הגעה', def: true, w: 70 },
       ],
@@ -65,12 +66,15 @@
         const all = await window.store.list('attendance');
         return ctx.students.map(s => {
           const r = all.filter(a => a.student_id === s.id);
-          const c = k => r.filter(a => a.status === k).length;
-          const present = c('נוכח'), late = c('איחור'), absent = c('חיסור') + c('נעדר');
-          const tot = present + late + absent;
+          // קודים באנגלית במסד; המחרוזות העבריות נשארות כגיבוי לרשומות ישנות.
+          // בלי זה כל דוח הנוכחות המיוצא הראה אפסים.
+          const c = ks => r.filter(a => ks.indexOf(a.status) > -1).length;
+          const present = c(['present', 'נוכח']), late = c(['late', 'איחור']),
+                leftMid = c(['left', 'יצא']), absent = c(['absent', 'חיסור', 'נעדר']);
+          const tot = present + late + leftMid + absent;
           return {
-            name: nm(s), cls: ctx.clsName(s.class_id), present, late, absent,
-            pct: tot ? Math.round(((present + late) / tot) * 100) + '%' : '—', _s: s,
+            name: nm(s), cls: ctx.clsName(s.class_id), present, late, leftMid, absent,
+            pct: tot ? Math.round(((present + late + leftMid) / tot) * 100) + '%' : '—', _s: s,
           };
         });
       },

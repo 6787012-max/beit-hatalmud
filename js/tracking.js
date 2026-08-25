@@ -116,7 +116,106 @@
     };
   }
 
-  // ----- נוכחות (P/A/L לכל תלמיד ליום) -----
+  // ----- נוכחות (נוכח / איחור / יצא / נעדר לכל תלמיד ליום) -----
+  //
+  // שלושה שינויים מהותיים מול הגרסה הראשונה (בקשת יוסף 25/08/2026):
+  //   1. **ביטול בלחיצה חוזרת** — לחיצה על כפתור שכבר מסומן מוחקת את הרישום
+  //      ומחזירה את התלמיד למצב "לא סומן". קודם לא היתה שום דרך לבטל טעות:
+  //      מי שלחץ "איחור" בשוגג נשאר עם איחור במסד ובדוחות לנצח.
+  //   2. **פירוט לאיחור** — שעת ההגעה נשמרת ב-attendance.at_time.
+  //   3. **סטטוס "יצא"** — תלמיד שיצא באמצע היום, עם משך היציאה בדקות
+  //      (attendance.minutes) ושעת היציאה. קודם הוא נאלץ להיספר כ"נעדר" יום שלם.
+  const ATT_KINDS = [
+    { v: 'present', lbl: 'נוכח',  cls: 'p' },
+    { v: 'late',    lbl: 'איחור', cls: 'l' },
+    { v: 'left',    lbl: 'יצא',   cls: 'o' },
+    { v: 'absent',  lbl: 'נעדר',  cls: 'a' },
+  ];
+  const hhmm = t => String(t || '').slice(0, 5);
+  const nowHHMM = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+  // תיאור קצר של הפירוט, להצגה לצד הכפתורים ובכרטיס התלמיד
+  function attDetailText(status, at_time, minutes) {
+    const p = [];
+    if (status === 'late') {
+      if (at_time) p.push('הגיע ' + hhmm(at_time));
+      if (minutes) p.push(minutes + ' דק׳ איחור');
+    } else if (status === 'left') {
+      if (minutes) p.push('יצא ל־' + minutes + ' דק׳');
+      if (at_time) p.push('משעה ' + hhmm(at_time));
+    }
+    return p.join(' · ');
+  }
+  window.cv3AttDetail = attDetailText;
+
+  // חלונית קלה שנפתחת ליד הכפתור (לא מודאל מלא — זו הזנה של שדה אחד תוך כדי
+  // מעבר על רשימת שיעור, ומודאל שחוסם את כל המסך היה הופך את זה לאיטי).
+  // מחזירה Promise: אובייקט הפירוט, או null אם המשתמש ביטל.
+  function attPopover(btn, kind, cur) {
+    return new Promise(resolve => {
+      document.querySelectorAll('.att-pop').forEach(x => x.remove());
+      const isLate = kind === 'late';
+      const pop = document.createElement('div');
+      pop.className = 'att-pop';
+      pop.innerHTML = isLate
+        ? '<div class="ap-t">באיזו שעה הגיע?</div>' +
+          '<input type="time" class="inp mb0 ap-time" value="' + esc(hhmm(cur.at_time) || nowHHMM()) + '">' +
+          '<div class="ap-l">או כמה דקות איחר</div>' +
+          '<div class="ap-chips">' + [5, 10, 15, 30].map(m =>
+            '<button type="button" class="ap-chip" data-min="' + m + '">' + m + ' דק׳</button>').join('') + '</div>' +
+          '<div class="ap-act"><button type="button" class="btn-ghost sm ap-x">ביטול</button>' +
+          '<button type="button" class="btn-primary sm ap-ok">שמור</button></div>'
+        : '<div class="ap-t">לכמה זמן יצא?</div>' +
+          '<div class="ap-chips">' + [10, 15, 30, 60, 120].map(m =>
+            '<button type="button" class="ap-chip" data-min="' + m + '">' + (m >= 60 ? (m / 60) + ' שע׳' : m + ' דק׳') + '</button>').join('') + '</div>' +
+          '<div class="ap-l">דקות</div><input type="number" min="0" max="600" class="inp mb0 ap-min" value="' + esc(cur.minutes == null ? '' : cur.minutes) + '" placeholder="למשל 20">' +
+          '<div class="ap-l">משעה (רשות)</div><input type="time" class="inp mb0 ap-time" value="' + esc(hhmm(cur.at_time)) + '">' +
+          '<div class="ap-act"><button type="button" class="btn-ghost sm ap-x">ביטול</button>' +
+          '<button type="button" class="btn-primary sm ap-ok">שמור</button></div>';
+      document.body.appendChild(pop);
+      const r = btn.getBoundingClientRect();
+      // ממוקמת ביחס לדף (scrollY) כדי שגלילה לא "תנתק" אותה מהכפתור
+      pop.style.top = (r.bottom + window.scrollY + 6) + 'px';
+      let left = r.left + window.scrollX;
+      left = Math.max(8, Math.min(left, window.innerWidth - pop.offsetWidth - 8));
+      pop.style.left = left + 'px';
+
+      let done = false;
+      const finish = v => { if (done) return; done = true; cleanup(); resolve(v); };
+      const onDoc = e => { if (!pop.contains(e.target) && e.target !== btn) finish(null); };
+      const onKey = e => { if (e.key === 'Escape') finish(null); else if (e.key === 'Enter') ok(); };
+      function cleanup() {
+        document.removeEventListener('mousedown', onDoc, true);
+        document.removeEventListener('keydown', onKey, true);
+        pop.remove();
+      }
+      function ok() {
+        const t = pop.querySelector('.ap-time'), mi = pop.querySelector('.ap-min');
+        const minutes = mi
+          ? (mi.value === '' ? null : Math.max(0, Number(mi.value)))
+          : (pop.dataset.min ? Number(pop.dataset.min) : null);
+        const at_time = t && t.value ? t.value : null;
+        if (!isLate && !minutes) { window.UI.toast('כמה דקות יצא?', 'err'); return; }
+        if (isLate && !at_time && !minutes) { window.UI.toast('שעת הגעה או דקות איחור', 'err'); return; }
+        finish({ at_time: at_time, minutes: minutes });
+      }
+      pop.querySelectorAll('.ap-chip').forEach(c => c.addEventListener('click', () => {
+        const m = Number(c.dataset.min);
+        const mi = pop.querySelector('.ap-min');
+        if (mi) mi.value = m;
+        else { pop.dataset.min = m; pop.querySelectorAll('.ap-chip').forEach(x => x.classList.toggle('on', x === c)); }
+      }));
+      pop.querySelector('.ap-ok').addEventListener('click', ok);
+      pop.querySelector('.ap-x').addEventListener('click', () => finish(null));
+      setTimeout(() => {
+        document.addEventListener('mousedown', onDoc, true);
+        document.addEventListener('keydown', onKey, true);
+        const f = pop.querySelector('.ap-min') || pop.querySelector('.ap-time');
+        if (f) f.focus();
+      }, 0);
+    });
+  }
+
   async function renderAttendance(page) {
     const studs = await students();
     const classes = window.cv3Students ? await window.cv3Students.getClasses() : [];
@@ -124,6 +223,7 @@
     const has = new Set(studs.map(s => s.class_id));
     const clsOpts = classes.filter(c => has.has(c.id)).map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
     const state = {};      // סטטוס מוצג לכל תלמיד ביום הנבחר
+    const det = {};        // פירוט (שעה/דקות) לאיחור וליציאה
     const rowIds = {};     // מזהה רשומת הנוכחות הקיימת — כדי לעדכן במקום למחוק+להוסיף
     const rowBy = {};      // מי סימן את הנוכחות של אותו תלמיד באותו יום
     const busy = {};       // נעילה פר-תלמיד נגד לחיצות רצופות
@@ -137,6 +237,8 @@
         '<input type="search" class="inp mb0" id="attSearch" placeholder="🔍 חיפוש תלמיד…">' +
         (window.cv3Sort ? window.cv3Sort.bar('att') : '') +
         '<span class="count-line" id="attSum" style="align-self:center"></span></div>' +
+      '<div class="login-hint entry-ui" style="margin:0 2px 8px">לחיצה על כפתור שכבר מסומן — מבטלת אותו. ' +
+        '"איחור" שואל באיזו שעה הגיע, ו"יצא" שואל לכמה זמן.</div>' +
       '<div class="table-wrap entry-ui"><table class="tbl"><thead><tr>' +
         '<th style="width:44px">#</th><th>תלמיד</th><th>נוכחות</th><th style="width:150px">סומן ע"י</th></tr></thead>' +
         '<tbody id="attBody"></tbody></table></div>';
@@ -149,52 +251,92 @@
       // מיון וקיבוץ אחידים לכל המסכים — ראה js/sortui.js
       const row = (s, n) => {
         const v = state[s.id] || '';
-        const btn = (val, lbl, cls) => '<button class="att-btn ' + cls + (v === val ? ' on' : '') + '" data-sid="' + s.id + '" data-v="' + val + '">' + lbl + '</button>';
+        const d = det[s.id] || {};
+        const btn = k => '<button class="att-btn ' + k.cls + (v === k.v ? ' on' : '') + '" data-sid="' + s.id + '" data-v="' + k.v + '"' +
+          (v === k.v ? ' title="לחיצה נוספת מבטלת את הסימון"' : '') + '>' + k.lbl + '</button>';
+        const info = attDetailText(v, d.at_time, d.minutes);
         return '<tr><td class="idx">' + n + '</td>' +
           '<td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> ' + esc(s.name) + '</td>' +
-          '<td class="att-cell">' + btn('present', 'נוכח', 'p') + btn('late', 'איחור', 'l') + btn('absent', 'נעדר', 'a') + '</td>' +
+          '<td class="att-cell">' + ATT_KINDS.map(btn).join('') +
+          (info ? '<span class="att-info">' + esc(info) + '</span>' : '') + '</td>' +
           '<td class="att-by">' + (v && window.Author ? window.Author.cell(rowBy[s.id]) : '<span class="au-none">—</span>') + '</td></tr>';
       };
       page.querySelector('#attBody').innerHTML = window.cv3Sort
         ? window.cv3Sort.rows(page, 'att', visible(), clsNameOf, row, 3)
         : visible().map((s, i) => row(s, i + 1)).join('');
-      const c = { present: 0, late: 0, absent: 0 };
+      const c = { present: 0, late: 0, left: 0, absent: 0 };
       Object.values(state).forEach(v => c[v] != null && c[v]++);
-      page.querySelector('#attSum').textContent = 'נוכחים ' + c.present + ' · איחורים ' + c.late + ' · נעדרים ' + c.absent;
+      page.querySelector('#attSum').textContent =
+        'נוכחים ' + c.present + ' · איחורים ' + c.late + ' · יצאו ' + c.left + ' · נעדרים ' + c.absent;
       page.querySelectorAll('.att-btn').forEach(b => b.addEventListener('click', async () => {
         const sid = Number(b.dataset.sid), v = b.dataset.v, d = page.querySelector('#attDate').value;
         if (busy[sid]) return;                 // לחיצות רצופות על אותו תלמיד יצרו כפילויות
+        const prev = state[sid], prevDet = det[sid];
+
+        // ── לחיצה חוזרת על הסימון הקיים = ביטול ──
+        if (prev === v) {
+          busy[sid] = true;
+          const existing = rowIds[sid];
+          delete state[sid]; delete det[sid]; draw();
+          try {
+            if (existing) {
+              const r = await window.store.remove('attendance', existing);
+              if (r && r.ok === false) {
+                state[sid] = prev; det[sid] = prevDet; draw();
+                window.UI.toast('הביטול נכשל — הסימון נשאר', 'err');
+                return;
+              }
+            }
+            delete rowIds[sid]; delete rowBy[sid];
+            draw();
+            window.UI.toast('הסימון בוטל');
+          } finally { busy[sid] = false; }
+          return;
+        }
+
+        // ── איחור / יציאה: קודם שואלים את הפרטים, ורק אז שומרים ──
+        let extra = { at_time: null, minutes: null };
+        if (v === 'late' || v === 'left') {
+          const ans = await attPopover(b, v, det[sid] || {});
+          if (!ans) return;                    // ביטול — לא נוגעים בכלום
+          extra = ans;
+        }
+
         busy[sid] = true;
-        const prev = state[sid];
-        state[sid] = v; draw();
+        state[sid] = v; det[sid] = extra; draw();
         try {
           // קודם: טעינת כל טבלת הנוכחות בכל לחיצה, ואז מחיקה ואז הוספה. אם
           // ההוספה נכשלה — הרישום הקודם כבר נמחק והתלמיד נשאר בלי נוכחות כלל.
           const existing = rowIds[sid];
+          const payload = { status: v, at_time: extra.at_time, minutes: extra.minutes };
           const r = existing
             // גם בעדכון נחתם המבצע: "סומן ע\"י" הוא מי שקבע את הסימון האחרון,
             // אחרת המסך יראה משתמש אחד והמסד יזכור אחר.
             ? await window.store.update('attendance', existing,
-                { status: v, created_by: (window.currentUser && window.currentUser.id) || null })
-            : await add('attendance', { student_id: sid, date: d, status: v });
+                Object.assign({ created_by: (window.currentUser && window.currentUser.id) || null }, payload))
+            : await add('attendance', Object.assign({ student_id: sid, date: d }, payload));
           if (!r.ok) {
-            state[sid] = prev; draw();
+            if (prev) { state[sid] = prev; det[sid] = prevDet; } else { delete state[sid]; delete det[sid]; }
+            draw();
             window.UI.toast('השמירה נכשלה — הסימון לא נשמר', 'err');
             return;
           }
           if (!existing) { const nr = r.data && r.data[0]; if (nr && nr.id) rowIds[sid] = nr.id; }
           rowBy[sid] = (window.currentUser && window.currentUser.id) || null;
+          draw();
           window.UI.toast('נשמר');
         } finally { busy[sid] = false; }
       }));
     }
     async function loadDate() {
       Object.keys(state).forEach(k => delete state[k]);
+      Object.keys(det).forEach(k => delete det[k]);
       Object.keys(rowIds).forEach(k => delete rowIds[k]);
       Object.keys(rowBy).forEach(k => delete rowBy[k]);
       const d = page.querySelector('#attDate').value;
       (await list('attendance')).filter(a => a.date === d).forEach(a => {
         state[a.student_id] = a.status; rowIds[a.student_id] = a.id; rowBy[a.student_id] = a.created_by || null;
+        det[a.student_id] = { at_time: a.at_time || null, minutes: a.minutes == null ? null : a.minutes };
       });
       draw();
     }

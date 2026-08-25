@@ -119,9 +119,14 @@
       S.byStudent('student_docs', s.id),
       S.byStudent('medications', s.id),
     ]);
-    const c = k => att.filter(a => a.status === k).length;
-    const present = c('נוכח'), late = c('איחור'), absent = c('חיסור') + c('נעדר');
-    const tot = present + late + absent;
+    // הסטטוסים במסד הם קודים באנגלית (present/late/left/absent). קודם נספרו
+    // כאן מחרוזות עבריות ("נוכח"/"איחור"), ולכן כל סיכומי הנוכחות שה-AI קיבל
+    // היו אפס — והוא "הסיק" שאין נוכחות בכלל. הערכים העבריים נשמרים כגיבוי
+    // לרשומות ישנות שהוזנו ידנית.
+    const c = ks => att.filter(a => ks.indexOf(a.status) > -1).length;
+    const present = c(['present', 'נוכח']), late = c(['late', 'איחור']),
+          leftMid = c(['left', 'יצא']), absent = c(['absent', 'חיסור', 'נעדר']);
+    const tot = present + late + leftMid + absent;
     const catName = id => { const x = cats.find(y => y.id == id); return x ? x.name : ''; };
     const grades = tests.map(t => Number(t.grade)).filter(x => !isNaN(x));
     const last = ra.slice().sort((a, b) => String(b.assessed_on || '').localeCompare(String(a.assessed_on || '')))[0];
@@ -159,7 +164,8 @@
     Object.keys(byCls).forEach(k => {
       const ids = byCls[k].map(s => s.id);
       const a = att.filter(x => ids.includes(x.student_id));
-      const p = cnt(a, 'נוכח'), l = cnt(a, 'איחור'), ab = cnt(a, 'חיסור') + cnt(a, 'נעדר');
+      const p = cnt(a, 'present') + cnt(a, 'נוכח'), l = cnt(a, 'late') + cnt(a, 'איחור') + cnt(a, 'left'),
+            ab = cnt(a, 'absent') + cnt(a, 'חיסור') + cnt(a, 'נעדר');
       const t = p + l + ab;
       const g = tests.filter(x => ids.includes(x.student_id)).map(x => Number(x.grade)).filter(x => !isNaN(x));
       lines.push('- ' + k + ': ' + ids.length + ' תלמידים' +
@@ -249,8 +255,9 @@
     const clsName = id => { const c = classes.find(x => x.id == id); return c ? c.name : ''; };
     const rows = students.map(s => {
       const a = att.filter(x => x.student_id === s.id);
-      const p = a.filter(x => x.status === 'נוכח').length, l = a.filter(x => x.status === 'איחור').length;
-      const ab = a.filter(x => x.status === 'חיסור' || x.status === 'נעדר').length;
+      const p = a.filter(x => x.status === 'present' || x.status === 'נוכח').length;
+      const l = a.filter(x => x.status === 'late' || x.status === 'left' || x.status === 'איחור').length;
+      const ab = a.filter(x => x.status === 'absent' || x.status === 'חיסור' || x.status === 'נעדר').length;
       const g = tests.filter(x => x.student_id === s.id).map(x => Number(x.grade)).filter(x => !isNaN(x));
       // אילו מהמסמכים שהאפיון מחייב חסרים — זו השאלה שנשאלת בפועל הכי הרבה
       const mine = docs.filter(d => d.student_id === s.id);

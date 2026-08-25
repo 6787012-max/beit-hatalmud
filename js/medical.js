@@ -17,11 +17,19 @@
   const today = () => new Date().toISOString().slice(0, 10);
   const STALE_DAYS = 31;
 
+  // 'all' = תצוגת הכל, והיא **ברירת המחדל** (בקשת יוסף 25/08/2026): מי שנכנס
+  // למסך הרפואי רוצה קודם כל לראות את התמונה המלאה של התלמיד, ולא לשוטט בין
+  // שלוש לשוניות כדי לגלות שלאחד יש גם אלרגיה וגם ריטלין.
+  const ALL = 'all';
+  const CATS = ['רגישות', 'מצב רפואי', 'תרופה'];
   const TABS = [
+    { k: ALL,        t: 'הכל',               icon: 'bi-list-ul' },
     { k: 'רגישות',   t: 'רגישויות ואלרגיות', icon: 'bi-exclamation-octagon' },
     { k: 'מצב רפואי', t: 'מצב רפואי',         icon: 'bi-heart-pulse' },
     { k: 'תרופה',    t: 'נטילת תרופות',      icon: 'bi-capsule' },
   ];
+  const catOf = r => { const c = r.category || 'תרופה'; return CATS.indexOf(c) > -1 ? c : 'תרופה'; };
+  const CAT_CHIP = { 'רגישות': 'off', 'מצב רפואי': 'off', 'תרופה': 'ok' };
 
   // שדות לכל קטגוריה — גם לטופס וגם לטבלה
   const FIELDS = {
@@ -94,19 +102,19 @@
       '</div>' +
       '<div class="count-line" id="mdCount"></div>' +
       '<div id="mdWrap" class="table-wrap"></div>' +
-      '<div id="mdEmpty" class="empty-state" hidden><i class="bi bi-capsule"></i><div>אין רישומים בקטגוריה זו</div></div>';
+      '<div id="mdEmpty" class="empty-state" hidden><i class="bi bi-capsule"></i><div>אין רישומים מתאימים</div></div>';
 
-    let tab = 'רגישות';
+    let tab = ALL;
     const visible = () => {
       const q = (page.querySelector('#mdQ').value || '').trim();
       const cid = page.querySelector('#mdCls').value;
       const onlyStale = page.querySelector('#mdStale').checked;
       return data.filter(r => {
-        if ((r.category || 'תרופה') !== tab) return false;
+        if (tab !== ALL && catOf(r) !== tab) return false;
         const s = stuOf(r.student_id);
         if (cid && String((s || {}).class_id) !== cid) return false;
         if (q && ![nm(s), r.name, r.purpose, r.details].join(' ').includes(q)) return false;
-        if (onlyStale && tab === 'תרופה' && !freshness(r).stale) return false;
+        if (onlyStale && (catOf(r) !== 'תרופה' || !freshness(r).stale)) return false;
         return true;
       });
     };
@@ -114,26 +122,51 @@
     function draw() {
       TABS.forEach(t => {
         const el = page.querySelector('[data-cnt="' + t.k + '"]');
-        if (el) el.textContent = data.filter(r => (r.category || 'תרופה') === t.k).length;
+        if (el) el.textContent = t.k === ALL ? data.length : data.filter(r => catOf(r) === t.k).length;
       });
-      page.querySelector('#mdStaleWrap').style.display = tab === 'תרופה' ? '' : 'none';
+      // הסינון "רק מה שדורש עדכון" נוגע לתרופות בלבד, ולכן זמין גם בתצוגת הכל
+      page.querySelector('#mdStaleWrap').style.display = (tab === 'תרופה' || tab === ALL) ? '' : 'none';
 
       const list = visible().slice().sort((a, b) => {
         const A = stuOf(a.student_id) || {}, B = stuOf(b.student_id) || {};
         return String(A.family || '').localeCompare(String(B.family || ''), 'he') ||
-               String(A.name || '').localeCompare(String(B.name || ''), 'he');
+               String(A.name || '').localeCompare(String(B.name || ''), 'he') ||
+               // באותו תלמיד: רגישות -> מצב רפואי -> תרופה (הקריטי קודם)
+               (CATS.indexOf(catOf(a)) - CATS.indexOf(catOf(b)));
       });
-      const isMed = tab === 'תרופה';
-      const head = isMed
-        ? ['#', 'תלמיד', 'שיעור', 'תרופה', 'מטרה', 'מינון', 'שעות', 'זמן נטילה', 'אופן נטילה', 'תופעות לוואי', 'עדכניות', '']
-        : ['#', 'תלמיד', 'שיעור', tab === 'רגישות' ? 'למה רגיש' : 'המצב', 'פירוט', ''];
+      const isMed = tab === 'תרופה', isAll = tab === ALL;
+      const head = isAll
+        // תצוגת הכל: עמודות משותפות לשלושת הסוגים. הפרטים שייחודיים לתרופה
+        // (מינון/שעות/אופן נטילה) מתומצתים לעמודת "פירוט" אחת — הטבלה
+        // המלאה של התרופות נשארת בלשונית שלה.
+        ? ['#', 'תלמיד', 'שיעור', 'סוג', 'נושא', 'פירוט', 'עדכניות', '']
+        : isMed
+          ? ['#', 'תלמיד', 'שיעור', 'תרופה', 'מטרה', 'מינון', 'שעות', 'זמן נטילה', 'אופן נטילה', 'תופעות לוואי', 'עדכניות', '']
+          : ['#', 'תלמיד', 'שיעור', tab === 'רגישות' ? 'למה רגיש' : 'המצב', 'פירוט', ''];
       const cell = v => '<td>' + esc(v == null || v === '' ? '—' : v) + '</td>';
+      // תקציר קריא של רשומת תרופה לשורה אחת
+      const medSummary = r => [
+        r.purpose && ('מטרה: ' + r.purpose), r.dose && ('מינון: ' + r.dose),
+        r.hours && ('שעות: ' + r.hours), r.take_time, r.take_how,
+        r.second ? 'כדור נוסף בצהריים' : '',
+        [r.side_during, r.side_after].filter(Boolean).join(' / '),
+      ].filter(Boolean).join(' · ');
       const body = list.map((r, i) => {
         const s = stuOf(r.student_id);
         const f = freshness(r);
+        const cat = catOf(r);
         const acts = '<td class="row-act">' +
           '<button class="mini" data-edit="' + r.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
           '<button class="mini danger" data-del="' + r.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></td>';
+        if (isAll) {
+          const isM = cat === 'תרופה';
+          return '<tr' + (isM && f.stale ? ' class="md-stale"' : '') + '><td class="idx">' + (i + 1) + '</td>' +
+            '<td><b>' + esc(nm(s)) + '</b>' + (isM && r.second ? ' <span class="det-badge">+ צהריים</span>' : '') + '</td>' +
+            cell(clsOf(s || {})) +
+            '<td><span class="chip ' + (CAT_CHIP[cat] || 'off') + '">' + esc(cat) + '</span></td>' +
+            cell(r.name) + cell(isM ? medSummary(r) : r.details) +
+            '<td>' + (isM ? '<span class="chip ' + f.cls + '">' + esc(f.txt) + '</span>' : '—') + '</td>' + acts + '</tr>';
+        }
         if (!isMed) {
           return '<tr><td class="idx">' + (i + 1) + '</td><td><b>' + esc(nm(s)) + '</b></td>' +
             cell(clsOf(s || {})) + cell(r.name) + cell(r.details) + acts + '</tr>';
@@ -150,9 +183,10 @@
         ? '<table class="tbl"><thead><tr>' + head.map(h => '<th>' + esc(h) + '</th>').join('') +
           '</tr></thead><tbody>' + body + '</tbody></table>' : '';
       page.querySelector('#mdEmpty').hidden = list.length > 0;
-      const stale = data.filter(r => (r.category || '') === 'תרופה' && freshness(r).stale).length;
+      const stale = data.filter(r => catOf(r) === 'תרופה' && freshness(r).stale).length;
       page.querySelector('#mdCount').innerHTML = list.length + ' רישומים' +
-        (tab === 'תרופה' && stale ? ' · <b style="color:#b91c1c">' + stale + ' דורשים עדכון מההורים</b>' : '');
+        (isAll ? ' · ' + [...new Set(list.map(r => r.student_id))].length + ' תלמידים' : '') +
+        ((tab === 'תרופה' || isAll) && stale ? ' · <b style="color:#b91c1c">' + stale + ' דורשים עדכון מההורים</b>' : '');
 
       page.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
         const r = data.find(x => x.id == b.dataset.edit); if (r) form(r);
@@ -167,7 +201,9 @@
 
     // ── טופס רישום/עריכה ──────────────────────────────────────────────────
     function form(rec) {
-      const cat = (rec && rec.category) || tab;
+      // בתצוגת "הכל" אין קטגוריה נגזרת - פותחים על הסוג הקריטי ביותר,
+      // והמשתמש מחליף בבורר שבראש הטופס.
+      const cat = (rec && rec.category) || (tab === ALL ? 'רגישות' : tab);
       const flds = FIELDS[cat] || FIELDS['תרופה'];
       const stuOpts = studs.map(x => '<option value="' + x.id + '"' +
         (rec && x.id == rec.student_id ? ' selected' : '') + '>' + esc(nm(x)) + '</option>').join('');
@@ -213,8 +249,10 @@
           if (!res || res.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
           if (rec) Object.assign(rec, row);
           else data = data.concat([(res.data && res.data[0]) || row]);
-          tab = c;
-          page.querySelectorAll('.md-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === c));
+          if (tab !== ALL) {
+            tab = c;
+            page.querySelectorAll('.md-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === c));
+          }
           draw();
           window.UI.toast(rec ? 'עודכן' : 'נוסף');
           return true;
@@ -233,7 +271,7 @@
     // נבנה דרך מודול הטפסים הקיים: כל הורה מקבל קישור אישי, ממלא, והתשובה
     // נשמרת תחת התלמיד. כך העדכון החודשי הוא תהליך במערכת ולא קובץ אקסל חדש.
     function updateForm() {
-      const stale = data.filter(r => (r.category || '') === 'תרופה' && freshness(r).stale);
+      const stale = data.filter(r => catOf(r) === 'תרופה' && freshness(r).stale);
       const ids = [...new Set(stale.map(r => r.student_id))];
       const names = ids.map(i => nm(stuOf(i))).filter(Boolean);
       window.UI.modal({
@@ -283,7 +321,7 @@
       const lines = [...t.tHead.rows, ...t.tBodies[0].rows].map(r => [...r.cells].map(c => q(c.innerText)).join(','));
       const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'רפואי — ' + tab + '.csv'; a.click();
+      a.href = URL.createObjectURL(blob); a.download = 'רפואי — ' + (tab === ALL ? 'הכל' : tab) + '.csv'; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 20000);
     });
 

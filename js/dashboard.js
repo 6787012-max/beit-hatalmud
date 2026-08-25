@@ -74,6 +74,7 @@
 
       const present = attR.filter(a => a.status === 'present').length;
       const late = attR.filter(a => a.status === 'late').length;
+      const leftMid = attR.filter(a => a.status === 'left').length;   // יצא באמצע היום
       const absent = attR.filter(a => a.status === 'absent').length;
       const attTotal = attR.length;
       const grades = tstR.map(t => Number(t.grade)).filter(n => !isNaN(n));
@@ -84,8 +85,9 @@
       // ── כרטיסי סיכום ──
       let h = '<div class="stat-row rp-stats">' +
         statCard('bi-people-fill', inScope.length, 'תלמידים') +
-        statCard('bi-calendar-check', attTotal ? pct(present + late, attTotal) + '%' : '—', 'נוכחות בטווח') +
+        statCard('bi-calendar-check', attTotal ? pct(present + late + leftMid, attTotal) + '%' : '—', 'נוכחות בטווח') +
         statCard('bi-clock-history', late, 'איחורים') +
+        statCard('bi-box-arrow-left', leftMid, 'יציאות באמצע') +
         statCard('bi-person-x', absent, 'היעדרויות') +
         statCard('bi-clipboard-check', behR.length, 'דיווחי מעקב') +
         statCard('bi-card-checklist', avgGrade == null ? '—' : avgGrade, 'ממוצע מבחנים') +
@@ -119,19 +121,20 @@
       const attByStu = {};
       attR.forEach(a => {
         const k = a.student_id;
-        attByStu[k] = attByStu[k] || { present: 0, late: 0, absent: 0 };
+        attByStu[k] = attByStu[k] || { present: 0, late: 0, left: 0, absent: 0 };
         if (attByStu[k][a.status] != null) attByStu[k][a.status]++;
       });
       const attRows = Object.keys(attByStu).map(k => {
-        const r = attByStu[k], tot = r.present + r.late + r.absent;
-        return { s: stById(k), present: r.present, late: r.late, absent: r.absent, tot: tot, rate: pct(r.present + r.late, tot), onTime: pct(r.present, tot) };
+        const r = attByStu[k], tot = r.present + r.late + r.left + r.absent;
+        // "יצא" = הגיע (נספר בהגעה) אבל לא "בזמן מלא" — בדיוק כמו איחור.
+        return { s: stById(k), present: r.present, late: r.late, left: r.left, absent: r.absent, tot: tot, rate: pct(r.present + r.late + r.left, tot), onTime: pct(r.present, tot) };
       }).sort((a, b) => a.rate - b.rate || a.onTime - b.onTime);
 
       h += rpSection('דוח נוכחות לפי תלמיד', 'bi-calendar-check', attRows.length
-        ? '<table class="tbl"><thead><tr><th>תלמיד</th><th>כיתה</th><th>נוכח</th><th>איחור</th><th>נעדר</th><th>סה"כ</th>' +
+        ? '<table class="tbl"><thead><tr><th>תלמיד</th><th>כיתה</th><th>נוכח</th><th>איחור</th><th>יצא</th><th>נעדר</th><th>סה"כ</th>' +
           '<th title="הגיע — כולל איחורים">% הגעה</th><th title="הגיע בזמן, בלי איחורים">% בזמן</th></tr></thead><tbody>' +
           attRows.map(r => '<tr><td>' + esc(fullName(r.s)) + '</td><td>' + esc(r.s ? clsName(r.s.class_id) : '') + '</td>' +
-            '<td>' + r.present + '</td><td>' + r.late + '</td><td>' + r.absent + '</td><td>' + r.tot + '</td>' +
+            '<td>' + r.present + '</td><td>' + r.late + '</td><td>' + r.left + '</td><td>' + r.absent + '</td><td>' + r.tot + '</td>' +
             '<td><span class="chip ' + (r.rate >= 90 ? 'ok' : 'off') + '">' + r.rate + '%</span></td>' +
             '<td><span class="chip ' + (r.onTime >= 90 ? 'ok' : 'off') + '">' + r.onTime + '%</span></td></tr>').join('') +
           '</tbody></table>'
@@ -141,19 +144,19 @@
       const byCls = {};
       inScope.forEach(s => {
         const k = s.class_id == null ? '0' : s.class_id;
-        byCls[k] = byCls[k] || { students: 0, present: 0, late: 0, absent: 0, beh: 0 };
+        byCls[k] = byCls[k] || { students: 0, present: 0, late: 0, left: 0, absent: 0, beh: 0 };
         byCls[k].students++;
       });
       attR.forEach(a => { const s = stById(a.student_id); const k = s && s.class_id != null ? s.class_id : '0'; if (byCls[k] && byCls[k][a.status] != null) byCls[k][a.status]++; });
       behR.forEach(e => { const s = stById(e.student_id); const k = s && s.class_id != null ? s.class_id : '0'; if (byCls[k]) byCls[k].beh++; });
       const clsRows = Object.keys(byCls).map(k => {
-        const r = byCls[k], tot = r.present + r.late + r.absent;
-        return { name: k === '0' ? 'ללא כיתה' : clsName(k), students: r.students, tot: tot, rate: pct(r.present + r.late, tot), late: r.late, absent: r.absent, beh: r.beh };
+        const r = byCls[k], tot = r.present + r.late + r.left + r.absent;
+        return { name: k === '0' ? 'ללא כיתה' : clsName(k), students: r.students, tot: tot, rate: pct(r.present + r.late + r.left, tot), late: r.late, left: r.left, absent: r.absent, beh: r.beh };
       });
       h += rpSection('סיכום לפי כיתה', 'bi-diagram-3',
-        '<table class="tbl"><thead><tr><th>כיתה</th><th>תלמידים</th><th>רישומי נוכחות</th><th>אחוז נוכחות</th><th>איחורים</th><th>היעדרויות</th><th>דיווחי מעקב</th></tr></thead><tbody>' +
+        '<table class="tbl"><thead><tr><th>כיתה</th><th>תלמידים</th><th>רישומי נוכחות</th><th>אחוז נוכחות</th><th>איחורים</th><th>יציאות</th><th>היעדרויות</th><th>דיווחי מעקב</th></tr></thead><tbody>' +
         clsRows.map(r => '<tr><td>' + esc(r.name) + '</td><td>' + r.students + '</td><td>' + r.tot + '</td>' +
-          '<td>' + (r.tot ? r.rate + '%' : '—') + '</td><td>' + r.late + '</td><td>' + r.absent + '</td><td>' + r.beh + '</td></tr>').join('') +
+          '<td>' + (r.tot ? r.rate + '%' : '—') + '</td><td>' + r.late + '</td><td>' + r.left + '</td><td>' + r.absent + '</td><td>' + r.beh + '</td></tr>').join('') +
         '</tbody></table>');
 
       // ── מבחנים ──
@@ -228,7 +231,10 @@
         attR.forEach(a => {
           const d = String(a.date).slice(0, 10);
           byDate[d] = byDate[d] || { p: 0, l: 0, a: 0 };
-          if (a.status === 'present') byDate[d].p++; else if (a.status === 'late') byDate[d].l++; else byDate[d].a++;
+          // "יצא" נספר בגרף המגמה יחד עם האיחורים — שניהם "הגיע אך לא יום מלא"
+          if (a.status === 'present') byDate[d].p++;
+          else if (a.status === 'late' || a.status === 'left') byDate[d].l++;
+          else byDate[d].a++;
         });
         const dates = Object.keys(byDate).sort();
         const attCv = body.querySelector('#attChart');
@@ -243,7 +249,7 @@
         const pie = body.querySelector('#attPie');
         if (pie && attTotal) CHARTS.push(new window.Chart(pie, {
           type: 'doughnut',
-          data: { labels: ['נוכח', 'איחור', 'נעדר'], datasets: [{ data: [present, late, absent], backgroundColor: ['#1f8a5b', '#d68910', '#c0392b'] }] },
+          data: { labels: ['נוכח', 'איחור', 'יצא', 'נעדר'], datasets: [{ data: [present, late, leftMid, absent], backgroundColor: ['#1f8a5b', '#d68910', '#0e7490', '#c0392b'] }] },
           options: { maintainAspectRatio: false },
         }));
         const behCv = body.querySelector('#behChart');
@@ -293,23 +299,24 @@
       rows.push(['כיתה', F.classId ? clsName(F.classId) : 'כל הכיתות']);
       rows.push([]);
       rows.push(['נוכחות לפי תלמיד']);
-      rows.push(['תלמיד', 'כיתה', 'נוכח', 'איחור', 'נעדר', 'סה"כ', 'אחוז הגעה', 'אחוז בזמן']);
-      d.attRows.forEach(r => rows.push([fullName(r.s), r.s ? clsName(r.s.class_id) : '', r.present, r.late, r.absent, r.tot, r.rate + '%', r.onTime + '%']));
+      rows.push(['תלמיד', 'כיתה', 'נוכח', 'איחור', 'יצא', 'נעדר', 'סה"כ', 'אחוז הגעה', 'אחוז בזמן']);
+      d.attRows.forEach(r => rows.push([fullName(r.s), r.s ? clsName(r.s.class_id) : '', r.present, r.late, r.left, r.absent, r.tot, r.rate + '%', r.onTime + '%']));
       rows.push([]);
       rows.push(['סיכום לפי כיתה']);
-      rows.push(['כיתה', 'תלמידים', 'רישומי נוכחות', 'אחוז נוכחות', 'איחורים', 'היעדרויות', 'דיווחי מעקב']);
-      d.clsRows.forEach(r => rows.push([r.name, r.students, r.tot, r.tot ? r.rate + '%' : '', r.late, r.absent, r.beh]));
+      rows.push(['כיתה', 'תלמידים', 'רישומי נוכחות', 'אחוז נוכחות', 'איחורים', 'יציאות', 'היעדרויות', 'דיווחי מעקב']);
+      d.clsRows.forEach(r => rows.push([r.name, r.students, r.tot, r.tot ? r.rate + '%' : '', r.late, r.left, r.absent, r.beh]));
       rows.push([]);
       rows.push(['מבחנים — ממוצע לפי תלמיד']);
       rows.push(['תלמיד', 'כיתה', 'מבחנים', 'ממוצע']);
       d.tstRows.forEach(r => rows.push([fullName(r.s), r.s ? clsName(r.s.class_id) : '', r.n, r.avg]));
       rows.push([]);
       rows.push(['פירוט רישומי נוכחות']);
-      rows.push(['תלמיד', 'כיתה', 'תאריך', 'סטטוס', 'הערה']);
+      rows.push(['תלמיד', 'כיתה', 'תאריך', 'סטטוס', 'פירוט', 'הערה']);
+      const attName = { present: 'נוכח', late: 'איחור', left: 'יצא', absent: 'נעדר' };
       d.attR.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(a => {
         const s = stById(a.student_id);
-        rows.push([fullName(s), s ? clsName(s.class_id) : '', dmy(a.date),
-          a.status === 'present' ? 'נוכח' : a.status === 'late' ? 'איחור' : 'נעדר', a.note || '']);
+        rows.push([fullName(s), s ? clsName(s.class_id) : '', dmy(a.date), attName[a.status] || a.status,
+          (window.cv3AttDetail ? window.cv3AttDetail(a.status, a.at_time, a.minutes) : ''), a.note || '']);
       });
       rows.push([]);
       rows.push(['פירוט דיווחי מעקב']);

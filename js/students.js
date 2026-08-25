@@ -19,16 +19,34 @@
 
   // כל הנתונים דרך המאגר המרכזי (store.js) — משותף עם שאר המודולים.
   async function getClasses() { return window.store.list('classes'); }
+
+  // הכיתות שהמשתמש מוגבל אליהן, או null = הכל.
+  // מחנך מוגדר scoped ב-roleCaps, ולכן Auth.scopeClasses מחזיר לו את רשימת
+  // הכיתות שהמנהל הקצה לו במסך ההגדרות. השרת ממילא אוכף את זה ב-RLS
+  // (can_see_student → has_class_access), אבל בלי סינון גם בצד הלקוח
+  // מסכי ההדגמה ורשימות הבורר היו מציגים תלמידים שאינם שלו.
+  function scopeClasses() {
+    try {
+      const sc = window.Auth && window.Auth.scopeClasses ? window.Auth.scopeClasses() : null;
+      return Array.isArray(sc) ? sc : null;
+    } catch (_) { return null; }
+  }
+  function inScope(s) {
+    const sc = scopeClasses();
+    return !sc || sc.some(c => String(c) === String(s.class_id));
+  }
+
   async function getStudents() {
-    // מודל עמנואל: כל צוות רואה את כל התלמידים; היקף הנתונים נאכף ב-RLS בשרת.
+    // היקף הנתונים נאכף ב-RLS בשרת; כאן סינון מקביל לפי הכיתות של המשתמש,
+    // כך שמחנך רואה — ובכרטיס התלמיד גם עורך — אך ורק את התלמידים שלו.
     //
     // ⚠️ ממוין כאן, במקום אחד, ולא בכל מסך בנפרד: כמעט כל המסכים (נוכחות,
     // מעקב, תל"א, טפסים, בוררי תלמיד, יצוא) שואבים דרך הפונקציה הזאת, ולפני
     // כן הם הציגו את סדר ההכנסה למסד — כלומר בלי סדר בכלל.
     // המיון לפי **שם משפחה**: העמודה `name` היא "פרטי + משפחה", ולכן מיון
     // לפיה בלבד הוא מיון לפי שם פרטי, וזה לא מה שמצפים ברשימת שיעור.
-    const list = await window.store.list('students');
-    return (list || []).slice().sort((a, b) =>
+    const list = (await window.store.list('students') || []).filter(inScope);
+    return list.slice().sort((a, b) =>
       String(a.family || '').localeCompare(String(b.family || ''), 'he') ||
       String(a.name || '').localeCompare(String(b.name || ''), 'he'));
   }
@@ -145,7 +163,7 @@
           (items.length > 5 ? '<span class="det-hint">5 אחרונים · גלול לעוד</span>' : '') +
           '</h4>' + (items.length > 5 ? '<div class="det-scroll">' + body + '</div>' : body) + '</div>';
       };
-      const attC = { present: 0, late: 0, absent: 0 }; att.forEach(a => attC[a.status] != null && attC[a.status]++);
+      const attC = { present: 0, late: 0, left: 0, absent: 0 }; att.forEach(a => attC[a.status] != null && attC[a.status]++);
       // משימות הקשורות לתלמיד — תאריך יעד בעברית + צ'יפ סטטוס (מראה זהה לסקשנים קריאה/כתיבה/מבחנים)
       const hebDate = iso => window.UI.hebDate(iso, { year: false });
       const taskLbl = st => st === 'done' ? 'הושלם' : st === 'in_progress' ? 'בתהליך' : 'לביצוע';
@@ -154,24 +172,27 @@
         (tsk.length ? tsk.slice(-4).reverse().map(t => li('<strong>' + esc(t.title) + '</strong> ' + taskChip(t.status), hebDate(t.due_date))).join('')
           : '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">אין משימות משויכות</div>') + '</div>';
       // ── נוכחות: אחוזים + פירוט אחרון (היה: שורת ספירה בלבד, בלי תאריכים ובלי אחוז) ──
-      const attTot = attC.present + attC.late + attC.absent;
+      // "יצא" נספר כנוכחות מלאה לעניין הגעה, אבל לא כ"בזמן" — הוא הפסיד זמן לימוד.
+      const attTot = attC.present + attC.late + attC.left + attC.absent;
       const attPct = (a, b) => b ? Math.round((a / b) * 100) : 0;
-      const attStatus = { present: ['נוכח', 'lo'], late: ['איחור', 'mid'], absent: ['נעדר', 'hi'] };
+      const attStatus = { present: ['נוכח', 'lo'], late: ['איחור', 'mid'], left: ['יצא', 'mid'], absent: ['נעדר', 'hi'] };
       const gregDate = x => { const mm = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(x || '')); return mm ? mm[3] + '/' + mm[2] + '/' + mm[1] : (x || ''); };
       const attSec = !attTot ? '' :
         '<div class="det-sec"><h4><i class="bi bi-calendar-check"></i> נוכחות <span class="det-badge">' + attTot + '</span></h4>' +
         '<div class="det-grid">' +
           '<div class="det-row"><span class="det-lbl">אחוז הגעה</span><span class="det-val"><span class="chip ' +
-            (attPct(attC.present + attC.late, attTot) >= 90 ? 'ok' : 'off') + '">' + attPct(attC.present + attC.late, attTot) + '%</span></span></div>' +
+            (attPct(attC.present + attC.late + attC.left, attTot) >= 90 ? 'ok' : 'off') + '">' + attPct(attC.present + attC.late + attC.left, attTot) + '%</span></span></div>' +
           '<div class="det-row"><span class="det-lbl">אחוז בזמן</span><span class="det-val"><span class="chip ' +
             (attPct(attC.present, attTot) >= 90 ? 'ok' : 'off') + '">' + attPct(attC.present, attTot) + '%</span></span></div>' +
           '<div class="det-row"><span class="det-lbl">נוכח</span><span class="det-val">' + attC.present + '</span></div>' +
           '<div class="det-row"><span class="det-lbl">איחורים</span><span class="det-val">' + attC.late + '</span></div>' +
+          '<div class="det-row"><span class="det-lbl">יציאות באמצע</span><span class="det-val">' + attC.left + '</span></div>' +
           '<div class="det-row"><span class="det-lbl">היעדרויות</span><span class="det-val">' + attC.absent + '</span></div>' +
         '</div>' +
         att.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-5).reverse().map(a => {
           const st = attStatus[a.status] || ['—', 'mid'];
-          return li('<strong>' + esc(st[0]) + '</strong>' + (a.note ? ' — ' + esc(a.note) : ''),
+          const dt = window.cv3AttDetail ? window.cv3AttDetail(a.status, a.at_time, a.minutes) : '';
+          return li('<strong>' + esc(st[0]) + '</strong>' + (dt ? ' <span class="tl-note">' + esc(dt) + '</span>' : '') + (a.note ? ' — ' + esc(a.note) : ''),
             (hebDate(a.date) || '') + ' · ' + gregDate(a.date), st[1]);
         }).join('') + '</div>';
 
@@ -446,9 +467,15 @@
   }
 
   async function addClass(name) { const r = await window.store.add('classes', { name }); return { ok: r.ok, id: r.data && r.data[0] && r.data[0].id }; }
-  // מודל עמנואל: כל צוות רואה את כל התלמידים; היקף הנתונים נאכף ב-RLS. null = הכל.
-  async function accessibleIds() { return null; }
-  window.cv3Students = { getStudents: getStudents, getClasses: getClasses, addClass: addClass, accessibleIds: accessibleIds };
+
+  // מזהי התלמידים שהמשתמש רשאי לראות, או null = הכל. משמש את המסכים
+  // שמושכים טבלאות רשומות שלמות (נוכחות, מעקב, מבחנים) כדי לסנן שורות של
+  // תלמידים מכיתות אחרות. קודם החזיר תמיד null.
+  async function accessibleIds() {
+    if (!scopeClasses()) return null;
+    return (await getStudents()).map(s => s.id);
+  }
+  window.cv3Students = { getStudents: getStudents, getClasses: getClasses, addClass: addClass, accessibleIds: accessibleIds, scopeClasses: scopeClasses };
   window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
   window.PAGE_RENDERERS.students = render;
 })();

@@ -5,12 +5,37 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const today = () => new Date().toISOString().slice(0, 10);
 
+  // מונה ריצות: החלפת משתמש מפעילה רינדור חדש בזמן שהקודם עוד ממתין
+  // לנתונים. בלי הבדיקה בסוף, הרינדור הישן היה דורס את החדש והמסך היה מציג
+  // את תפריט המשתמש הקודם.
+  let runSeq = 0;
+
   window.renderTeacherHome = async function (host) {
+    const seq = ++runSeq;
+    // מנקים מיד: אחרת התפריט של המשתמש הקודם נשאר על המסך עד שהנתונים
+    // מגיעים — כלומר מי שהתחלף רואה לרגע מסכים שאינם שלו.
+    host.innerHTML = '<div class="page-loading"><span class="spin">' +
+      '<i class="bi bi-arrow-repeat"></i></span><div>טוען…</div></div>';
     const cats = await window.store.list('categories');
+    if (seq !== runSeq) return;
     const catOpts = cats.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
     const pickHtml = await window.cv3Picker.html('th');
+    if (seq !== runSeq) return;
     const u = window.currentUser || {};
     const isMechanech = u.role === 'מחנך';
+    // כפתורי הפעולה נגזרים מההרשאות בפועל, ולא מרשימה קשיחה.
+    // קודם היו כאן ארבעה כפתורים קבועים (מעקב/נוכחות/מבחנים/תלמידים), ורשת
+    // האריחים מוסתרת למורים — כך שמסך שהמנהל הוסיף למורה בהגדרות (למשל
+    // "דרכון" לרפאל רוקמיל) פשוט לא היה לו דרך להגיע אליו בכלל.
+    const allowed = (window.MODULES || []).filter(m =>
+      !m.adminOnly && m.id !== 'settings' &&
+      (!window.Auth || !window.Auth.canAccess || window.Auth.canAccess(m.id)) &&
+      // "תלמידים" נשמר למחנך בלבד — מלמד מזין ולא מעיין בתיקי התלמידים
+      (m.id !== 'students' || isMechanech));
+    const goBtn = m => '<button class="teacher-btn" data-go="' + m.id + '">' +
+      '<i class="bi ' + m.icon + '"></i><span>' +
+      esc(m.id === 'behavior' ? 'מעקב מלא' : m.id === 'students' ? 'התלמידים שלי' : m.label) +
+      '</span></button>';
     host.innerHTML =
       '<div class="teacher-card"><h3><i class="bi bi-lightning-charge"></i> רישום מהיר לתלמיד</h3>' +
         '<div class="qr-grid" style="grid-template-columns:repeat(3,1fr) auto">' +
@@ -21,12 +46,8 @@
           '<input class="inp mb0 fld-wide" id="thNote" placeholder="הערה (רשות)" style="grid-column:1/-2">' +
           '<button class="btn-primary" id="thSave"><i class="bi bi-check-lg"></i> שמור רישום</button>' +
         '</div><div id="thMsg" class="count-line" style="margin-top:8px;min-height:1.2em"></div></div>' +
-      '<div class="teacher-actions">' +
-        '<button class="teacher-btn" data-go="behavior"><i class="bi bi-clipboard-check"></i><span>מעקב מלא</span></button>' +
-        '<button class="teacher-btn" data-go="attendance"><i class="bi bi-calendar-check"></i><span>נוכחות</span></button>' +
-        '<button class="teacher-btn" data-go="tests"><i class="bi bi-card-checklist"></i><span>מבחנים</span></button>' +
-        (isMechanech ? '<button class="teacher-btn" data-go="students"><i class="bi bi-people-fill"></i><span>התלמידים שלי</span></button>' : '') +
-      '</div>';
+      '<div class="teacher-actions">' + allowed.map(goBtn).join('') + '</div>';
+    if (seq !== runSeq) return;
     const pick = window.cv3Picker.wire(host, 'th');
     host.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => window.showPage(b.dataset.go)));
     host.querySelector('#thSave').addEventListener('click', async () => {
