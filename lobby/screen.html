@@ -91,7 +91,7 @@ footer{grid-column:1/-1}
 .ag.last{background:linear-gradient(90deg,rgba(190,70,60,.55),rgba(190,70,60,.12));
   border-inline-start-color:#e0705f}
 .ag.last .cd{color:#ffb3a7;animation:blink 1s infinite}
-#agBar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:8px;overflow:hidden;display:none}
+#agBar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:12px;overflow:hidden;display:none;flex:0 0 auto}
 #agBar i{display:block;height:100%;width:0;border-radius:99px;
   background:linear-gradient(90deg,var(--gold),var(--gold-lt));transition:width 1s linear}
 
@@ -597,11 +597,15 @@ function paintCountdown(left, total, nxt) {
   if (!cd) { cd = document.createElement('span'); cd.className = 'cd'; row.appendChild(cd); }
   row.classList.remove('warn', 'last');
   if (left == null) { cd.textContent = ''; bar.style.display = 'none'; return; }
+  // הזמן שנותר הוא עד *סוף* המשבצת הפעילה — "עוד 11 דק׳" ליד שם השיעור נקרא
+  // כאילו הוא עוד לא התחיל. בשורה עתידית (לפני פתיחת היום) המשמעות הפוכה.
+  var isNow = row.classList.contains('now');
   if (left <= CD_WARN) {
-    cd.textContent = mmss(left);
+    cd.textContent = (isNow ? 'נותרו ' : 'בעוד ') + mmss(left);
     row.classList.add(left <= CD_LAST ? 'last' : 'warn');
   } else {
-    cd.textContent = 'עוד ' + Math.ceil(left / 60) + ' דק׳';
+    var m = Math.ceil(left / 60);
+    cd.textContent = isNow ? 'נותרו ' + m + ' דק׳' : 'מתחיל בעוד ' + m + ' דק׳';
   }
   if (total > 0) {
     bar.style.display = 'block';
