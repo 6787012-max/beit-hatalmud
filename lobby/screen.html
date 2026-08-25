@@ -750,7 +750,8 @@ function drawAgenda() {
     font = clamp(per * 0.40, AG_MINF, AG_MAXF);
     pad = clamp((per - font * 1.5) / 2, 2, 14);
     rowH = font * 1.5 + pad * 2;
-    if (show <= 2 || show * rowH + (show - 1) * AG_GAP <= H) break;
+    // מרווח ביטחון: עיגול גופנים וגבהי שורה בפועל סוטים מהחישוב בכמה פיקסלים
+    if (show <= 2 || show * rowH + (show - 1) * AG_GAP <= H - 6) break;
     show--;
     if (show < n) from = Math.max(0, Math.min(n - show, (idx < 0 ? 0 : idx) - 1));
   }
