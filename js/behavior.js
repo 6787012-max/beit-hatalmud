@@ -27,6 +27,7 @@
 
   async function renderBehavior(page) {
     const [studs, cs, evs, cls] = await Promise.all([students(), cats(), events(), classes()]);
+    if (window.Author) await window.Author.load();
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
     const clsOf = sid => { const s = studs.find(x => x.id == sid); const c = s && cls.find(x => x.id == s.class_id); return c ? c.name : 'ללא כיתה'; };
@@ -50,7 +51,7 @@
         '</div></div>' +
       '<div class="toolbar" style="grid-template-columns:1fr auto auto auto">' + pickFilter +
         '<select class="inp mb0" id="fCat"><option value="">כל הקטגוריות</option>' + catFilterOpts + '</select>' +
-        '<select class="inp mb0" id="fGroup" title="תצוגה לפי"><option value="">ללא קיבוץ</option><option value="student">לפי תלמיד</option><option value="class">לפי כיתה</option><option value="cat">לפי קטגוריה</option></select>' +
+        '<select class="inp mb0" id="fGroup" title="תצוגה לפי"><option value="">ללא קיבוץ</option><option value="student">לפי תלמיד</option><option value="class">לפי כיתה</option><option value="cat">לפי קטגוריה</option><option value="by">לפי מי שרשם</option></select>' +
         '<span class="count-line" id="evCount" style="align-self:center"></span></div>' +
       '<div id="timeline"></div>' +
       '<div id="evEmpty" class="empty-state" hidden><i class="bi bi-clipboard-check"></i><div>אין דיווחים עדיין — השתמש בדיווח המהיר למעלה</div></div>';
@@ -88,10 +89,13 @@
       '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
       '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + esc(catOf(e.category_id)) +
       (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
-      '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') + '</div>' +
+      '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
+        ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
       '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
       '<button class="mini danger" data-del="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></div>';
-    const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id) : catOf(e.category_id) || 'ללא קטגוריה';
+    const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id)
+      : g === 'by' ? (window.Author ? window.Author.name(e.created_by) : 'לא ידוע')
+      : catOf(e.category_id) || 'ללא קטגוריה';
     function draw() {
       const rows = filtered();
       const g = page.querySelector('#fGroup').value;
@@ -157,9 +161,10 @@
     page.querySelector('#fCat').addEventListener('change', draw);
     page.querySelector('#fGroup').addEventListener('change', draw);
     page.querySelector('#behCsv').addEventListener('click', () => {
-      const head = ['תלמיד', 'קטגוריה', 'תאריך', 'שעה', 'הערה'];
+      const head = ['תלמיד', 'קטגוריה', 'תאריך', 'שעה', 'הערה', 'נרשם ע"י'];
       const lines = [head.join(',')].concat(filtered().map(e =>
-        [nameOf(e.student_id), catOf(e.category_id), e.event_date, e.event_time || '', e.note || '']
+        [nameOf(e.student_id), catOf(e.category_id), e.event_date, e.event_time || '', e.note || '',
+         window.Author ? window.Author.name(e.created_by) : '']
           .map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')));
       const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'behavior_report.csv'; a.click();
@@ -193,13 +198,16 @@
         '</div></div><div id="logList-' + uid + '"></div>' +
         '<div id="logEmpty-' + uid + '" class="empty-state" hidden><i class="bi ' + icon + '"></i><div>אין רישומים עדיין</div></div>';
       const pick = window.cv3Picker.wire(page, 'l');
+      if (window.Author) await window.Author.load();
       let data = await window.store.list(table);
       const _ids = window.cv3Students ? await window.cv3Students.accessibleIds() : null;
       if (_ids) data = data.filter(x => _ids.includes(x.student_id));
       function draw() {
         page.querySelector('#logList-' + uid).innerHTML = data.slice().reverse().map(x =>
           '<div class="tl-item"><span class="sev-dot mid"></span><div class="tl-main"><strong>' + esc(nameOf(x.student_id)) + '</strong> · ' + esc(x.level) +
-          (x.note ? ' <span class="tl-note">— ' + esc(x.note) + '</span>' : '') + '</div><div class="tl-meta">' + esc(x.date) + '</div></div>').join('');
+          (x.note ? ' <span class="tl-note">— ' + esc(x.note) + '</span>' : '') + '</div><div class="tl-meta">' + esc(x.date) +
+          ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(x.created_by) : '') +
+          '</div></div>').join('');
         page.querySelector('#logEmpty-' + uid).hidden = data.length > 0;
       }
       page.querySelector('#lSave-' + uid).addEventListener('click', async () => {

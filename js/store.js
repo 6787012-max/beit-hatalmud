@@ -148,7 +148,28 @@
     if (!res.ok) reportReadFailure(table, res.error);
     return res.data || [];
   }
+  // חתימת מבצע — מי רשם את הרשומה.
+  // נעשה כאן ולא בכל מודול בנפרד, כי "בכל מקום שיופיע מי מילא את זה" (בקשת
+  // יוסף) חייב לכלול גם מסכים שייכתבו בעתיד. כל טבלה ברשימה הזאת אכן מכילה
+  // עמודת created_by — הוספת טבלה בלעדיה תפיל את ה-insert.
+  const AUTHORED = {
+    attendance: 1, behavior_events: 1, calendar_events: 1, conversations: 1,
+    expenses: 1, forms: 1, functioning: 1, income: 1, medications: 1,
+    meetings: 1, passport: 1, projects: 1, reading: 1, reading_assessments: 1,
+    student_docs: 1, tasks: 1, tests: 1, tla_class_templates: 1, tla_goals: 1,
+    tla_meetings: 1, tla_plans: 1, tla_schedule: 1, voice_reports: 1, writing: 1,
+  };
+
+  function stampAuthor(table, row) {
+    if (!AUTHORED[table]) return row;
+    if (row && row.created_by != null) return row;      // מודול שכבר חתם — לא נוגעים
+    const uid = (window.currentUser && window.currentUser.id) || null;
+    if (!uid) return row;
+    return Object.assign({}, row, { created_by: uid });
+  }
+
   async function add(table, row) {
+    row = stampAuthor(table, row);
     if (DEMO) { row = Object.assign({}, row); if (!seqs[table]) seqs[table] = 1; row.id = seqs[table]++; (mem[table] = mem[table] || []).push(row); return { ok: true, data: [row] }; }
     return window.db.insert(table, row);
   }

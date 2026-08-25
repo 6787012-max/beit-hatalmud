@@ -42,11 +42,13 @@
         '<div id="recList-' + uid + '"></div>' +
         '<div id="recEmpty-' + uid + '" class="empty-state" hidden><i class="bi ' + cfg.icon + '"></i><div>אין רישומים עדיין</div></div>';
       const pick = window.cv3Picker.wire(page, cfg.table);
+      if (window.Author) await window.Author.load();
       let data = rows;
       function draw() {
         page.querySelector('#recList-' + uid).innerHTML = data.slice().reverse().map(x =>
           '<div class="tl-item"><span class="sev-dot mid"></span><div class="tl-main"><strong>' + esc(nameOf(x.student_id)) + '</strong> · ' +
-          cfg.fields.map(f => esc(x[f.k])).filter(Boolean).join(' · ') + '</div><div class="tl-meta">' + esc(x[cfg.dateField || 'date'] || x.date || x.event_date || '') + '</div>' +
+          cfg.fields.map(f => esc(x[f.k])).filter(Boolean).join(' · ') + '</div><div class="tl-meta">' + esc(x[cfg.dateField || 'date'] || x.date || x.event_date || '') +
+          ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(x.created_by) : '') + '</div>' +
           '<button class="mini" data-edit="' + x.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
           '<button class="mini danger" data-del="' + x.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></div>').join('');
         page.querySelector('#recEmpty-' + uid).hidden = data.length > 0;
@@ -118,10 +120,12 @@
   async function renderAttendance(page) {
     const studs = await students();
     const classes = window.cv3Students ? await window.cv3Students.getClasses() : [];
+    if (window.Author) await window.Author.load();
     const has = new Set(studs.map(s => s.class_id));
     const clsOpts = classes.filter(c => has.has(c.id)).map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
     const state = {};      // סטטוס מוצג לכל תלמיד ביום הנבחר
     const rowIds = {};     // מזהה רשומת הנוכחות הקיימת — כדי לעדכן במקום למחוק+להוסיף
+    const rowBy = {};      // מי סימן את הנוכחות של אותו תלמיד באותו יום
     const busy = {};       // נעילה פר-תלמיד נגד לחיצות רצופות
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>נוכחות</h2></div>' +
@@ -134,7 +138,7 @@
         (window.cv3Sort ? window.cv3Sort.bar('att') : '') +
         '<span class="count-line" id="attSum" style="align-self:center"></span></div>' +
       '<div class="table-wrap entry-ui"><table class="tbl"><thead><tr>' +
-        '<th style="width:44px">#</th><th>תלמיד</th><th>נוכחות</th></tr></thead>' +
+        '<th style="width:44px">#</th><th>תלמיד</th><th>נוכחות</th><th style="width:150px">סומן ע"י</th></tr></thead>' +
         '<tbody id="attBody"></tbody></table></div>';
     function visible() {
       const cid = page.querySelector('#attClass').value, q = (page.querySelector('#attSearch').value || '').trim();
@@ -148,7 +152,8 @@
         const btn = (val, lbl, cls) => '<button class="att-btn ' + cls + (v === val ? ' on' : '') + '" data-sid="' + s.id + '" data-v="' + val + '">' + lbl + '</button>';
         return '<tr><td class="idx">' + n + '</td>' +
           '<td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> ' + esc(s.name) + '</td>' +
-          '<td class="att-cell">' + btn('present', 'נוכח', 'p') + btn('late', 'איחור', 'l') + btn('absent', 'נעדר', 'a') + '</td></tr>';
+          '<td class="att-cell">' + btn('present', 'נוכח', 'p') + btn('late', 'איחור', 'l') + btn('absent', 'נעדר', 'a') + '</td>' +
+          '<td class="att-by">' + (v && window.Author ? window.Author.cell(rowBy[s.id]) : '<span class="au-none">—</span>') + '</td></tr>';
       };
       page.querySelector('#attBody').innerHTML = window.cv3Sort
         ? window.cv3Sort.rows(page, 'att', visible(), clsNameOf, row, 3)
@@ -167,7 +172,10 @@
           // ההוספה נכשלה — הרישום הקודם כבר נמחק והתלמיד נשאר בלי נוכחות כלל.
           const existing = rowIds[sid];
           const r = existing
-            ? await window.store.update('attendance', existing, { status: v })
+            // גם בעדכון נחתם המבצע: "סומן ע\"י" הוא מי שקבע את הסימון האחרון,
+            // אחרת המסך יראה משתמש אחד והמסד יזכור אחר.
+            ? await window.store.update('attendance', existing,
+                { status: v, created_by: (window.currentUser && window.currentUser.id) || null })
             : await add('attendance', { student_id: sid, date: d, status: v });
           if (!r.ok) {
             state[sid] = prev; draw();
@@ -175,6 +183,7 @@
             return;
           }
           if (!existing) { const nr = r.data && r.data[0]; if (nr && nr.id) rowIds[sid] = nr.id; }
+          rowBy[sid] = (window.currentUser && window.currentUser.id) || null;
           window.UI.toast('נשמר');
         } finally { busy[sid] = false; }
       }));
@@ -182,9 +191,10 @@
     async function loadDate() {
       Object.keys(state).forEach(k => delete state[k]);
       Object.keys(rowIds).forEach(k => delete rowIds[k]);
+      Object.keys(rowBy).forEach(k => delete rowBy[k]);
       const d = page.querySelector('#attDate').value;
       (await list('attendance')).filter(a => a.date === d).forEach(a => {
-        state[a.student_id] = a.status; rowIds[a.student_id] = a.id;
+        state[a.student_id] = a.status; rowIds[a.student_id] = a.id; rowBy[a.student_id] = a.created_by || null;
       });
       draw();
     }
