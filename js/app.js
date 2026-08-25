@@ -22,6 +22,9 @@
     { id: 'calendar',      label: 'לוח שנה',          icon: 'bi-calendar3',       group: G2, color: '#117a65' },
     { id: 'reports',       label: 'דשבורד ודוחות',    icon: 'bi-graph-up-arrow',  group: G3, color: '#34495e' },
     { id: 'cashbox',       label: 'קופה כללית',       icon: 'bi-wallet2',         group: G3, color: '#16794f' },
+    // קופה קטנה — מסך נפרד, וכמה קופות בתוכו (בית התלמוד · משמרת חיים).
+    // "משמרת חיים" היא גוף אחר לגמרי; אין שום סיכום שחוצה קופות.
+    { id: 'pettycash',     label: 'קופה קטנה',        icon: 'bi-receipt-cutoff',  group: G3, color: '#b45309' },
     { id: 'yemot',         label: 'קו ימות המשיח',     icon: 'bi-telephone-inbound', group: G3, color: '#0e7490', adminOnly: true },
     { id: 'voicereports',  label: 'דיווחים קוליים',    icon: 'bi-mic-fill',        group: G3, color: '#8e44ad', adminOnly: true },
     { id: 'exporter',      label: 'יצוא והדפסה',      icon: 'bi-printer',         group: G3, color: '#475569' },
