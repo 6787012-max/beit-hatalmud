@@ -481,7 +481,7 @@
       '<label class="fld"><span>סוג</span><select class="inp mb0" id="c_hl">' +
         HL.map(h => '<option value="' + h.v + '"' + ((c.highlight || '') === h.v ? ' selected' : '') + '>' + esc(h.label) + '</option>').join('') +
       '</select></label>' +
-      '<label class="fld fld-wide"><span>הערה</span><input class="inp mb0" id="c_note" value="' + esc(c.note || '') + '"></label>' +
+      '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="c_note" rows="3">' + esc(c.note || '') + '</textarea></label>' +
       '</div><p class="login-hint" style="text-align:right">ריקון הנושא וההערה מוחק את המשבצת.</p>';
     window.UI.modal({
       title: DAYS[d - 1] + ' · משבצת ' + (i + 1), bodyHTML: body, saveLabel: 'שמירה',

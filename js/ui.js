@@ -108,6 +108,19 @@
     } catch (_) { return ''; }
   }
 
-  window.UI = { modal, toast, confirm, el: elc, fullName: fullName,
+  // גדילה אוטומטית ל-textarea של הדיווחים. `field-sizing:content` עושה את זה
+  // ב-CSS, אבל הוא עוד לא נתמך בכל דפדפן — ובלעדיו שדה עם 8 שורות טקסט מציג
+  // 3 ומסתיר את השאר. מאזין אחד ברמת המסמך מכסה גם תוכן שנוצר אחרי הטעינה.
+  const AUTO_MAX = () => Math.round(window.innerHeight * 0.4);
+  function autoGrow(t) {
+    if (!t || t.tagName !== 'TEXTAREA' || !t.classList.contains('ta-auto')) return;
+    if (CSS && CSS.supports && CSS.supports('field-sizing', 'content')) return;
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight + 2, AUTO_MAX()) + 'px';
+  }
+  document.addEventListener('input', e => autoGrow(e.target), true);
+  document.addEventListener('focusin', e => autoGrow(e.target), true);
+
+  window.UI = { modal, toast, confirm, el: elc, fullName: fullName, autoGrow: autoGrow,
     hebDate: hebDate, hebYear: hebYear, gematria: gematria };
 })();

@@ -174,7 +174,7 @@
           '<label class="fld fld-wide"><span>כותרת *</span><input class="inp mb0" id="ce_title" autocomplete="off"></label>' +
           '<label class="fld"><span>שעה</span><input class="inp mb0" id="ce_time" type="time"></label>' +
           '<label class="fld"><span>סוג</span><select class="inp mb0" id="ce_kind">' + KIND_OPTS + '</select></label>' +
-          '<label class="fld fld-wide"><span>הערה</span><input class="inp mb0" id="ce_note" autocomplete="off"></label>' +
+          '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ce_note" rows="3"></textarea></label>' +
         '</div>';
 
       const hf = hebFull(d), gf = gregFull(d);

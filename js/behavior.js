@@ -46,7 +46,7 @@
           '<div style="display:flex;flex-direction:column;gap:2px"><input class="inp mb0" id="qDate" type="date" value="' + today() + '" title="תאריך">' +
             '<span class="heb-date" id="qDateHeb" style="font-size:.72rem;color:var(--muted,#888);padding-right:2px"></span></div>' +
           '<input class="inp mb0" id="qTime" type="time" title="שעה">' +
-          '<input class="inp mb0 fld-wide" id="qNote" placeholder="הערה" style="grid-column:1/-2">' +
+          '<textarea class="inp mb0 fld-wide ta-auto" id="qNote" rows="3" placeholder="הערה — אפשר לכתוב כמה שורות" style="grid-column:1/-2"></textarea>' +
           '<button class="btn-primary sm" id="qSave"><i class="bi bi-plus-lg"></i> רישום</button>' +
         '</div></div>' +
       '<div class="toolbar" style="grid-template-columns:1fr auto auto auto">' + pickFilter +
@@ -136,7 +136,7 @@
             '<label class="fld"><span>תאריך</span><input class="inp mb0" id="ee_date" type="date" value="' + esc(String(ev.event_date || '').slice(0, 10)) + '"></label>' +
             '<label class="fld"><span>שעה</span><input class="inp mb0" id="ee_time" type="time" value="' + esc(ev.event_time || '') + '"></label>' +
             '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev">' + sevSel + '</select></label>' +
-            '<label class="fld fld-wide"><span>הערה</span><input class="inp mb0" id="ee_note" value="' + esc(ev.note || '') + '"></label>' +
+            '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="4">' + esc(ev.note || '') + '</textarea></label>' +
           '</div>',
         onSave: async (mel) => {
           const row = {
@@ -193,7 +193,7 @@
         '<div class="qr-card"><h3><i class="bi ' + icon + '"></i> רישום חדש</h3><div class="qr-grid">' +
           pickHtml +
           '<input class="inp mb0" id="lLevel-' + uid + '" placeholder="רמה / הישג">' +
-          '<input class="inp mb0" id="lNote-' + uid + '" placeholder="הערה (רשות)">' +
+          '<textarea class="inp mb0 ta-auto" id="lNote-' + uid + '" rows="2" placeholder="הערה (רשות)"></textarea>' +
           '<button class="btn-primary sm" id="lSave-' + uid + '"><i class="bi bi-plus-lg"></i> הוסף</button>' +
         '</div></div><div id="logList-' + uid + '"></div>' +
         '<div id="logEmpty-' + uid + '" class="empty-state" hidden><i class="bi ' + icon + '"></i><div>אין רישומים עדיין</div></div>';

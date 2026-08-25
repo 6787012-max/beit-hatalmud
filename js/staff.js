@@ -163,7 +163,7 @@
           '<label class="fld"><span>פעיל</span><select class="inp mb0" data-f="active">' +
             '<option value="true"' + (r.active !== false ? ' selected' : '') + '>כן</option>' +
             '<option value="false"' + (r.active === false ? ' selected' : '') + '>לא</option></select></label>' +
-          '<label class="fld fld-wide"><span>הערה</span><input class="inp mb0" data-f="note" value="' + esc(r.note || '') + '"></label>' +
+          '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" data-f="note" rows="3">' + esc(r.note || '') + '</textarea></label>' +
           '</div>',
         onSave: async (m) => {
           const row = {};

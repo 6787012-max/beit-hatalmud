@@ -17,6 +17,31 @@
   ];
   const regVal = (s, label) => (s && s.reg && s.reg[label] != null) ? String(s.reg[label]) : '';
 
+  // ── תמונות תלמידים (student_photos) ──────────────────────────────────
+  // הן יושבות בטבלה נפרדת ולא ב-students, כי כמעט כל מסך במערכת שואב את
+  // students וזה היה מוסיף ~30KB לתלמיד לכל טעינה. ראה migration_student_photos.sql.
+  //   thumb (~96px, ~2KB) — לעיגול ברשימות, נטען פעם אחת לכל התלמידים.
+  //   photo (~480px, ~16KB) — לכרטיס, נטען רק לתלמיד שנפתח.
+  const thumbs = { loaded: false, map: {} };
+  async function loadThumbs() {
+    if (thumbs.loaded) return thumbs.map;
+    thumbs.loaded = true;                       // גם בכישלון — לא לנסות שוב בכל ציור
+    try {
+      const rows = await window.store.list('student_photos', { select: 'student_id,mime,thumb' });
+      (rows || []).forEach(r => { if (r.thumb) thumbs.map[r.student_id] = 'data:' + (r.mime || 'image/jpeg') + ';base64,' + r.thumb; });
+    } catch (_) { /* אין תמונות — נופלים לראשי תיבות */ }
+    return thumbs.map;
+  }
+  // עיגול התלמיד: תמונה אם יש, אחרת שתי האותיות הראשונות כמו קודם
+  function avaHTML(st, cls) {
+    const u = thumbs.map[st.id];
+    const c = 'ava' + (cls ? ' ' + cls : '');
+    return u
+      ? '<span class="' + c + ' ava-img"><img src="' + u + '" alt="" loading="lazy"></span>'
+      : '<span class="' + c + '">' + esc((st.name || '?').slice(0, 2)) + '</span>';
+  }
+  window.cv3Avatar = avaHTML;
+
   // כל הנתונים דרך המאגר המרכזי (store.js) — משותף עם שאר המודולים.
   async function getClasses() { return window.store.list('classes'); }
 
@@ -56,7 +81,7 @@
   const classNameOf = (classes, id) => { const c = classes.find(x => x.id === id); return c ? c.name : ''; };
 
   async function render(page) {
-    const [students, classes] = await Promise.all([getStudents(), getClasses()]);
+    const [students, classes] = await Promise.all([getStudents(), getClasses(), loadThumbs()]);
     page.innerHTML =
       '<div class="page-head">' +
         '<button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
@@ -98,7 +123,7 @@
       const tr = (s, n) =>
         '<tr>' +
         '<td class="idx">' + n + '</td>' +
-        '<td><span class="ava">' + esc((s.name || '?').slice(0, 2)) + '</span> <span class="name-link" data-view="' + s.id + '">' + esc(s.name) + '</span></td>' +
+        '<td>' + avaHTML(s) + ' <span class="name-link" data-view="' + s.id + '">' + esc(s.name) + '</span></td>' +
         '<td>' + esc(classNameOf(classes, s.class_id)) + '</td>' +
         '<td>' + esc(s.parent_name) + '</td>' +
         '<td>' + (s.parent_phone ? '<a href="tel:' + esc(s.parent_phone) + '">' + esc(s.parent_phone) + '</a>' : '') + '</td>' +
@@ -128,7 +153,7 @@
       // קטגוריות הקריאה הוצגו כ"משימות" ותיק המסמכים נעלם. אין להוסיף או
       // להסיר כאן שורה בלי לעדכן את שני הצדדים יחד.
       if (window.Author) await window.Author.load();
-      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs, psp] = await Promise.all([
+      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs, psp, photoRows] = await Promise.all([
         window.store.list('categories'),
         window.store.byStudent('behavior_events', s.id), window.store.byStudent('attendance', s.id),
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
@@ -142,7 +167,10 @@
         ((!window.Auth || window.Auth.canAccess('voicereports')) ? window.store.byStudent('voice_reports', s.id) : Promise.resolve([])),
         (window.cv3StudentDocs ? window.cv3StudentDocs.forStudent(s.id) : Promise.resolve([])),
         window.store.byStudent('passport', s.id),
+        window.store.list('student_photos', { select: 'student_id,mime,photo', eq: { student_id: s.id } }),
       ]);
+      const ph = (photoRows || [])[0];
+      const bigPhoto = ph && ph.photo ? 'data:' + (ph.mime || 'image/jpeg') + ';base64,' + ph.photo : '';
       const canTla = !window.Auth || window.Auth.canAccess('tla');
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
@@ -253,7 +281,9 @@
           '</div>' +
         '</div>';
       m.el.querySelector('.modal-body').innerHTML =
-        '<div class="det-head"><span class="ava lg">' + esc((s.name || '?').slice(0, 2)) + '</span>' +
+        '<div class="det-head">' + (bigPhoto
+          ? '<img class="det-photo" src="' + bigPhoto + '" alt="' + esc(s.name || '') + '">'
+          : avaHTML(s, 'lg')) +
         '<div><div class="det-name">' + esc(s.name) + '</div><span class="chip ' + (s.status === 'פעיל' ? 'ok' : 'off') + '">' + esc(s.status || '') + '</span></div></div>' +
         '<div class="det-grid">' + row('כיתה', classNameOf(classes, s.class_id)) + row('שם הורה', s.parent_name) +
           (s.parent_phone ? '<div class="det-row"><span class="det-lbl">טלפון</span><span class="det-val"><a href="tel:' + esc(s.parent_phone) + '">' + esc(s.parent_phone) + '</a></span></div>' : '') +

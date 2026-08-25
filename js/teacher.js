@@ -43,7 +43,7 @@
           '<select class="inp mb0" id="thCat"><option value="">בחר קטגוריה…</option>' + catOpts + '</select>' +
           '<input class="inp mb0" id="thDate" type="date" value="' + today() + '" title="תאריך">' +
           '<input class="inp mb0" id="thTime" type="time" title="שעה">' +
-          '<input class="inp mb0 fld-wide" id="thNote" placeholder="הערה (רשות)" style="grid-column:1/-2">' +
+          '<textarea class="inp mb0 fld-wide ta-auto" id="thNote" rows="3" placeholder="הערה (רשות) — אפשר כמה שורות" style="grid-column:1/-2"></textarea>' +
           '<button class="btn-primary" id="thSave"><i class="bi bi-check-lg"></i> שמור רישום</button>' +
         '</div><div id="thMsg" class="count-line" style="margin-top:8px;min-height:1.2em"></div></div>' +
       '<div class="teacher-actions">' + allowed.map(goBtn).join('') + '</div>';

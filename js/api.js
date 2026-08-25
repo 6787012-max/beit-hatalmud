@@ -12,7 +12,7 @@
   const PAGE = 1000;
   // טבלאות ללא עמודת id (מפתח מורכב). נלמד גם בזמן ריצה, אבל מזריעים את הידועות
   // מראש כדי לא לשרוף בקשה שנכשלת ב-400 בכל טעינה של מסך ההגדרות.
-  const noIdCol = { user_class_access: 1, student_links: 1 };
+  const noIdCol = { user_class_access: 1, student_links: 1, student_photos: 1 };
 
   async function list(table, opts) {
     if (DEMO) return { ok: true, data: [], demo: true };

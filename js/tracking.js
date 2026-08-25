@@ -28,13 +28,16 @@
       // וכולם קיימים ב-DOM במקביל. מזהים קבועים יצרו כפילות ב-HTML, כך ש-
       // document.querySelector('#recSave') החזיר את הכפתור של מסך אחר.
       const uid = cfg.table;
-      const fieldsHtml = cfg.fields.map(f =>
-        '<input class="inp mb0' + (f.wide ? ' fld-wide' : '') + '" data-f="' + f.k + '" placeholder="' + esc(f.label) + '"' + (f.type === 'number' ? ' type="number"' : '') + '>').join('');
+      // שדה `wide` הוא תמיד טקסט חופשי (סיכום שיחה, סיכום אסיפה) — textarea
+      // ולא input. בשורה אחת אי אפשר לקרוא מה שכתבת ואי אפשר לרדת שורה.
+      const fieldsHtml = cfg.fields.map(f => f.wide
+        ? '<textarea class="inp mb0 fld-wide ta-auto" rows="3" data-f="' + f.k + '" placeholder="' + esc(f.label) + '"></textarea>'
+        : '<input class="inp mb0" data-f="' + f.k + '" placeholder="' + esc(f.label) + '"' + (f.type === 'number' ? ' type="number"' : '') + '>').join('');
       page.innerHTML =
         '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>' + cfg.title + '</h2>' +
         '<div class="head-actions"><button class="btn-ghost sm" id="recCsv-' + uid + '"><i class="bi bi-download"></i> ייצוא CSV</button></div></div>' +
         (cfg.restricted ? '<div class="demo-note" style="margin:0 2px 12px"><i class="bi bi-shield-lock"></i> מידע רגיש — הגישה מוגבלת לתפקידים מורשים (נאכף ע"י ה-RLS בצד-שרת).</div>' : '') +
-        '<div class="qr-card"><h3><i class="bi ' + cfg.icon + '"></i> רישום חדש</h3><div class="qr-grid" style="grid-template-columns:repeat(' + cfg.fields.length + ',1fr) auto">' +
+        '<div class="qr-card"><h3><i class="bi ' + cfg.icon + '"></i> רישום חדש</h3><div class="qr-grid" style="grid-template-columns:repeat(' + cfg.fields.filter(f => !f.wide).length + ',1fr) auto;align-items:start">' +
           pickHtml +
           fieldsHtml +
           '<button class="btn-primary sm" id="recSave-' + uid + '"><i class="bi bi-plus-lg"></i> הוסף</button>' +
@@ -77,8 +80,10 @@
             (dk ? '<label class="fld"><span>תאריך</span><input class="inp mb0" id="er_date" type="date" value="' +
                   esc(String(rec[dk] || '').slice(0, 10)) + '"></label>' : '') +
             cfg.fields.map(f => '<label class="fld' + (f.wide ? ' fld-wide' : '') + '"><span>' + esc(f.label) + '</span>' +
-              '<input class="inp mb0" data-e="' + f.k + '"' + (f.type === 'number' ? ' type="number"' : '') +
-              ' value="' + esc(rec[f.k] == null ? '' : rec[f.k]) + '"></label>').join('') +
+              (f.wide
+                ? '<textarea class="inp mb0 ta-auto" rows="5" data-e="' + f.k + '">' + esc(rec[f.k] == null ? '' : rec[f.k]) + '</textarea>'
+                : '<input class="inp mb0" data-e="' + f.k + '"' + (f.type === 'number' ? ' type="number"' : '') +
+                  ' value="' + esc(rec[f.k] == null ? '' : rec[f.k]) + '">') + '</label>').join('') +
             '</div>',
           onSave: async (mel) => {
             const row = { student_id: Number(mel.querySelector('#er_stu').value) || null };

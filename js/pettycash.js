@@ -298,7 +298,7 @@
             '<label class="fld"><span>סטטוס</span><select class="inp mb0" id="pf_status">' + opts(STATUSES, r.status || 'שולם') + '</select></label>'
           : '<label class="fld"><span>מי הכניס</span><input class="inp mb0" id="pf_buyer" value="' + esc(r.buyer || '') + '"></label>') +
         '<label class="fld"><span>אמצעי תשלום</span><select class="inp mb0" id="pf_method"><option value="">—</option>' + opts(METHODS, r.method) + '</select></label>' +
-        '<label class="fld fld-wide"><span>הערה</span><input class="inp mb0" id="pf_note" value="' + esc(r.note || '') + '"></label>' +
+        '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="pf_note" rows="3">' + esc(r.note || '') + '</textarea></label>' +
         (isExp ? '<div class="fld fld-wide"><span>חשבונית</span>' +
           '<div id="pf_rcbox" class="login-hint" style="margin:0">' +
           (r.receipt_id ? '<i class="bi bi-paperclip"></i> ' + esc(r.receipt_name || 'מצורפת')
