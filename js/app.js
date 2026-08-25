@@ -157,11 +157,27 @@
       target.innerHTML = '<div class="page-loading"><span class="spin"><i class="bi bi-arrow-repeat"></i></span><div>טוען…</div></div>';
       try { window.PAGE_RENDERERS[id](target); } catch (e) { console.warn('renderer error', id, e); }
     }
-    if (id && id !== 'home') { try { history.replaceState({}, '', '#' + id); } catch (_) {} }
-    else { try { history.replaceState({}, '', location.pathname); } catch (_) {} }
+    // 'login' לא נכתב לכתובת: הוא מסך מצב ולא יעד, ורענון (למשל אחרי עדכון
+    // service worker) היה הופך אותו ליעד המבוקש ומאבד את הקישור הישיר המקורי.
+    // 'login' לא נוגע בכתובת בכלל: הוא מסך מצב ולא יעד. כשהוא ניקה את ה-hash,
+    // רענון (למשל אחרי עדכון service worker) איבד את הקישור הישיר שהמשתמש פתח.
+    if (id !== 'login') {
+      try {
+        if (id && id !== 'home') history.replaceState({}, '', '#' + id);
+        else history.replaceState({}, '', location.pathname);
+      } catch (_) {}
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   window.showPage = showPage;
+
+  // ניווט בכתובת (כפתור אחורה של הדפדפן, או הדבקת קישור לטאב פתוח)
+  window.addEventListener('hashchange', () => {
+    const id = String(location.hash || '').replace('#', '') || 'home';
+    const cur = document.querySelector('.page.active');
+    if (cur && cur.id === 'page-' + id) return;
+    if (id === 'home' || (window.MODULES || []).some(m => m.id === id)) showPage(id);
+  });
 
   function wireDark() {
     const btn = $('#darkBtn');
@@ -200,6 +216,10 @@
       '<button class="btn-primary" style="margin-top:16px" onclick="location.reload()">רענון</button>' +
       '</div></div>';
   }
+
+  // המסך שהתבקש בכתובת נתפס כאן, לפני שמסך הכניסה או showPage('home') מנקים
+  // את ה-hash — אחרת קישור ישיר כמו index.html#lobby תמיד נחת בבית.
+  window.__wantPage = String(location.hash || '').replace('#', '');
 
   document.addEventListener('DOMContentLoaded', () => {
     const cfg = window.CV3 || {};

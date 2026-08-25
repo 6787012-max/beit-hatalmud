@@ -101,7 +101,15 @@
     else if (A.mode === 'writeonly') document.body.classList.add('mode-writeonly');
     renderUserInfo();
     filterByPermissions();
-    if (window.showPage) window.showPage('home');
+    // קישור ישיר למסך מסוים: index.html#lobby. אם המשתמש לא מורשה — showPage
+    // עצמו יחזיר אותו לבית עם הודעה, ולכן אין צורך בבדיקה כפולה כאן.
+    let want = 'home';
+    try {
+      const h = window.__wantPage || String(location.hash || '').replace('#', '');
+      if (h && (window.MODULES || []).some(m => m.id === h)) want = h;
+      window.__wantPage = '';           // חד-פעמי: לא לחזור לשם בכל רענון פרופיל
+    } catch (_) {}
+    if (window.showPage) window.showPage(want);
   }
 
   function renderUserInfo() {
