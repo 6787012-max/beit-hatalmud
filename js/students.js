@@ -37,7 +37,9 @@
     const u = thumbs.map[st.id];
     const c = 'ava' + (cls ? ' ' + cls : '');
     return u
-      ? '<span class="' + c + ' ava-img"><img src="' + u + '" alt="" loading="lazy"></span>'
+      // בלי loading="lazy": ה-data URL כבר בזיכרון ואין בקשת רשת לחסוך, אבל
+      // הדחייה כן מונעת מהתמונה להיטען כשהשורה בתוך מיכל עם גלילה.
+      ? '<span class="' + c + ' ava-img"><img src="' + u + '" alt="" decoding="async"></span>'
       : '<span class="' + c + '">' + esc((st.name || '?').slice(0, 2)) + '</span>';
   }
   window.cv3Avatar = avaHTML;
