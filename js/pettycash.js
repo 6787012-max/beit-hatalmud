@@ -26,7 +26,10 @@
   const dmy = x => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(x || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : (x || ''); };
 
   const METHODS = ['מזומן', 'העברה', 'אשראי', 'צ׳ק', 'נדרים פלוס'];
-  const CATEGORIES = ['מזון וכיבוד', 'ניקיון', 'ציוד משרדי', 'אירועים', 'תחזוקה', 'נסיעות', 'ספרים', 'מתנות', 'אחר'];
+  // 'כללית' ו'עובד' הגיעו מהקופה הכללית שמוזגה לכאן (25/08/2026). הן ברשימה
+  // כדי שעריכת שורה שהועברה לא תאבד את הקטגוריה שלה בשקט.
+  const CATEGORIES = ['מזון וכיבוד', 'ניקיון', 'ציוד משרדי', 'אירועים', 'תחזוקה',
+    'נסיעות', 'ספרים', 'מתנות', 'כללית', 'עובד', 'אחר'];
   const STATUSES = ['שולם', 'ממתין להחזר'];
   const PENDING = 'ממתין להחזר';
 
@@ -236,6 +239,12 @@
       title: (rec ? 'עריכת ' : '') + (isExp ? 'הוצאה' : 'הכנסה') + ' — ' + esc((state.funds.find(f => f.id === state.fund) || {}).name || ''),
       saveLabel: 'שמירה',
       bodyHTML: '<div class="form-grid">' +
+        // העברה בין קופות: הרישום נרשם בקופה הלא נכונה, וזה קורה. הבורר כאן
+        // מזיז גם את השורה וגם את קובץ החשבונית שלה בדרייב — ראה onSave.
+        '<label class="fld"><span>קופה *</span><select class="inp mb0" id="pf_fund">' +
+          state.funds.map(f => '<option value="' + f.id + '"' +
+            (String(f.id) === String(r.fund_id || state.fund) ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('') +
+        '</select></label>' +
         '<label class="fld"><span>תאריך *</span><input class="inp mb0" id="pf_date" type="date" value="' + esc(r.date || today()) + '"></label>' +
         '<label class="fld"><span>סכום ₪ *</span><input class="inp mb0" id="pf_amt" type="number" step="0.01" min="0" value="' + esc(r.amount == null ? '' : r.amount) + '"></label>' +
         '<label class="fld"><span>' + (isExp ? 'ספק / חנות *' : 'מקור ההכנסה *') + '</span><input class="inp mb0" id="pf_party" value="' + esc(r.party || '') + '"></label>' +
@@ -256,8 +265,24 @@
         const party = mel.querySelector('#pf_party').value.trim();
         if (!(amount > 0)) { window.UI.toast('סכום חייב להיות גדול מאפס', 'err'); return false; }
         if (!party) { window.UI.toast(isExp ? 'שם הספק חובה' : 'מקור ההכנסה חובה', 'err'); return false; }
+        const toFund = Number(mel.querySelector('#pf_fund').value) || state.fund;
+        const from = Number(r.fund_id || state.fund);
+        // אם הרישום עובר קופה ויש לו חשבונית — מעבירים קודם את הקובץ בדרייב,
+        // ורק אם זה הצליח שומרים. אחרת השורה תצביע על קובץ בתיקייה של הקופה
+        // השנייה, וה-RLS יחסום אותה — החשבונית תיראה כאילו נעלמה.
+        let moved = null;
+        if (rec && toFund !== from && r.receipt_id) {
+          try {
+            const res = await fetch(driveUrl({ action: 'move', fundId: from, toFundId: toFund, fileId: r.receipt_id }), {
+              method: 'POST', headers: await driveAuth(),
+            });
+            const d = await res.json();
+            if (!d.ok) { window.UI.toast('העברת החשבונית נכשלה: ' + (d.error || ''), 'err'); return false; }
+            moved = d.file;
+          } catch (e) { window.UI.toast('העברת החשבונית נכשלה: ' + (e.message || e), 'err'); return false; }
+        }
         const row = {
-          fund_id: state.fund, kind: kind,
+          fund_id: toFund, kind: kind,
           date: mel.querySelector('#pf_date').value || today(),
           amount: amount, party: party,
           category: isExp ? (mel.querySelector('#pf_cat').value || null) : null,
@@ -266,10 +291,14 @@
           status: isExp ? mel.querySelector('#pf_status').value : 'שולם',
           note: mel.querySelector('#pf_note').value.trim() || null,
         };
+        if (moved) row.receipt_link = moved.webViewLink || null;
         const res = rec ? await window.store.update('petty_entries', rec.id, row)
                         : await window.store.add('petty_entries', row);
         if (!res || res.ok === false) { window.UI.toast('השמירה נכשלה: ' + ((res && res.error) || ''), 'err'); return false; }
-        window.UI.toast(rec ? 'עודכן' : 'נשמר');
+        const fundName = f => (state.funds.find(x => x.id === f) || {}).name || '';
+        window.UI.toast(toFund !== from
+          ? 'הועבר לקופת ' + fundName(toFund)
+          : (rec ? 'עודכן' : 'נשמר'));
         await draw(page);
         return true;
       },

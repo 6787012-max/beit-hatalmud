@@ -21,8 +21,9 @@
     { id: 'forms',         label: 'טפסים וחתימות',    icon: 'bi-file-earmark-check', group: G2, color: '#c0398a' },
     { id: 'calendar',      label: 'לוח שנה',          icon: 'bi-calendar3',       group: G2, color: '#117a65' },
     { id: 'reports',       label: 'דשבורד ודוחות',    icon: 'bi-graph-up-arrow',  group: G3, color: '#34495e' },
-    { id: 'cashbox',       label: 'קופה כללית',       icon: 'bi-wallet2',         group: G3, color: '#16794f' },
-    // קופה קטנה — מסך נפרד, וכמה קופות בתוכו (בית התלמוד · משמרת חיים).
+    // מסך "קופה כללית" (income/expenses) הוסר 25/08/2026 — תוכנו הועבר לקופה
+    // הקטנה של בית התלמוד (migration_cashbox_to_petty.sql). הטבלאות נשארו במסד.
+    // קופה קטנה — כמה קופות בתוכו (בית התלמוד · משמרת חיים).
     // "משמרת חיים" היא גוף אחר לגמרי; אין שום סיכום שחוצה קופות.
     { id: 'pettycash',     label: 'קופה קטנה',        icon: 'bi-receipt-cutoff',  group: G3, color: '#b45309' },
     { id: 'yemot',         label: 'קו ימות המשיח',     icon: 'bi-telephone-inbound', group: G3, color: '#0e7490', adminOnly: true },

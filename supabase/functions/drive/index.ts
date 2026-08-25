@@ -278,6 +278,31 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ── העברת חשבונית בין קופות ──
+    // כשרישום עובר מקופה לקופה, גם הקובץ בדרייב חייב לעבור: אחרת השורה
+    // מצביעה על קובץ שיושב בתיקייה של הקופה השנייה, ו-fileInAllowed יחסום
+    // אותו — כלומר החשבונית "נעלמת" מבלי שאיש מחק אותה.
+    // ההרשאה נבדקת על **שתי** התיקיות, כל אחת בנפרד ועם ה-JWT של המשתמש.
+    if (action === 'move') {
+      const fileId = u.searchParams.get('fileId') || '';
+      const toFundId = u.searchParams.get('toFundId') || '';
+      if (!fundId || !toFundId) return fail('חסר מזהה קופה מקור או יעד');
+      const dest = await allowedFolders(jwt, '', '', toFundId);
+      if (!dest.length) return fail('אין לך הרשאה לקופת היעד, או שאין לה תיקיית חשבוניות', 403);
+      const f = await fileInAllowed(fileId, folders);
+      if (!f) return fail('הקובץ אינו בתיקיית החשבוניות של קופת המקור', 403);
+      const from = (f.parents || []).filter((x: string) => folders.includes(x)).join(',');
+      const r = await gFetch(`${DRIVE}/files/${fileId}?addParents=${dest[0]}&removeParents=${encodeURIComponent(from)}` +
+        `&fields=id,name,webViewLink,parents`, { method: 'PATCH' });
+      const d = await r.json();
+      if (!r.ok) {
+        return fail(r.status === 403
+          ? 'אין הרשאת העברה לקובץ הזה — הוא לא הועלה דרך המערכת. העבר אותו בדרייב'
+          : 'ההעברה נכשלה: ' + JSON.stringify(d).slice(0, 150), r.status);
+      }
+      return json({ ok: true, file: d });
+    }
+
     // ── תיקיית משנה בתוך תיקיית התלמיד ──
     if (action === 'mkdir') {
       const folderId = u.searchParams.get('folderId') || folders[0];
