@@ -106,7 +106,13 @@
           '<label class="fld"><span>רמת גישה <small style="font-weight:400;color:var(--muted)">— מה מותר לו לעשות</small></span><select class="inp mb0" id="u_mode">' +
             [['', 'ברירת מחדל (לפי תפקיד)'], ['full', 'גישה מלאה — צפייה + עריכה'], ['readonly', 'צפייה בלבד — בלי לערוך'], ['writeonly', 'הזנה בלבד — בלי לצפות']].map(o => '<option value="' + o[0] + '"' + (((u.access_mode || '') === o[0]) ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
             '</select></label>' +
-          '<div class="fld fld-wide"><span>כיתות מורשות</span><div class="cb-grid" id="classGrid">' + (clsBoxes || '<span class="tl-note">אין כיתות — הוסף כיתה קודם</span>') + '</div></div>' +
+          '<div class="fld fld-wide"><span>כיתות מורשות</span>' +
+            '<div class="cb-grid" id="classGrid">' + (clsBoxes || '<span class="tl-note">אין כיתות — הוסף כיתה קודם</span>') + '</div>' +
+            '<div style="margin-top:7px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+              '<button type="button" class="btn-ghost sm" id="clsAll">כל השיעורים</button>' +
+              '<button type="button" class="btn-ghost sm" id="clsNone">נקה הכל</button>' +
+              '<span class="tl-note" id="clsHint" style="font-size:.78rem"></span>' +
+            '</div></div>' +
           '<div class="fld fld-wide"><span>מסכים מורשים <small style="font-weight:400;color:var(--muted)">— מנהל רואה הכל</small></span>' +
             '<div class="cb-grid" id="permGrid">' + permBoxes + '</div>' +
             '<div style="margin-top:7px;display:flex;gap:6px"><button type="button" class="btn-ghost sm" id="permAll">סמן הכל</button><button type="button" class="btn-ghost sm" id="permNone">נקה הכל</button></div></div>' +
@@ -163,7 +169,25 @@
       const pg = mm.el.querySelector('#permGrid'), roleSel = mm.el.querySelector('#u_role');
       mm.el.querySelector('#permAll').addEventListener('click', () => pg.querySelectorAll('input').forEach(c => c.checked = true));
       mm.el.querySelector('#permNone').addEventListener('click', () => pg.querySelectorAll('input').forEach(c => c.checked = false));
-      const toggleAdmin = () => { const dis = roleSel.value === 'מנהל'; mm.el.querySelectorAll('#permGrid input, #classGrid input, #permAll, #permNone').forEach(el => { el.disabled = dis; }); };
+      const cg = mm.el.querySelector('#classGrid'), clsHint = mm.el.querySelector('#clsHint');
+      mm.el.querySelector('#clsAll').addEventListener('click', () => cg.querySelectorAll('input').forEach(c => c.checked = true));
+      mm.el.querySelector('#clsNone').addEventListener('click', () => cg.querySelectorAll('input').forEach(c => c.checked = false));
+      // הכיתות המסומנות מגבילות בפועל **רק מחנך** — ב-RLS
+      // (migration_scope_roles.sql) מלמד ומפקח אינם מוגבלי-כיתה, ומנהל רואה
+      // הכל. בלי החיווי הזה מנהל שמסמן שיעור אחד למלמד מצפה להגבלה שלא קורית.
+      const CLS_HINT = {
+        'מחנך':  'הרב יראה — ויערוך — רק את תלמידי השיעורים המסומנים. אפשר לסמן אחד, שניים או את כולם.',
+        'מנהל':  'מנהל רואה את כל השיעורים; אין מה לסמן.',
+        'מלמד':  'מלמד מזין לכל התלמידים ואינו מוגבל לשיעור — הסימון כאן לא מגביל אותו.',
+        'מפקח':  'מפקח צופה בכל המוסד — הסימון כאן לא מגביל אותו.',
+        'מזכירה': 'מזכירה עובדת מול כספים ומנהלה — הסימון כאן לא מגביל אותה.',
+      };
+      const toggleAdmin = () => {
+        const dis = roleSel.value === 'מנהל';
+        mm.el.querySelectorAll('#permGrid input, #classGrid input, #permAll, #permNone, #clsAll, #clsNone')
+          .forEach(el => { el.disabled = dis; });
+        if (clsHint) clsHint.textContent = CLS_HINT[roleSel.value] || '';
+      };
       // בשינוי תפקיד — עדכן את הסימונים לברירת-המחדל של התפקיד החדש (המנהל יכול אחר-כך להתאים ידנית)
       roleSel.addEventListener('change', () => {
         toggleAdmin();
