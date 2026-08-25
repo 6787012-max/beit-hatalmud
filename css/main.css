@@ -207,10 +207,37 @@ textarea.inp.ta-auto{overflow-y:auto}
    נחתך אחרת באמצע הפנים. */
 .ava-img{padding:0; overflow:hidden; background:var(--bg)}
 .ava-img img{width:100%; height:100%; object-fit:cover; object-position:50% 12%; display:block}
-/* תמונת התלמיד בכרטיס — פורטרט, לא עיגול */
-.det-photo{width:78px; height:104px; object-fit:cover; object-position:50% 10%;
-  border-radius:12px; border:1px solid var(--line); background:var(--bg);
-  margin-inline-end:12px; flex:none; box-shadow:0 2px 8px rgba(0,0,0,.10)}
+/* תמונת התלמיד בכרטיס — פורטרט, לא עיגול.
+   הגודל נגזר מהמקור השמור (360x480): מעבר לזה התמונה מתחילה להיראות רכה. */
+.det-photo{width:150px; height:200px; object-fit:cover; object-position:50% 10%;
+  border-radius:14px; border:1px solid var(--line); background:var(--bg);
+  margin-inline-end:14px; flex:none; box-shadow:0 4px 14px rgba(0,0,0,.13)}
+@media (max-width:560px){
+  .det-photo{width:104px; height:139px; border-radius:11px; margin-inline-end:10px}
+}
+/* כפתור ההגדלה עוטף את התמונה ולא מוסיף לה מסגרת משלו */
+.det-photo-btn{position:relative; padding:0; border:0; background:none; cursor:zoom-in;
+  line-height:0; border-radius:14px; flex:none}
+.det-photo-btn .det-photo{margin:0}
+.det-photo-zoom{position:absolute; inset-inline-end:8px; inset-block-end:8px;
+  display:grid; place-items:center; width:28px; height:28px; border-radius:8px;
+  background:rgba(0,0,0,.55); color:#fff; font-size:.8rem; opacity:0; transition:opacity .15s}
+.det-photo-btn:hover .det-photo-zoom,.det-photo-btn:focus-visible .det-photo-zoom{opacity:1}
+
+/* תצוגת התמונה המוגדלת */
+.photo-ov{position:fixed; inset:0; z-index:120; background:rgba(8,14,20,.92);
+  display:grid; place-items:center; padding:24px; cursor:zoom-out;
+  animation:photoIn .14s ease-out}
+@keyframes photoIn{from{opacity:0}to{opacity:1}}
+.photo-ov img{max-width:min(92vw,760px); max-height:82vh; object-fit:contain;
+  border-radius:14px; box-shadow:0 18px 50px rgba(0,0,0,.55); cursor:default}
+.photo-cap{position:absolute; inset-block-end:22px; inset-inline:0; text-align:center;
+  color:#fff; font-weight:800; font-size:1rem; text-shadow:0 1px 6px rgba(0,0,0,.7)}
+.photo-x{position:absolute; inset-block-start:16px; inset-inline-end:16px;
+  width:40px; height:40px; border-radius:11px; border:0; cursor:pointer;
+  background:rgba(255,255,255,.14); color:#fff; font-size:1rem}
+.photo-x:hover{background:rgba(255,255,255,.26)}
+@media print{ .photo-ov{display:none !important} }
 .det-head{display:flex; align-items:center; gap:14px; margin-bottom:16px}
 .det-name{font-size:1.2rem; font-weight:800; color:var(--primary-dark); margin-bottom:4px}
 .det-grid{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:11px; overflow:hidden; margin-bottom:16px}

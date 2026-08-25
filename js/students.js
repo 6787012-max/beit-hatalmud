@@ -44,6 +44,27 @@
   }
   window.cv3Avatar = avaHTML;
 
+  // הגדלת התמונה בלחיצה. שכבה משלה ולא UI.modal — למודאל יש כותרת, פוטר
+  // ורוחב קבוע, וכאן רוצים שהתמונה עצמה תמלא את המסך בלי מסגרת סביבה.
+  function openPhoto(src, name) {
+    if (!src) return;
+    const ov = document.createElement('div');
+    ov.className = 'photo-ov';
+    ov.innerHTML =
+      '<button class="photo-x" aria-label="סגור"><i class="bi bi-x-lg"></i></button>' +
+      '<img src="' + src + '" alt="' + esc(name || '') + '">' +
+      (name ? '<div class="photo-cap">' + esc(name) + '</div>' : '');
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    // הקלקה על הרקע סוגרת; על התמונה עצמה — לא, כדי שאפשר יהיה להתבונן בה
+    ov.addEventListener('click', e => { if (e.target !== ov.querySelector('img')) close(); });
+    // ⚠️ capture: כרטיס התלמיד הוא מודאל, ובלי capture ה-Escape היה סוגר
+    // גם אותו יחד עם התמונה.
+    document.addEventListener('keydown', onKey, true);
+  }
+  window.cv3OpenPhoto = openPhoto;
+
   // כל הנתונים דרך המאגר המרכזי (store.js) — משותף עם שאר המודולים.
   async function getClasses() { return window.store.list('classes'); }
 
@@ -284,7 +305,9 @@
         '</div>';
       m.el.querySelector('.modal-body').innerHTML =
         '<div class="det-head">' + (bigPhoto
-          ? '<img class="det-photo" src="' + bigPhoto + '" alt="' + esc(s.name || '') + '">'
+          ? '<button class="det-photo-btn" id="detPhotoBtn" title="לחץ להגדלה">' +
+            '<img class="det-photo" src="' + bigPhoto + '" alt="' + esc(s.name || '') + '">' +
+            '<span class="det-photo-zoom"><i class="bi bi-arrows-fullscreen"></i></span></button>'
           : avaHTML(s, 'lg')) +
         '<div><div class="det-name">' + esc(s.name) + '</div><span class="chip ' + (s.status === 'פעיל' ? 'ok' : 'off') + '">' + esc(s.status || '') + '</span></div></div>' +
         '<div class="det-grid">' + row('כיתה', classNameOf(classes, s.class_id)) + row('שם הורה', s.parent_name) +
@@ -367,6 +390,8 @@
         setTimeout(done, 8000);   // דפדפנים שלא יורים afterprint
         window.print();
       });
+      const photoBtn = m.el.querySelector('#detPhotoBtn');
+      if (photoBtn) photoBtn.addEventListener('click', () => openPhoto(bigPhoto, window.UI.fullName ? window.UI.fullName(s) : s.name));
       const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
       const ctb = m.el.querySelector('[data-cert]'); if (ctb && window.cv3Cert) ctb.addEventListener('click', () => window.cv3Cert.openCertificate(s));
       const tlb = m.el.querySelector('[data-tla]'); if (tlb && window.cv3Tla) tlb.addEventListener('click', () => { m.close(); window.cv3Tla.openForStudent(s); });
