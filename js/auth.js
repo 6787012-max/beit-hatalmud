@@ -194,7 +194,11 @@
       st = Array.isArray(data) ? data[0] : data;
     } catch (_) { return; }
     if (!st || !st.needs_change) { A.pwOk = true; return; }
-    const left = st.deadline ? Math.ceil((new Date(st.deadline) - Date.now()) / 86400000) : null;
+    // round ולא ceil: ברגע ההתראה הראשונה ההפרש הוא 7.0000x ימים, ו-ceil
+    // היה מציג "נותרו 8 ימים" על חלון של שבוע. max(1) כדי שלא יוצג 0 ביום האחרון.
+    const left = st.deadline
+      ? Math.max(1, Math.round((new Date(st.deadline) - Date.now()) / 86400000))
+      : null;
     const show = () => changeOwnPassword({
       force: true, overdue: !!st.overdue, blocking: !!st.overdue,
       daysLeft: (left != null && left > 0) ? left : null,
