@@ -7,21 +7,26 @@
     opts = opts || {};
     const ov = elc('div', 'modal-ov');
     const card = elc('div', 'modal-card');
+    // opts.noClose — מודאל חוסם: בלי X, בלי "ביטול", בלי סגירה בלחיצה על
+    // הרקע או ב-Escape. משמש רק כשאסור להמשיך בלי לבצע את הפעולה
+    // (למשל החלפת סיסמת ברירת מחדל אחרי שעבר הדדליין).
     card.innerHTML =
       '<div class="modal-head"><h3>' + (opts.title || '') + '</h3>' +
-      '<button class="modal-x" aria-label="סגור"><i class="bi bi-x-lg"></i></button></div>' +
+      (opts.noClose ? '' : '<button class="modal-x" aria-label="סגור"><i class="bi bi-x-lg"></i></button>') + '</div>' +
       '<div class="modal-body"></div>' +
       '<div class="modal-foot">' +
-      '<button class="btn-ghost" data-act="cancel">ביטול</button>' +
+      (opts.noClose ? '' : '<button class="btn-ghost" data-act="cancel">' + (opts.cancelLabel || 'ביטול') + '</button>') +
       (opts.onSave ? '<button class="btn-primary sm' + (opts.saveAlways ? ' always-on' : '') + '" data-act="save">' + (opts.saveLabel || 'שמירה') + '</button>' : '') +
       '</div>';
     card.querySelector('.modal-body').innerHTML = opts.bodyHTML || '';
     ov.appendChild(card);
     document.body.appendChild(ov);
     const close = () => { ov.remove(); if (opts.onClose) { try { opts.onClose(); } catch (_) {} } };
-    ov.addEventListener('click', e => { if (e.target === ov) close(); });
-    card.querySelector('.modal-x').addEventListener('click', close);
-    card.querySelector('[data-act="cancel"]').addEventListener('click', close);
+    if (!opts.noClose) {
+      ov.addEventListener('click', e => { if (e.target === ov) close(); });
+      card.querySelector('.modal-x').addEventListener('click', close);
+      card.querySelector('[data-act="cancel"]').addEventListener('click', close);
+    }
     const saveBtn = card.querySelector('[data-act="save"]');
     if (saveBtn) saveBtn.addEventListener('click', async () => {
       const ok = await opts.onSave(card);

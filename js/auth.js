@@ -110,6 +110,8 @@
       window.__wantPage = '';           // חד-פעמי: לא לחזור לשם בכל רענון פרופיל
     } catch (_) {}
     if (window.showPage) window.showPage(want);
+    // אחרי שהמסך נטען — בודקים אם הוא עדיין בסיסמת ברירת המחדל
+    setTimeout(checkPasswordPolicy, 900);
   }
 
   function renderUserInfo() {
@@ -129,23 +131,77 @@
   }
 
   // שינוי סיסמה עצמי — זמין לכל משתמש מחובר (מנהל/מורה/צוות).
-  function changeOwnPassword() {
+  // opts.force — הפעלה מתוך כפיית החלפת סיסמת ברירת המחדל: כותרת מסבירה,
+  // ואם עבר הדדליין גם מודאל חוסם שאי אפשר לסגור.
+  function changeOwnPassword(opts) {
+    opts = opts || {};
     const u = A.currentUser; if (!u) return;
+    // הסיסמה הראשונית היא הטלפון, ולכן היא פסולה כסיסמה חדשה — אחרת
+    // "החלפתי" היתה יכולה להיות החלפה לאותו דבר בדיוק.
+    const myId = String(u.tz || u.phone || (u.email || '').split('@')[0] || '').replace(/\D/g, '');
+    const intro = opts.force
+      ? '<div class="demo-note" style="margin:0 0 12px"><i class="bi bi-shield-exclamation"></i> ' +
+        (opts.overdue
+          ? '<b>חובה להחליף סיסמה כדי להמשיך.</b> הסיסמה שלך היא עדיין ברירת המחדל — מספר הטלפון — ' +
+            'ומי שמכיר את המספר יכול להיכנס בשמך.'
+          : '<b>הסיסמה שלך היא עדיין מספר הטלפון.</b> מי שמכיר את המספר יכול להיכנס בשמך. ' +
+            'נא להחליף אותה' + (opts.daysLeft != null ? ' — נותרו ' + opts.daysLeft + ' ימים' : '') + '.') +
+        '</div>'
+      : '';
     window.UI.modal({
-      title: 'שינוי הסיסמה שלי', saveLabel: 'עדכן סיסמה', saveAlways: true,
-      bodyHTML: '<div class="form-grid">' +
+      title: opts.force ? 'החלפת סיסמה נדרשת' : 'שינוי הסיסמה שלי',
+      saveLabel: 'עדכן סיסמה', saveAlways: true,
+      noClose: !!opts.blocking,
+      cancelLabel: opts.force ? 'אחר כך' : 'ביטול',
+      bodyHTML: intro + '<div class="form-grid">' +
         '<label class="fld fld-wide"><span>סיסמה חדשה *</span><input class="inp mb0" id="cp_new" type="password" autocomplete="new-password"></label>' +
         '<label class="fld fld-wide"><span>אימות סיסמה *</span><input class="inp mb0" id="cp_conf" type="password" autocomplete="new-password"></label>' +
+        '<div class="fld fld-wide"><span class="login-hint" style="margin:0">6 תווים לפחות, ולא מספר הטלפון.</span></div>' +
         '</div>',
+      onClose: opts.onClose,
       onSave: async (mel) => {
         const p1 = mel.querySelector('#cp_new').value, p2 = mel.querySelector('#cp_conf').value;
-        if (!p1 || p1.length < 4) { window.UI.toast('סיסמה קצרה מדי (4 תווים לפחות)', 'err'); return false; }
+        if (!p1 || p1.length < 6) { window.UI.toast('סיסמה קצרה מדי (6 תווים לפחות)', 'err'); return false; }
         if (p1 !== p2) { window.UI.toast('הסיסמאות אינן תואמות', 'err'); return false; }
+        if (myId && p1.replace(/\D/g, '') === myId) { window.UI.toast('אי אפשר לבחור את מספר הטלפון כסיסמה', 'err'); return false; }
         if (DEMO) { await window.store.update('users', u.id, { password: p1 }); }
-        else if (window.sb) { const { error } = await window.sb.auth.updateUser({ password: p1 }); if (error) { window.UI.toast('שגיאה: ' + error.message, 'err'); return false; } }
-        window.UI.toast('הסיסמה עודכנה בהצלחה'); return true;
+        else if (window.sb) {
+          const { error } = await window.sb.auth.updateUser({ password: p1 });
+          if (error) { window.UI.toast('שגיאה: ' + error.message, 'err'); return false; }
+          // מסמנים במסד שהמשתמש החליף בעצמו — זה מה שמכבה את ההתראה לתמיד
+          try { await window.sb.rpc('pw_mark_changed'); } catch (_) {}
+        }
+        A.pwOk = true;
+        window.UI.toast('הסיסמה עודכנה בהצלחה');
+        if (opts.onDone) { try { opts.onDone(); } catch (_) {} }
+        return true;
       },
     });
+  }
+
+  // ── כפיית החלפת סיסמת ברירת המחדל ──────────────────────────────────────
+  // סיסמת הכניסה הראשונית של כל איש צוות היא מספר הטלפון שלו, והמספרים
+  // ידועים במוסד. עד היום זו היתה פרצה פתוחה ומתועדת ב-SECURITY.md.
+  // שבוע ראשון: התראה שאפשר לדחות ("אחר כך"). אחריו: מודאל חוסם.
+  // השבוע נספר מרגע ההתראה הראשונה (השרת קובע), ולא מרגע יצירת המשתמש —
+  // כל הצוות קיים כבר חודש, וספירה מהיצירה היתה נועלת את כולם מיד.
+  async function checkPasswordPolicy() {
+    if (DEMO || !window.sb || !A.currentUser || A.pwOk) return;
+    let st = null;
+    try {
+      const { data, error } = await window.sb.rpc('pw_status');
+      if (error) return;                       // לא חוסמים כניסה בגלל תקלה בבדיקה
+      st = Array.isArray(data) ? data[0] : data;
+    } catch (_) { return; }
+    if (!st || !st.needs_change) { A.pwOk = true; return; }
+    const left = st.deadline ? Math.ceil((new Date(st.deadline) - Date.now()) / 86400000) : null;
+    const show = () => changeOwnPassword({
+      force: true, overdue: !!st.overdue, blocking: !!st.overdue,
+      daysLeft: (left != null && left > 0) ? left : null,
+      // אחרי הדדליין אין דרך לצאת: סגירה כלשהי פותחת מחדש
+      onClose: () => { if (st.overdue && !A.pwOk) setTimeout(show, 150); },
+    });
+    show();
   }
 
   function filterByPermissions() {
@@ -165,7 +221,7 @@
 
   async function logout() {
     if (!DEMO && window.sb) { try { await window.sb.auth.signOut(); } catch (_) {} }
-    A.currentUser = null; window.currentUser = null;
+    A.currentUser = null; window.currentUser = null; A.pwOk = false;
     document.body.classList.remove('mode-readonly', 'mode-writeonly');
     renderUserInfo();
     if (window.showPage) window.showPage('login');

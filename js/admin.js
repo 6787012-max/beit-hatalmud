@@ -24,7 +24,9 @@
       '<div class="qr-card"><h3><i class="bi bi-tags"></i> קטגוריות התנהגות</h3><p class="login-hint" style="margin:0 0 8px">הקטגוריות מופיעות בבחירה בעת דיווח התנהגות. ניתן להוסיף, לערוך ולמחוק.</p><div id="catList"></div>' +
         '<div class="qr-grid" style="grid-template-columns:1fr auto;margin-top:10px"><input class="inp mb0" id="newCat" placeholder="שם קטגוריה חדשה"><button class="btn-primary sm" id="addCat"><i class="bi bi-plus-lg"></i> הוסף</button></div></div>' +
       '<div class="qr-card"><div class="card-h-row"><h3><i class="bi bi-people"></i> צוות והרשאות</h3><button class="btn-primary sm" id="usrAdd"><i class="bi bi-person-plus"></i> משתמש חדש</button></div>' +
-        '<div class="table-wrap"><table class="tbl"><thead><tr><th>שם</th><th>טלפון</th><th>תפקיד</th><th>כיתות</th><th></th></tr></thead><tbody id="usrBody"></tbody></table></div></div>' +
+        '<div class="table-wrap"><table class="tbl"><thead><tr><th>שם</th><th>טלפון</th><th>תפקיד</th><th>כיתות</th><th>סיסמה</th><th></th></tr></thead><tbody id="usrBody"></tbody></table></div>' +
+        '<p class="login-hint" style="margin:8px 2px 0">סיסמת הכניסה הראשונית היא מספר הטלפון. מי שלא החליף ' +
+        'מקבל התראה בכניסה, ואחרי שבוע הוא נחסם עד שיחליף.</p></div>' +
       '<div id="staffCard"></div>' +
       '<div class="qr-card"><h3><i class="bi bi-clock-history"></i> יומן פעולות</h3><div id="audList"></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-bug"></i> בקשות תיקון</h3><div class="qr-grid" style="grid-template-columns:auto 2fr auto"><select class="inp mb0" id="fbKind"><option value="bug">באג</option><option value="idea">רעיון</option></select><textarea class="inp mb0 ta-auto" id="fbBody" rows="2" placeholder="תיאור…"></textarea><button class="btn-primary sm" id="fbSave"><i class="bi bi-send"></i> שלח</button></div><div id="fbList" style="margin-top:10px"></div></div>' +
@@ -63,7 +65,12 @@
       page.querySelector('#usrBody').innerHTML = users.map(u => {
         const cls = (u.role === 'מנהל' ? '<span class="tl-note">כל הכיתות</span>' : (userClasses(u.id).map(clsName).filter(Boolean).join(', ') || '—')) +
           (u.role !== 'מנהל' && u.perms && u.perms.length ? ' <span class="det-badge">' + u.perms.length + ' מסכים</span>' : '');
+        // pw_changed_at ריק = עדיין בסיסמת ברירת המחדל (הטלפון)
+        const pw = u.pw_changed_at
+          ? '<span class="chip ok" title="הוחלפה ב-' + esc(String(u.pw_changed_at).slice(0, 10)) + '">הוחלפה</span>'
+          : '<span class="chip off" style="color:#b45309;border-color:#b45309" title="עדיין מספר הטלפון">ברירת מחדל</span>';
         return '<tr><td>' + esc(u.name) + '</td><td>' + esc(u.phone || u.tz || '') + '</td><td><span class="chip ' + (u.role === 'מנהל' ? 'ok' : 'off') + '">' + esc(u.role) + '</span></td><td>' + cls + '</td>' +
+          '<td>' + pw + '</td>' +
           '<td class="row-act"><button class="mini" data-ucard="' + u.id + '" title="כרטיס איש צוות"><i class="bi bi-person-vcard"></i></button><button class="mini" data-uedit="' + u.id + '" title="עריכה"><i class="bi bi-pencil"></i></button><button class="mini danger" data-udel="' + u.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></td></tr>';
       }).join('');
       page.querySelectorAll('[data-ucard]').forEach(b => b.addEventListener('click', () => { if (window.cv3StaffCard) window.cv3StaffCard.open(b.dataset.ucard); }));
@@ -138,6 +145,11 @@
             const ur = await window.store.update('profiles', u.id, { name, role, tz: phone, perms, access_mode });
             if (!ur || ur.ok === false) { window.UI.toast('עדכון המשתמש נכשל: ' + ((ur && ur.error) || ''), 'err'); return false; }
             Object.assign(u, { name, role, tz: phone, perms, access_mode }); uid = u.id;
+            // מנהל שאיפס סיסמה — המשתמש חוזר להיות "לא החליף" ויתבקש שוב.
+            // אחרת סיסמה שהמנהל קבע היתה נחשבת לנצח כסיסמה שהמשתמש בחר.
+            if (pw && window.sb) {
+              try { await window.sb.rpc('pw_reset_flag', { p_user: u.id }); u.pw_changed_at = null; } catch (_) {}
+            }
           } else {
             // ── חי: יצירת משתמש אמיתי דרך Supabase Auth (client זמני שלא נוגע בסשן המנהל) ──
             const C = window.CV3 || {};
