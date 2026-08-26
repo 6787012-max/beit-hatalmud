@@ -116,8 +116,12 @@ Content-Type: ${mime}
 // שני נושאים: תלמיד (student_docs, לפי can_read_student) ואיש צוות (staff, מנהל בלבד).
 // בשני המקרים השאילתה נשלחת **עם ה-JWT של המשתמש**, ולכן ה-RLS הוא שמחליט:
 // אם אין לו גישה הוא מקבל רשימה ריקה, ואין מה להמשיך.
-async function allowedFolders(userJwt: string, studentId: string, staffId: string, fundId = ''): Promise<string[]> {
-  const url = fundId
+async function allowedFolders(userJwt: string, studentId: string, staffId: string, fundId = '', tripId = ''): Promise<string[]> {
+  const url = tripId
+    // טיול: תיקיית הקבצים של הטיול. ה-RLS על trips מחריג מלמד ואנונימי,
+    // ולכן מי שאין לו גישה מקבל רשימה ריקה.
+    ? `${SB_URL}/rest/v1/trips?select=drive_folder&id=eq.${encodeURIComponent(tripId)}`
+    : fundId
     // קופה קטנה: תיקיית החשבוניות של הקופה. ה-RLS על petty_funds הוא
     // מנהל/מזכירה/מפקח בלבד, ולכן מורה שינחש fundId יקבל רשימה ריקה.
     ? `${SB_URL}/rest/v1/petty_funds?select=drive_folder&id=eq.${encodeURIComponent(fundId)}`
@@ -127,7 +131,7 @@ async function allowedFolders(userJwt: string, studentId: string, staffId: strin
   const r = await fetch(url, { headers: { apikey: SB_ANON, Authorization: 'Bearer ' + userJwt } });
   if (!r.ok) return [];
   const rows = await r.json();
-  const key = fundId ? 'drive_folder' : 'drive_id';
+  const key = (fundId || tripId) ? 'drive_folder' : 'drive_id';
   const top = (Array.isArray(rows) ? rows : [])
     .map((x: Record<string, string>) => x[key]).filter(Boolean);
   if (!top.length) return [];
@@ -164,11 +168,14 @@ Deno.serve(async (req) => {
     const studentId = u.searchParams.get('studentId') || '';
     const staffId = u.searchParams.get('staffId') || '';
     const fundId = u.searchParams.get('fundId') || '';
-    if (!studentId && !staffId && !fundId) return fail('חסר מזהה תלמיד / איש צוות / קופה');
+    const tripId = u.searchParams.get('tripId') || '';
+    if (!studentId && !staffId && !fundId && !tripId) return fail('חסר מזהה תלמיד / איש צוות / קופה / טיול');
 
-    const folders = await allowedFolders(jwt, studentId, staffId, fundId);
+    const folders = await allowedFolders(jwt, studentId, staffId, fundId, tripId);
     if (!folders.length) {
-      return fail(fundId
+      return fail(tripId
+        ? 'אין לך הרשאה לטיול הזה, או שלא הוגדרה לו תיקיית קבצים בדרייב'
+        : fundId
         ? 'אין לך הרשאה לקופה הזו, או שלא הוגדרה לה תיקיית חשבוניות בדרייב'
         : staffId
           ? 'אין לך הרשאה לתיק הזה (מנהל בלבד), או שאין לאיש הצוות תיקייה בדרייב'
@@ -217,7 +224,7 @@ Deno.serve(async (req) => {
     if (action === 'download' || action === 'preview') {
       const fileId = u.searchParams.get('fileId') || '';
       const f = await fileInAllowed(fileId, folders);
-      if (!f) return fail(fundId ? 'הקובץ אינו בתיקיית החשבוניות של הקופה' : 'הקובץ אינו בתיקיית התלמיד', 403);
+      if (!f) return fail(tripId ? 'הקובץ אינו בתיקיית הטיול' : fundId ? 'הקובץ אינו בתיקיית החשבוניות של הקופה' : 'הקובץ אינו בתיקיית התלמיד', 403);
       // מסמכי Google (Docs/Sheets) אינם ניתנים להורדה ישירה — מייצאים ל-PDF
       const isGoogleDoc = String(f.mimeType || '').startsWith('application/vnd.google-apps');
       const url = isGoogleDoc
@@ -265,7 +272,7 @@ Deno.serve(async (req) => {
     if (action === 'delete') {
       const fileId = u.searchParams.get('fileId') || '';
       const f = await fileInAllowed(fileId, folders);
-      if (!f) return fail(fundId ? 'הקובץ אינו בתיקיית החשבוניות של הקופה' : 'הקובץ אינו בתיקיית התלמיד', 403);
+      if (!f) return fail(tripId ? 'הקובץ אינו בתיקיית הטיול' : fundId ? 'הקובץ אינו בתיקיית החשבוניות של הקופה' : 'הקובץ אינו בתיקיית התלמיד', 403);
       const r = await gFetch(`${DRIVE}/files/${fileId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }),
       });

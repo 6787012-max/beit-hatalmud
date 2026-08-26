@@ -112,7 +112,10 @@
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
       '<h2>תל"א — תכנית לימודים אישית</h2>' +
       '<div class="head-actions">' +
-        (isAdmin() ? '<button class="btn-ghost sm" id="tlaBatch"><i class="bi bi-magic"></i> מילוי אוטומטי לכולם</button> ' : '') +
+        // המילוי האוטומטי מהאבחונים הוסר 26/08/2026 לבקשת יוסף — התוצאות לא
+        // היו טובות מספיק, והתל"א נכתב בידי הצוות. הקוד נשאר ב-tla-autofill.js
+        // ואינו נטען לשום מסך; אין להחזיר בלי בקשה מפורשת.
+        '' +
         '<button class="btn-primary sm" id="tlaNew"><i class="bi bi-plus-lg"></i> תל"א חדש</button></div></div>' +
       '<div class="toolbar" style="grid-template-columns:1fr auto auto">' +
         '<input class="inp mb0" id="tlaQ" placeholder="חיפוש תלמיד…">' +
@@ -162,16 +165,6 @@
     page.querySelector('#tlaQ').addEventListener('input', draw);
     page.querySelector('#tlaStat').addEventListener('change', draw);
     page.querySelector('#tlaNew').addEventListener('click', () => newPlanDialog(() => renderPage(page)));
-    // הרצה קבוצתית — מנהל בלבד. יוצרת טיוטות, לא כותבת לתיקים.
-    const bb = page.querySelector('#tlaBatch');
-    if (bb && window.cv3TlaAutofill) bb.addEventListener('click', () => window.cv3TlaAutofill.batchModal());
-    else if (bb) bb.style.display = 'none';
-    // פאנל הטיוטות — מוצג מעל הרשימה, כדי שיהיה נגיש גם לתלמידים
-    // שאין להם עדיין תכנית תל"א (רובם).
-    if (window.cv3TlaAutofill) {
-      const wrap = page.querySelector('#tlaList');
-      window.cv3TlaAutofill.draftsPanel(wrap.parentNode, () => renderPage(page)).catch(() => {});
-    }
     draw();
   }
 
@@ -288,16 +281,7 @@
       '<label class="fld"><span>תאריך</span><input type="date" class="inp mb0" id="tp_sgd" value="' + esc(plan.signed_at || '') + '"></label>' +
       '</div></div>' +
       '<div class="tla-save"><button class="btn-primary sm" id="tpSave"><i class="bi bi-check-lg"></i> שמירת דף ההכנה</button></div>';
-    // "מלא אוטומטית מהאבחונים" — ממלא את השדות כטיוטה בלבד. השמירה לתיק
-    // נשארת בידי המשתמש, דרך אותו כפתור "שמירת דף ההכנה" שלמטה.
-    if (window.cv3TlaAutofill && stud) {
-      window.cv3TlaAutofill.mount(host, stud, vals => {
-        Object.keys(vals).forEach(k => {
-          const t = host.querySelector('[data-pf="' + k + '"]');
-          if (t && vals[k]) { t.value = vals[k]; t.style.background = '#fbfaff'; }
-        });
-      });
-    }
+    // כאן היה "מלא אוטומטית מהאבחונים" — הוסר 26/08/2026 לבקשת יוסף.
 
     host.querySelector('#tpSave').addEventListener('click', async () => {
       const prof = {};
