@@ -168,6 +168,7 @@
       body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => del(students.find(s => s.id == b.dataset.del))));
     }
 
+    window.__openStudentDetail = openDetail;
     async function openDetail(s) {
       if (!s) return;
       const m = window.UI.modal({ title: 'כרטיס תלמיד', bodyHTML: '<div style="padding:26px;text-align:center;color:var(--muted)"><i class="bi bi-hourglass-split"></i> טוען…</div>' });
@@ -198,6 +199,9 @@
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
+      // מוצהר כאן ולא באמצע: behSec משתמש בו, ו-const באמצע הפונקציה היה
+      // נופל ב-TDZ ("Cannot access before initialization") וסוגר את הכרטיס.
+      const hebDate = iso => window.UI.hebDate(iso, { year: false });
       // הפרמטר הרביעי (by) הוא מזהה מי שרשם. מוצג בכל רשומת מעקב בכרטיס
       // התלמיד — בקשת יוסף: "בכל מקום שיופיע מי מילא את זה".
       const li = (main, meta, dot, by) => '<div class="det-item">' + (dot ? '<span class="sev-dot ' + dot + '"></span>' : '') +
@@ -214,9 +218,31 @@
           (items.length > 5 ? '<span class="det-hint">5 אחרונים · גלול לעוד</span>' : '') +
           '</h4>' + (items.length > 5 ? '<div class="det-scroll">' + body + '</div>' : body) + '</div>';
       };
+      // ── דיווחי מעקב: קריאה **ועריכה** מתוך הכרטיס ──
+      // קודם זה היה סקשן לקריאה בלבד, ומי שרצה לתקן דיווח נאלץ לצאת למסך
+      // המעקב ולחפש אותו שם. ההערה מקוצרת לשתי שורות ונפתחת בלחיצה, כמו בבית.
+      const canEditBeh = !window.Auth || !window.Auth.isReadonly();
+      const behSec = '<div class="det-sec"><h4><i class="bi bi-clipboard-check"></i> התנהגות ומעקב ' +
+        '<span class="det-badge">' + beh.length + '</span>' +
+        (canEditBeh ? '<button class="btn-ghost sm" id="behAdd" style="margin-inline-start:auto"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' : '') +
+        '</h4>' +
+        (beh.length
+          ? '<div class="' + (beh.length > 5 ? 'det-scroll' : '') + '">' + beh.slice().reverse().map(e =>
+              '<div class="det-item hr-item" data-ev="' + e.id + '">' +
+              '<span class="sev-dot ' + sevc(e.severity) + '"></span>' +
+              '<span class="di-main"><div class="hr-head"><strong>' + esc(catName(e.category_id) || 'דיווח') + '</strong></div>' +
+              (e.note ? '<div class="tl-note hr-note" data-note>' + esc(e.note) + '</div>' : '') + '</span>' +
+              '<span class="di-meta">' + esc(hebDate(e.event_date) || '') +
+              ' · ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</span>' +
+              (canEditBeh ? '<span class="hr-act">' +
+                '<button class="mini" data-behedit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+                '<button class="mini danger" data-behdel="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></span>' : '') +
+              '</div>').join('') + '</div>'
+          : '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">אין דיווחים</div>') +
+        '</div>';
+
       const attC = { present: 0, late: 0, left: 0, absent: 0 }; att.forEach(a => attC[a.status] != null && attC[a.status]++);
       // משימות הקשורות לתלמיד — תאריך יעד בעברית + צ'יפ סטטוס (מראה זהה לסקשנים קריאה/כתיבה/מבחנים)
-      const hebDate = iso => window.UI.hebDate(iso, { year: false });
       const taskLbl = st => st === 'done' ? 'הושלם' : st === 'in_progress' ? 'בתהליך' : 'לביצוע';
       const taskChip = st => '<span class="chip ' + (st === 'done' ? 'ok' : 'off') + '">' + taskLbl(st) + '</span>';
       const tasksSec = '<div class="det-sec"><h4><i class="bi bi-kanban"></i> משימות הקשורות <span class="det-badge">' + tsk.length + '</span></h4>' +
@@ -335,7 +361,7 @@
           return li('<strong>' + esc(x.name) + '</strong>' + (parts.length ? ' — ' + esc(parts.join(' · ')) : '') +
             ' <span class="chip ' + f.cls + '">' + esc(f.txt) + '</span>', '', 'hi');
         }) +
-        sec('התנהגות ומעקב', 'bi-clipboard-check', beh, e => li('<strong>' + esc(catName(e.category_id)) + '</strong>' + (e.note ? ' — ' + esc(e.note) : ''), e.event_date, sevc(e.severity), e.created_by)) +
+        behSec +
         attSec +
         (window.cv3Passport ? window.cv3Passport.cardSection(psp) : '') +
         // תל"א מוצג רק למי שיש לו גישה למסך תל"א (מלמד — לא).
@@ -390,6 +416,30 @@
         setTimeout(done, 8000);   // דפדפנים שלא יורים afterprint
         window.print();
       });
+      // רענון הכרטיס אחרי שינוי בדיווחים — פותחים אותו מחדש עם הנתונים המעודכנים
+      const reopen = () => { try { m.close(); } catch (_) {} openDetail(s); };
+      const behAdd = m.el.querySelector('#behAdd');
+      if (behAdd) behAdd.addEventListener('click', () => {
+        if (window.cv3Behavior) window.cv3Behavior.open(null, { studentId: s.id, onSaved: reopen });
+      });
+      m.el.querySelectorAll('[data-behedit]').forEach(b => b.addEventListener('click', () => {
+        const e = beh.find(x => String(x.id) === b.dataset.behedit);
+        if (e && window.cv3Behavior) window.cv3Behavior.open(e, { onSaved: reopen });
+      }));
+      m.el.querySelectorAll('[data-behdel]').forEach(b => b.addEventListener('click', () => {
+        const e = beh.find(x => String(x.id) === b.dataset.behdel);
+        if (e && window.cv3Behavior) window.cv3Behavior.remove(e, reopen);
+      }));
+      // קיצור ההערות לשתי שורות + הרחבה בלחיצה (זהה לרשימת הבית)
+      m.el.querySelectorAll('[data-note]').forEach(nt => {
+        if (nt.scrollHeight > nt.clientHeight + 2) nt.classList.add('hr-clamped');
+      });
+      m.el.querySelectorAll('.hr-item').forEach(it => it.addEventListener('click', ev => {
+        if (ev.target.closest('button')) return;
+        const nt = it.querySelector('[data-note]');
+        if (nt && nt.classList.contains('hr-clamped')) nt.classList.toggle('open');
+      }));
+
       const photoBtn = m.el.querySelector('#detPhotoBtn');
       if (photoBtn) photoBtn.addEventListener('click', () => openPhoto(bigPhoto, window.UI.fullName ? window.UI.fullName(s) : s.name));
       const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
@@ -532,7 +582,22 @@
     if (!scopeClasses()) return null;
     return (await getStudents()).map(s => s.id);
   }
-  window.cv3Students = { getStudents: getStudents, getClasses: getClasses, addClass: addClass, accessibleIds: accessibleIds, scopeClasses: scopeClasses };
+  // פתיחת כרטיס תלמיד מכל מסך אחר (למשל מרשימת הדיווחים בדף הבית).
+  // openDetail חי בתוך render, ולכן הוא נרשם כאן כשהמסך נבנה; אם המסך עוד
+  // לא נבנה — טוענים את התלמיד ופותחים בלי לעבור אליו.
+  async function openCard(id) {
+    if (window.__openStudentDetail) {
+      const list = await getStudents();
+      const s = list.find(x => String(x.id) === String(id));
+      if (s) { window.__openStudentDetail(s); return; }
+    }
+    if (window.showPage) window.showPage('students');
+    for (let i = 0; i < 40 && !window.__openStudentDetail; i++) await new Promise(r => setTimeout(r, 120));
+    const list = await getStudents();
+    const s = list.find(x => String(x.id) === String(id));
+    if (s && window.__openStudentDetail) window.__openStudentDetail(s);
+  }
+  window.cv3Students = { getStudents: getStudents, getClasses: getClasses, addClass: addClass, accessibleIds: accessibleIds, scopeClasses: scopeClasses, openCard: openCard };
   window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
   window.PAGE_RENDERERS.students = render;
 })();

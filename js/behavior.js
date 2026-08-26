@@ -25,6 +25,72 @@
 
   async function classes() { return window.cv3Students ? await window.cv3Students.getClasses() : []; }
 
+  // ── טופס דיווח משותף ─────────────────────────────────────────────────
+  // אותו טופס משמש את מסך המעקב, את רשימת הדיווחים בבית, ואת כרטיס התלמיד.
+  // קודם הוא חי בתוך renderBehavior ולכן היה נגיש רק משם, וכל מסך אחר נאלץ
+  // להיות לקריאה בלבד.
+  //
+  // openEventForm(ev, opts):
+  //   ev   — הדיווח לעריכה, או null ליצירת דיווח חדש
+  //   opts — { studentId: נעילת התלמיד ביצירה, onSaved: קריאה חוזרת }
+  async function openEventForm(ev, opts) {
+    opts = opts || {};
+    const isNew = !ev || !ev.id;
+    const [studs, cs] = await Promise.all([students(), cats()]);
+    const cur = ev || { student_id: opts.studentId || null, event_date: today(), severity: 'רגילה' };
+    const nm = x => window.UI.fullName ? window.UI.fullName(x) : x.name;
+    const stuOpts = studs.map(x => '<option value="' + x.id + '"' +
+      (String(x.id) === String(cur.student_id) ? ' selected' : '') + '>' + esc(nm(x)) + '</option>').join('');
+    const catSel = cs.map(c => '<option value="' + c.id + '"' +
+      (String(c.id) === String(cur.category_id) ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+    const sevSel = ['נמוכה', 'רגילה', 'גבוהה'].map(x =>
+      '<option' + ((cur.severity || 'רגילה') === x ? ' selected' : '') + '>' + x + '</option>').join('');
+    // כשהתלמיד נעול (דיווח מתוך הכרטיס שלו) מציגים את שמו ולא בורר
+    const lockStu = isNew && opts.studentId;
+    const stuRec = lockStu ? (studs.find(x => String(x.id) === String(opts.studentId)) || {}) : null;
+    window.UI.modal({
+      title: isNew ? ('דיווח חדש' + (stuRec ? ' — ' + esc(nm(stuRec)) : '')) : 'עריכת דיווח',
+      saveLabel: 'שמירה',
+      bodyHTML:
+        '<div class="form-grid">' +
+          (lockStu
+            ? '<input type="hidden" id="ee_stu" value="' + esc(opts.studentId) + '">'
+            : '<label class="fld"><span>תלמיד</span><select class="inp mb0" id="ee_stu"><option value="">— בחר —</option>' + stuOpts + '</select></label>') +
+          '<label class="fld"><span>קטגוריה</span><select class="inp mb0" id="ee_cat"><option value="">ללא</option>' + catSel + '</select></label>' +
+          '<label class="fld"><span>תאריך</span><input class="inp mb0" id="ee_date" type="date" value="' + esc(String(cur.event_date || today()).slice(0, 10)) + '"></label>' +
+          '<label class="fld"><span>שעה</span><input class="inp mb0" id="ee_time" type="time" value="' + esc(cur.event_time || '') + '"></label>' +
+          '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev">' + sevSel + '</select></label>' +
+          '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="5">' + esc(cur.note || '') + '</textarea></label>' +
+        '</div>',
+      onSave: async (mel) => {
+        const row = {
+          student_id: Number(mel.querySelector('#ee_stu').value) || null,
+          category_id: Number(mel.querySelector('#ee_cat').value) || null,
+          event_date: mel.querySelector('#ee_date').value || today(),
+          event_time: mel.querySelector('#ee_time').value || null,
+          severity: mel.querySelector('#ee_sev').value,
+          note: mel.querySelector('#ee_note').value.trim() || null,
+        };
+        if (!row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
+        const r = isNew ? await addEvent(row) : await updEvent(ev.id, row);
+        if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
+        if (!isNew) Object.assign(ev, row);
+        window.UI.toast(isNew ? 'הדיווח נשמר' : 'הדיווח עודכן');
+        if (opts.onSaved) { try { await opts.onSaved(); } catch (_) {} }
+        return true;
+      },
+    });
+  }
+  async function removeEvent(ev, onDone) {
+    if (!ev) return;
+    if (!(await window.UI.confirm('למחוק את הדיווח?'))) return;
+    const r = await delEvent(ev.id);
+    if (!r || r.ok === false) { window.UI.toast('המחיקה נכשלה', 'err'); return; }
+    window.UI.toast('נמחק');
+    if (onDone) { try { await onDone(); } catch (_) {} }
+  }
+  window.cv3Behavior = { open: openEventForm, remove: removeEvent };
+
   async function renderBehavior(page) {
     const [studs, cs, evs, cls] = await Promise.all([students(), cats(), events(), classes()]);
     if (window.Author) await window.Author.load();
@@ -119,44 +185,9 @@
         const ev = list.find(x => x.id == b.dataset.edit); if (ev) editEvent(ev);
       }));
     }
-    // עריכת דיווח קיים: אותם שדות של הרישום המהיר, כדי שלא יהיו שני מסלולים
-    // שונים לאותו נתון. השמירה מעדכנת גם את השורה בזיכרון וגם את התצוגה.
-    function editEvent(ev) {
-      const stuOpts = studs.map(x => '<option value="' + x.id + '"' + (x.id == ev.student_id ? ' selected' : '') + '>' +
-        esc(window.UI.fullName ? window.UI.fullName(x) : x.name) + '</option>').join('');
-      const catSel = cs.map(c => '<option value="' + c.id + '"' + (c.id == ev.category_id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
-      const sevSel = ['נמוכה', 'רגילה', 'גבוהה'].map(x =>
-        '<option' + ((ev.severity || 'רגילה') === x ? ' selected' : '') + '>' + x + '</option>').join('');
-      window.UI.modal({
-        title: 'עריכת דיווח', saveLabel: 'שמירה',
-        bodyHTML:
-          '<div class="form-grid">' +
-            '<label class="fld"><span>תלמיד</span><select class="inp mb0" id="ee_stu">' + stuOpts + '</select></label>' +
-            '<label class="fld"><span>קטגוריה</span><select class="inp mb0" id="ee_cat"><option value="">ללא</option>' + catSel + '</select></label>' +
-            '<label class="fld"><span>תאריך</span><input class="inp mb0" id="ee_date" type="date" value="' + esc(String(ev.event_date || '').slice(0, 10)) + '"></label>' +
-            '<label class="fld"><span>שעה</span><input class="inp mb0" id="ee_time" type="time" value="' + esc(ev.event_time || '') + '"></label>' +
-            '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev">' + sevSel + '</select></label>' +
-            '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="4">' + esc(ev.note || '') + '</textarea></label>' +
-          '</div>',
-        onSave: async (mel) => {
-          const row = {
-            student_id: Number(mel.querySelector('#ee_stu').value) || null,
-            category_id: Number(mel.querySelector('#ee_cat').value) || null,
-            event_date: mel.querySelector('#ee_date').value || null,
-            event_time: mel.querySelector('#ee_time').value || null,
-            severity: mel.querySelector('#ee_sev').value,
-            note: mel.querySelector('#ee_note').value.trim() || null,
-          };
-          if (!row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
-          const r = await updEvent(ev.id, row);
-          if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
-          Object.assign(ev, row);
-          draw();
-          window.UI.toast('הדיווח עודכן');
-          return true;
-        },
-      });
-    }
+    // עטיפה דקה סביב הטופס המשותף — אותו מסלול בדיוק כמו מהבית ומכרטיס
+    // התלמיד, כדי שלא יהיו שני מסלולים שונים לאותו נתון.
+    function editEvent(ev) { openEventForm(ev, { onSaved: () => draw() }); }
 
     page.querySelector('#fCat').addEventListener('change', draw);
     page.querySelector('#fGroup').addEventListener('change', draw);

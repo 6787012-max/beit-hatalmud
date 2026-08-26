@@ -136,12 +136,41 @@
       rows = rows.slice(0, 6);
       const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
       const catOf = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
+      const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
       const list = $('#homeReportList');
+      // ההערה מקוצרת לשתי שורות (`.hr-note` ב-CSS) ונפתחת בלחיצה. דיווח ארוך
+      // מתח קודם את כל דף הבית ודחק את כל השאר מחוץ למסך.
       list.innerHTML = rows.length ? rows.map(e =>
-        '<div class="tl-item"><span class="sev-dot mid"></span><div class="tl-main"><strong>' + _esc(nameOf(e.student_id)) + '</strong> · ' + _esc(catOf(e.category_id)) +
-        (e.note ? ' <span class="tl-note">— ' + _esc(e.note) + '</span>' : '') + '</div>' +
-        '<div class="tl-meta">' + _esc(hebDate(e.event_date) || e.event_date || '') + (e.event_time ? ' · ' + _esc(e.event_time) : '') + '</div></div>').join('')
+        '<div class="tl-item hr-item" data-ev="' + e.id + '"><span class="sev-dot ' + sevc(e.severity) + '"></span>' +
+        '<div class="tl-main">' +
+          '<div class="hr-head"><strong>' + _esc(nameOf(e.student_id)) + '</strong>' +
+            (catOf(e.category_id) ? ' · ' + _esc(catOf(e.category_id)) : '') + '</div>' +
+          (e.note ? '<div class="tl-note hr-note" data-note>' + _esc(e.note) + '</div>' : '') +
+        '</div>' +
+        '<div class="tl-meta">' + _esc(hebDate(e.event_date) || e.event_date || '') + (e.event_time ? ' · ' + _esc(e.event_time) : '') + '</div>' +
+        '<div class="hr-act">' +
+          '<button class="mini" data-card="' + e.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-vcard"></i></button>' +
+          '<button class="mini" data-edit="' + e.id + '" title="עריכת הדיווח"><i class="bi bi-pencil"></i></button>' +
+        '</div></div>').join('')
         : '<div class="empty-state" style="padding:12px"><i class="bi bi-clipboard-check"></i><div>אין דיווחים עדיין — הקש "דיווח חדש"</div></div>';
+
+      // הרחבה/כיווץ של ההערה. מסמנים רק הערות שבאמת נחתכות, כדי שלא יופיע
+      // "הצג עוד" על דיווח בן שורה אחת.
+      list.querySelectorAll('[data-note]').forEach(nt => {
+        if (nt.scrollHeight > nt.clientHeight + 2) nt.classList.add('hr-clamped');
+      });
+      list.querySelectorAll('.hr-item').forEach(it => it.addEventListener('click', ev => {
+        if (ev.target.closest('button')) return;          // כפתורי הפעולה לא מרחיבים
+        const nt = it.querySelector('[data-note]');
+        if (nt && nt.classList.contains('hr-clamped')) nt.classList.toggle('open');
+      }));
+      list.querySelectorAll('[data-card]').forEach(b => b.addEventListener('click', () => {
+        if (window.cv3Students && window.cv3Students.openCard) window.cv3Students.openCard(b.dataset.card);
+      }));
+      list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+        const e = rows.find(x => String(x.id) === b.dataset.edit);
+        if (e && window.cv3Behavior) window.cv3Behavior.open(e, { onSaved: renderHomeReports });
+      }));
     } catch (e) { console.warn('homeReports', e); const l = $('#homeReportList'); if (l) l.innerHTML = ''; }
   }
   window.renderHomeReports = renderHomeReports;
