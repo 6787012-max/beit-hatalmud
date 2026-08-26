@@ -23,9 +23,8 @@
   const nm = s => (window.UI && window.UI.fullName) ? window.UI.fullName(s) : ((s && s.name) || '');
   const hebDate = iso => { try { return window.UI.hebDate(iso); } catch (_) { return ''; } };
 
-  // תיקיית האם של קובצי הטיולים בדרייב של חשבון המכינה (6787012) — אותו
-  // חשבון שהטוקן של ה-Edge Function שייך לו, ולכן העלאה עובדת בהיקף drive.file.
-  const TRIPS_ROOT = '1qvKkgy0lOotW_SeTeZd3lMUg0Wh63lyK';
+  // תיקיית האם של קובצי הטיולים יושבת בצד-שרת (TRIPS_ROOT ב-Edge Function),
+  // כדי שהלקוח לא יוכל לכוון יצירת תיקייה למקום אחר בדרייב.
   const STATUSES = ['מתוכנן', 'יצא', 'הסתיים', 'בוטל'];
   const STATUS_CLS = { 'מתוכנן': 'off', 'יצא': 'ok', 'הסתיים': 'off', 'בוטל': 'off' };
 
@@ -65,23 +64,15 @@
   async function ensureFolder(trip) {
     if (trip.drive_folder) return trip.drive_folder;
     const name = (dmy(trip.trip_date) ? dmy(trip.trip_date).replace(/\//g, '-') + ' ' : '') + trip.name;
-    const res = await fetch(driveUrl({ action: 'mkroot', name: name }), {
+    // action=tripfolder ולא mkdir: ההרשאה לתיקיית טיול נגזרת מ-drive_folder,
+    // שעוד ריק בדיוק עכשיו. הפעולה הייעודית בודקת הרשאה מול טבלת trips
+    // ויוצרת תמיד תחת תיקיית האם הקבועה שבצד-שרת.
+    const res = await fetch(driveUrl({ action: 'tripfolder', tripId: trip.id, name: name }), {
       method: 'POST', headers: await driveAuth(),
-    }).catch(() => null);
-    // ה-Edge Function לא יודעת ליצור תיקייה בלי הרשאה קיימת, ולכן היצירה
-    // נעשית דרך mkdir על תיקיית האם שמוגדרת מראש על הטיול.
-    if (!res || !res.ok) {
-      const r2 = await fetch(driveUrl({ action: 'mkdir', tripId: trip.id, folderId: TRIPS_ROOT, name: name }), {
-        method: 'POST', headers: await driveAuth(),
-      });
-      const d2 = await r2.json();
-      if (!d2.ok) throw new Error(d2.error || 'יצירת תיקיית הטיול נכשלה');
-      await window.store.update('trips', trip.id, { drive_folder: d2.folder.id });
-      trip.drive_folder = d2.folder.id;
-      return trip.drive_folder;
-    }
+    });
     const d = await res.json();
-    await window.store.update('trips', trip.id, { drive_folder: d.folder.id });
+    if (!d.ok) throw new Error(d.error || 'יצירת תיקיית הטיול נכשלה');
+    if (!d.existed) await window.store.update('trips', trip.id, { drive_folder: d.folder.id });
     trip.drive_folder = d.folder.id;
     return trip.drive_folder;
   }

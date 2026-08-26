@@ -22,6 +22,10 @@ const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
 const REFRESH_TOKEN = Deno.env.get('GOOGLE_REFRESH_TOKEN')!;
 const GAS_URL = Deno.env.get('GAS_URL') || '';
 
+// תיקיית האם של קובצי הטיולים בדרייב של חשבון המכינה. קבועה כאן ולא מגיעה
+// מהלקוח — אחרת אפשר היה לבקש יצירת תיקייה בכל מקום בדרייב.
+const TRIPS_ROOT = '1qvKkgy0lOotW_SeTeZd3lMUg0Wh63lyK';
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -170,6 +174,29 @@ Deno.serve(async (req) => {
     const fundId = u.searchParams.get('fundId') || '';
     const tripId = u.searchParams.get('tripId') || '';
     if (!studentId && !staffId && !fundId && !tripId) return fail('חסר מזהה תלמיד / איש צוות / קופה / טיול');
+
+    // ── יצירת תיקיית הטיול ──
+    // ⚠️ חייבת לרוץ **לפני** בדיקת allowedFolders: ההרשאה לטיול נגזרת מ-
+    // trips.drive_folder, והוא עוד ריק בדיוק ברגע שצריך ליצור אותו — ביצה
+    // ותרנגולת. כאן ההרשאה נבדקת אחרת: שואלים את trips **עם ה-JWT של
+    // המשתמש** אם הוא בכלל רואה את הטיול (RLS), והתיקייה נוצרת תמיד תחת
+    // TRIPS_ROOT הקבוע, כך שאי אפשר לכוון אותה למקום אחר בדרייב.
+    if (action === 'tripfolder') {
+      if (!tripId) return fail('חסר מזהה טיול');
+      const r0 = await fetch(`${SB_URL}/rest/v1/trips?select=id,name,drive_folder&id=eq.${encodeURIComponent(tripId)}`,
+        { headers: { apikey: SB_ANON, Authorization: 'Bearer ' + jwt } });
+      const rows = r0.ok ? await r0.json() : [];
+      if (!Array.isArray(rows) || !rows.length) return fail('אין לך הרשאה לטיול הזה', 403);
+      if (rows[0].drive_folder) return json({ ok: true, folder: { id: rows[0].drive_folder }, existed: true });
+      const name = (u.searchParams.get('name') || rows[0].name || ('טיול ' + tripId)).slice(0, 120);
+      const r = await gFetch(`${DRIVE}/files?fields=id,name`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [TRIPS_ROOT] }),
+      });
+      const d = await r.json();
+      if (!r.ok) return fail('יצירת תיקיית הטיול נכשלה: ' + JSON.stringify(d).slice(0, 150), 502);
+      return json({ ok: true, folder: d });
+    }
 
     const folders = await allowedFolders(jwt, studentId, staffId, fundId, tripId);
     if (!folders.length) {
