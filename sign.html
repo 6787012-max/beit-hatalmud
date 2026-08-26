@@ -100,7 +100,38 @@
       render(form, resp);
     }
 
-    // בונה קנבס לחתימה ידנית (עכבר + מגע). מחזיר אובייקט עם isBlank ו-dataURL.
+    // ⚠️ **החתימה נשמרת כקווים ולא כתמונה.**
+    // קודם היא נשלחה כ-`canvas.toDataURL('image/png')` — 10–50KB של base64 של
+    // תמונה בתוך גוף ה-POST. נטפרי סורק את גוף הבקשה ומזהה שם תמונה, ולכן
+    // שליחת הטופס נחסמה אצל הורים. עכשיו נשלח JSON של קואורדינטות בלבד:
+    // מספרים, בלי שום בייט של תמונה — אין מה לחסום, וגם הנפח קטן פי כמה.
+    // הציור משוחזר כ-SVG בצד המציג. הפורמט: {v:1,w,h,s:[[[x,y],...],...]}
+    // תמונות ישנות (data:image/...) ממשיכות להיות מוצגות כרגיל.
+    const SIG_V = 1;
+    function sigToSVG(sig, opts) {
+      opts = opts || {};
+      let d;
+      try { d = typeof sig === 'string' ? JSON.parse(sig) : sig; } catch (_) { return ''; }
+      if (!d || !d.s || !d.s.length) return '';
+      const w = d.w || 600, h = d.h || 160;
+      const paths = d.s.filter(st => st && st.length).map(st =>
+        '<path d="M' + st.map(pt => pt[0] + ' ' + pt[1]).join(' L') + '"/>').join('');
+      return '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" ' +
+        'style="' + (opts.style || 'width:100%;max-width:320px;height:auto') + '" ' +
+        'fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        paths + '</svg>';
+    }
+    // מציג חתימה בכל אחד משני הפורמטים
+    function sigHTML(sig) {
+      if (!sig) return '';
+      if (/^data:image\//.test(sig)) {
+        return '<img src="' + esc(sig) + '" alt="חתימה" style="max-width:100%;border:1px solid var(--line,#ccc);border-radius:8px;background:#fff">';
+      }
+      const svg = sigToSVG(sig, { style: 'width:100%;max-width:320px;height:auto;background:#fff;border:1px solid var(--line,#ccc);border-radius:8px' });
+      return svg || '';
+    }
+
+    // בונה קנבס לחתימה ידנית (עכבר + מגע). מחזיר isBlank ו-strokes.
     function setupCanvas(canvas) {
       const ctx = canvas.getContext('2d');
       // התאמת רזולוציה לרוחב בפועל
@@ -111,28 +142,37 @@
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cssW, cssH);
       ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       let drawing = false, dirty = false, lastX = 0, lastY = 0;
+      const strokes = [];                 // [[x,y],...] לכל משיכת עט
+      let cur = null;
+      const R = v => Math.round(v * 10) / 10;   // עשירית פיקסל — די והותר לחתימה
       const pos = e => {
         const rc = canvas.getBoundingClientRect();
         const t = (e.touches && e.touches[0]) || e;
         return { x: t.clientX - rc.left, y: t.clientY - rc.top };
       };
-      const start = e => { e.preventDefault(); drawing = true; const p = pos(e); lastX = p.x; lastY = p.y; };
+      const start = e => {
+        e.preventDefault(); drawing = true;
+        const p = pos(e); lastX = p.x; lastY = p.y;
+        cur = [[R(p.x), R(p.y)]]; strokes.push(cur);
+      };
       const move = e => {
         if (!drawing) return; e.preventDefault();
         const p = pos(e);
         ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
         lastX = p.x; lastY = p.y; dirty = true;
+        if (cur) cur.push([R(p.x), R(p.y)]);
       };
-      const end = () => { drawing = false; };
+      const end = () => { drawing = false; cur = null; };
       canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move);
       window.addEventListener('mouseup', end);
       canvas.addEventListener('touchstart', start, { passive: false });
       canvas.addEventListener('touchmove', move, { passive: false });
       canvas.addEventListener('touchend', end);
       return {
-        clear() { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cssW, cssH); dirty = false; },
+        clear() { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cssW, cssH); dirty = false; strokes.length = 0; cur = null; },
         isBlank() { return !dirty; },
-        dataURL() { return canvas.toDataURL('image/png'); },
+        // JSON של קווים — לא תמונה. ראה ההערה למעלה.
+        value() { return JSON.stringify({ v: SIG_V, w: Math.round(cssW), h: Math.round(cssH), s: strokes }); },
       };
     }
 
@@ -161,8 +201,9 @@
           if (v == null || v === '') v = '—';
           return '<div class="det-row"><span class="det-lbl">' + esc(f.label) + '</span><span class="det-val">' + esc(v) + '</span></div>';
         }).join('');
-        const sig = resp.signature && /^data:image\//.test(resp.signature)
-          ? '<div style="margin-top:10px"><div style="color:var(--muted);font-size:.85rem;margin-bottom:4px">חתימה:</div><img src="' + esc(resp.signature) + '" alt="חתימה" style="max-width:100%;border:1px solid var(--line,#ccc);border-radius:8px;background:#fff"></div>'
+        const sigInner = sigHTML(resp.signature);
+        const sig = sigInner
+          ? '<div style="margin-top:10px"><div style="color:var(--muted);font-size:.85rem;margin-bottom:4px">חתימה:</div>' + sigInner + '</div>'
           : '';
         content.innerHTML =
           '<h2>' + esc(form.title) + '</h2>' +
@@ -193,12 +234,12 @@
 
         // איסוף תשובות + ולידציה
         const answers = {};
-        let sigDataUrl = '';
+        let sigValue = '';
         for (const f of fields) {
           const el = document.getElementById('fld_' + f.key);
           if (f.type === 'signature') {
             const cv = canvases[f.key];
-            if (cv && !cv.isBlank()) sigDataUrl = cv.dataURL();
+            if (cv && !cv.isBlank()) sigValue = cv.value();
             if (f.required && (!cv || cv.isBlank())) { alert('נא לחתום בשדה "' + f.label + '"'); return; }
             continue;
           }
@@ -208,20 +249,15 @@
           if (f.required && (val === '' || val === false || val == null)) { alert('נא למלא את השדה "' + f.label + '"'); return; }
           answers[f.key] = val;
         }
-        // אם אין שדה חתימה מוגדר — עדיין ניתן לחתום (חתימה ברירת מחדל: שם החותם בלבד)
-        if (!sigDataUrl && fields.some(f => f.type === 'signature')) {
-          // שדה חתימה קיים אך לא חובה ולא צויר — נשלח ריק
-        }
-
         btn.disabled = true;
         let res;
         if (token) {
-          res = await sb.rpc('submit_signature', { p_token: token, p_name: name, p_answers: answers, p_signature: sigDataUrl || null });
+          res = await sb.rpc('submit_signature', { p_token: token, p_name: name, p_answers: answers, p_signature: sigValue || null });
         } else {
-          res = await sb.rpc('submit_public_form', { g_token: gtok, p_name: name, p_answers: answers, p_signature: sigDataUrl || null });
+          res = await sb.rpc('submit_public_form', { g_token: gtok, p_name: name, p_answers: answers, p_signature: sigValue || null });
         }
         if (res.error || res.data === false) { alert('שגיאה בשליחה. ייתכן שהטופס נסגר או שכבר נשלח.'); btn.disabled = false; return; }
-        render(form, { status: 'signed', signer_name: name, signed_at: new Date().toISOString().slice(0, 10), answers: answers, signature: sigDataUrl });
+        render(form, { status: 'signed', signer_name: name, signed_at: new Date().toISOString().slice(0, 10), answers: answers, signature: sigValue });
       });
     }
     load();

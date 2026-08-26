@@ -269,11 +269,17 @@
       page.querySelector('#fBody').innerHTML = rs.map(r => {
         const link = signBase() + '?f=' + f.id + '&t=' + r.token;
         const isSigned = r.status === 'signed';
-        return '<tr><td>' + esc(nameOf(r.student_id)) + '</td><td>' + esc(clsOf(r.student_id)) + '</td>' +
+        // תשובה שהגיעה מהקישור הכללי אין לה תלמיד, ולכן התלמיד שלה נספר
+        // כ"ממתין" למרות שההורה מילא. מסמנים אותה ומאפשרים שיוך בלחיצה.
+        const unlinked = r.student_id == null;
+        return '<tr' + (unlinked ? ' class="fr-unlinked"' : '') + '><td>' +
+          (unlinked ? '<span class="chip off">לא משויך</span>' : esc(nameOf(r.student_id))) +
+          '</td><td>' + esc(clsOf(r.student_id)) + '</td>' +
           '<td><button class="chip ' + (isSigned ? 'ok' : 'off') + '" data-tog="' + r.id + '">' + (isSigned ? 'נחתם' : 'ממתין') + '</button></td>' +
           '<td>' + esc(r.signer_name || '') + '</td><td>' + esc(r.signed_at || '') + '</td>' +
           '<td class="row-act">' +
             (isSigned ? '<button class="mini" data-viewsig="' + r.id + '" title="צפייה בטופס החתום"><i class="bi bi-eye"></i></button>' : '') +
+            (unlinked ? '<button class="mini" data-link="' + r.id + '" title="שייך לתלמיד"><i class="bi bi-person-check"></i></button>' : '') +
             '<button class="mini" data-copy="' + esc(link) + '" title="העתק קישור"><i class="bi bi-link-45deg"></i></button>' +
             '<button class="mini" data-wa="' + esc(link) + '" title="שליחה בוואטסאפ"><i class="bi bi-whatsapp"></i></button>' +
           '</td></tr>';
@@ -286,10 +292,55 @@
         detailView(f);
       }));
       page.querySelectorAll('[data-viewsig]').forEach(b => b.addEventListener('click', () => viewSigned(f, resp.find(x => x.id == b.dataset.viewsig))));
+      page.querySelectorAll('[data-link]').forEach(b => b.addEventListener('click', () => linkToStudent(f, resp.find(x => x.id == b.dataset.link))));
       page.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyLink(b.dataset.copy)));
       page.querySelectorAll('[data-wa]').forEach(b => b.addEventListener('click', () => {
         window.open('https://wa.me/?text=' + encodeURIComponent('קישור לחתימת אישור: ' + b.dataset.wa), '_blank');
       }));
+    }
+
+    // ---------- שיוך תשובה ציבורית לתלמיד ----------
+    // הקישור הכללי אחד לכולם, ולכן התשובה נוחתת בלי student_id. כאן המנהל
+    // מכריע. אם כבר קיימת שורה ממתינה לאותו תלמיד באותו טופס — התוכן עובר
+    // אליה והשורה הכפולה נמחקת, כדי שלא יופיעו שתי שורות לאותו תלמיד.
+    // ⚠️ אם השורה הממתינה **כבר חתומה** (הורה שני שמילא) — לא דורסים ולא
+    // מוחקים: החתימה השנייה נשמרת כשורה משלה.
+    function linkToStudent(f, r) {
+      if (!r) return;
+      const opts = studs.slice().sort((a, b) =>
+        String(a.family || '').localeCompare(String(b.family || ''), 'he') ||
+        String(a.name || '').localeCompare(String(b.name || ''), 'he'))
+        .map(x => '<option value="' + x.id + '">' + esc(x.name) + ' — ' + esc(clsOf(x.id)) + '</option>').join('');
+      window.UI.modal({
+        title: 'שיוך לתלמיד — ' + esc(r.signer_name || ''),
+        saveLabel: 'שייך',
+        bodyHTML: '<p class="login-hint" style="margin:0 0 10px">התשובה הגיעה מהקישור הכללי, ולכן אינה מקושרת לתלמיד. ' +
+          'בחר את התלמיד שההורה מילא עבורו.</p>' +
+          '<div class="form-grid"><label class="fld fld-wide"><span>תלמיד *</span>' +
+          '<select class="inp mb0" id="lnk_stu"><option value="">— בחר —</option>' + opts + '</select></label></div>',
+        onSave: async (mel) => {
+          const sid = Number(mel.querySelector('#lnk_stu').value);
+          if (!sid) { window.UI.toast('נא לבחור תלמיד', 'err'); return false; }
+          const target = resp.find(x => x.form_id == f.id && x.student_id == sid && x.status !== 'signed');
+          if (target) {
+            const patch = { status: 'signed', signer_name: r.signer_name, signed_at: r.signed_at,
+                            answers: r.answers, signature: r.signature };
+            const u = await window.store.update('form_responses', target.id, patch);
+            if (!u || u.ok === false) { window.UI.toast('השיוך נכשל', 'err'); return false; }
+            const d = await window.store.remove('form_responses', r.id);
+            if (!d || d.ok === false) { window.UI.toast('שויך, אך השורה הכפולה נשארה', 'err'); }
+            Object.assign(target, patch);
+            const i = resp.indexOf(r); if (i >= 0) resp.splice(i, 1);
+          } else {
+            const u = await window.store.update('form_responses', r.id, { student_id: sid });
+            if (!u || u.ok === false) { window.UI.toast('השיוך נכשל', 'err'); return false; }
+            r.student_id = sid;
+          }
+          window.UI.toast('שויך ל' + nameOf(sid));
+          detailView(f);
+          return true;
+        },
+      });
     }
 
     // ---------- צפייה בטופס החתום ----------
@@ -305,11 +356,25 @@
       });
       return out;
     }
+    // החתימה נשמרת מ-25/08/2026 כ-JSON של קווים ולא כתמונה — נטפרי חסם את
+    // ה-POST כשהיה בו base64 של PNG, והורים לא הצליחו לשלוח את הטופס.
+    // חתימות ישנות (data:image/...) ממשיכות להיות מוצגות כתמונה.
     function signatureImg(r) {
       const sig = r && r.signature;
-      return (sig && /^data:image\//.test(sig))
-        ? '<img src="' + esc(sig) + '" alt="חתימה" style="max-width:100%;border:1px solid var(--line,#ccc);border-radius:8px;background:#fff">'
-        : '<span style="color:var(--muted)">אין תמונת חתימה שמורה</span>';
+      if (!sig) return '<span style="color:var(--muted)">אין חתימה שמורה</span>';
+      if (/^data:image\//.test(sig)) {
+        return '<img src="' + esc(sig) + '" alt="חתימה" style="max-width:100%;border:1px solid var(--line,#ccc);border-radius:8px;background:#fff">';
+      }
+      let d = null;
+      try { d = JSON.parse(sig); } catch (_) { d = null; }
+      if (!d || !d.s || !d.s.length) return '<span style="color:var(--muted)">אין חתימה שמורה</span>';
+      const w = d.w || 600, h = d.h || 160;
+      const paths = d.s.filter(st => st && st.length).map(st =>
+        '<path d="M' + st.map(pt => pt[0] + ' ' + pt[1]).join(' L') + '"/>').join('');
+      return '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" ' +
+        'style="width:100%;max-width:340px;height:auto;background:#fff;border:1px solid var(--line,#ccc);border-radius:8px" ' +
+        'fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        paths + '</svg>';
     }
     function signedBlockHTML(f, r) {
       return '<div class="det-head"><div><div class="det-name">' + esc(nameOf(r.student_id)) + '</div>' +
