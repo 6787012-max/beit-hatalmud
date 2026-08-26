@@ -6,6 +6,8 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
   const isAdmin = () => !!(window.currentUser && window.currentUser.role === 'מנהל');
+  // פילוח פעילות הצוות הוא מידע ניהולי — מנהל ומפקח בלבד
+  const canSeeStats = () => !!(window.currentUser && ['מנהל', 'מפקח'].includes(window.currentUser.role));
   const hebDate = iso => window.UI.hebDate(iso);
 
   const sevClass = s => s === 'גבוהה' ? 'hi' : s === 'נמוכה' ? 'lo' : 'mid';
@@ -101,6 +103,12 @@
     const pickAdd = await window.cv3Picker.html('q');
     const pickFilter = await window.cv3Picker.html('f', { placeholder: 'כל התלמידים' });
     const catFilterOpts = cs.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+    const authorName = uid => (window.Author ? window.Author.name(uid) : (uid ? 'לא ידוע' : '—'));
+    // מפתח יציב לסינון: המזהה עצמו, ו-'__none' למי שאין לו (רשומות ישנות)
+    const authorKey = e => e.created_by || '__none';
+    const byFilterOpts = [...new Map(evs.map(e => [authorKey(e), authorName(e.created_by)])).entries()]
+      .sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'he'))
+      .map(([k, v]) => '<option value="' + esc(k) + '">' + esc(v) + '</option>').join('');
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>מעקב תלמידים</h2>' +
       '<div class="head-actions"><button class="btn-ghost sm" id="behCsv"><i class="bi bi-download"></i> ייצוא דוח CSV</button></div></div>' +
@@ -115,10 +123,19 @@
           '<textarea class="inp mb0 fld-wide ta-auto" id="qNote" rows="3" placeholder="הערה — אפשר לכתוב כמה שורות" style="grid-column:1/-2"></textarea>' +
           '<button class="btn-primary sm" id="qSave"><i class="bi bi-plus-lg"></i> רישום</button>' +
         '</div></div>' +
-      '<div class="toolbar" style="grid-template-columns:1fr auto auto auto">' + pickFilter +
+      // "מי דיווח" — מי שרשם את הדיווח. הרשימה נבנית מהדיווחים עצמם ולא
+      // מטבלת המשתמשים, כדי שיופיעו גם מי שכבר לא פעיל וגם "לא ידוע"
+      // (רשומות מלפני שהמערכת התחילה לתעד מי רשם).
+      '<div class="toolbar" style="grid-template-columns:1fr auto auto auto auto">' + pickFilter +
         '<select class="inp mb0" id="fCat"><option value="">כל הקטגוריות</option>' + catFilterOpts + '</select>' +
+        '<select class="inp mb0" id="fBy" title="מי דיווח"><option value="">כל המדווחים</option>' + byFilterOpts + '</select>' +
         '<select class="inp mb0" id="fGroup" title="תצוגה לפי"><option value="">ללא קיבוץ</option><option value="student">לפי תלמיד</option><option value="class">לפי כיתה</option><option value="cat">לפי קטגוריה</option><option value="by">לפי מי שרשם</option></select>' +
         '<span class="count-line" id="evCount" style="align-self:center"></span></div>' +
+      // פילוח פעילות הצוות — למנהל ולמפקח. עונה על "מי מעדכן, כמה, ומה".
+      (canSeeStats() ? '<div class="qr-card" id="byCard"><div class="card-h-row">' +
+        '<h3 style="margin:0"><i class="bi bi-people"></i> מי מדווח — פילוח פעילות</h3>' +
+        '<span class="tl-note" style="font-size:.78rem">לחיצה על שורה מסננת אליה</span></div>' +
+        '<div id="byStats"></div></div>' : '') +
       '<div id="timeline"></div>' +
       '<div id="evEmpty" class="empty-state" hidden><i class="bi bi-clipboard-check"></i><div>אין דיווחים עדיין — השתמש בדיווח המהיר למעלה</div></div>';
 
@@ -149,7 +166,11 @@
     let list = evs;
     const filtered = () => {
       const f = fpick.value(), fc = page.querySelector('#fCat').value;
-      return list.filter(e => (!f || String(e.student_id) === f) && (!fc || String(e.category_id) === fc));
+      const fb = (page.querySelector('#fBy') || {}).value || '';
+      return list.filter(e =>
+        (!f || String(e.student_id) === f) &&
+        (!fc || String(e.category_id) === fc) &&
+        (!fb || authorKey(e) === fb));
     };
     const itemHtml = e =>
       '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
@@ -162,8 +183,57 @@
     const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id)
       : g === 'by' ? (window.Author ? window.Author.name(e.created_by) : 'לא ידוע')
       : catOf(e.category_id) || 'ללא קטגוריה';
+    // ── פילוח פעילות הצוות ──────────────────────────────────────────────
+    // "כמה כל אחד מעדכן ואיזה דברים" — לכן גם ספירה, גם התפלגות קטגוריות,
+    // גם כמה תלמידים הוא נגע בהם, וגם מתי דיווח לאחרונה. נבנה תמיד על **כל**
+    // הדיווחים ולא על הסינון הנוכחי, אחרת סינון למדווח אחד היה מציג אותו
+    // כ-100% מהפעילות.
+    function drawByStats() {
+      const host = page.querySelector('#byStats');
+      if (!host) return;
+      const cur = (page.querySelector('#fBy') || {}).value || '';
+      const by = {};
+      list.forEach(e => {
+        const k = authorKey(e);
+        const b = by[k] = by[k] || { key: k, name: authorName(e.created_by), n: 0, cats: {}, studs: new Set(), last: '' };
+        b.n++;
+        const c = catOf(e.category_id) || 'ללא קטגוריה';
+        b.cats[c] = (b.cats[c] || 0) + 1;
+        if (e.student_id) b.studs.add(e.student_id);
+        const d = String(e.event_date || '');
+        if (d > b.last) b.last = d;
+      });
+      const arr = Object.values(by).sort((a, b) => b.n - a.n);
+      const total = list.length || 1;
+      if (!arr.length) { host.innerHTML = '<div class="tl-note" style="padding:8px">אין דיווחים</div>'; return; }
+      host.innerHTML =
+        '<div class="table-wrap"><table class="tbl"><thead><tr>' +
+        '<th>מי דיווח</th><th style="width:90px">דיווחים</th><th style="width:110px">חלק מהסה״כ</th>' +
+        '<th style="width:90px">תלמידים</th><th>על מה דיווח</th><th style="width:120px">דיווח אחרון</th>' +
+        '</tr></thead><tbody>' +
+        arr.map(b => {
+          const pct = Math.round((b.n / total) * 100);
+          const top = Object.entries(b.cats).sort((x, y) => y[1] - x[1])
+            .map(([c, n]) => '<span class="chip off" style="margin:1px">' + esc(c) + ' ' + n + '</span>').join('');
+          return '<tr class="by-row' + (cur === b.key ? ' on' : '') + '" data-by="' + esc(b.key) + '">' +
+            '<td><b>' + esc(b.name) + '</b></td>' +
+            '<td><b>' + b.n + '</b></td>' +
+            '<td><div class="by-bar"><span style="width:' + pct + '%"></span></div>' +
+              '<span class="tl-note" style="font-size:.74rem">' + pct + '%</span></td>' +
+            '<td>' + b.studs.size + '</td>' +
+            '<td>' + top + '</td>' +
+            '<td>' + esc(hebDate(b.last) || b.last || '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      host.querySelectorAll('.by-row').forEach(tr => tr.addEventListener('click', () => {
+        const sel = page.querySelector('#fBy');
+        sel.value = sel.value === tr.dataset.by ? '' : tr.dataset.by;   // לחיצה שנייה מבטלת
+        draw();
+      }));
+    }
+
     function draw() {
       const rows = filtered();
+      drawByStats();
       const g = page.querySelector('#fGroup').value;
       if (!g) {
         page.querySelector('#timeline').innerHTML = rows.map(itemHtml).join('');
@@ -190,12 +260,14 @@
     function editEvent(ev) { openEventForm(ev, { onSaved: () => draw() }); }
 
     page.querySelector('#fCat').addEventListener('change', draw);
+    const fByEl = page.querySelector('#fBy'); if (fByEl) fByEl.addEventListener('change', draw);
     page.querySelector('#fGroup').addEventListener('change', draw);
     page.querySelector('#behCsv').addEventListener('click', () => {
-      const head = ['תלמיד', 'קטגוריה', 'תאריך', 'שעה', 'הערה', 'נרשם ע"י'];
+      const head = ['תלמיד', 'קטגוריה', 'תאריך', 'שעה', 'הערה', 'נרשם ע"י', 'תפקיד'];
       const lines = [head.join(',')].concat(filtered().map(e =>
         [nameOf(e.student_id), catOf(e.category_id), e.event_date, e.event_time || '', e.note || '',
-         window.Author ? window.Author.name(e.created_by) : '']
+         window.Author ? window.Author.name(e.created_by) : '',
+         window.Author ? window.Author.role(e.created_by) : '']
           .map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')));
       const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'behavior_report.csv'; a.click();

@@ -383,6 +383,13 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .qk-type{font-size:.68rem; font-weight:800; color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,transparent); padding:1px 7px; border-radius:999px; margin-inline-end:6px}
 
 /* ===== attendance ===== */
+/* פילוח "מי מדווח" במסך המעקב */
+.by-row{cursor:pointer}
+.by-row:hover td{background:color-mix(in srgb,var(--primary) 7%,transparent)}
+.by-row.on td{background:color-mix(in srgb,var(--primary) 14%,transparent); font-weight:700}
+.by-bar{display:block; height:7px; border-radius:99px; background:var(--bg); overflow:hidden; margin-bottom:2px}
+.by-bar>span{display:block; height:100%; background:var(--primary); border-radius:99px}
+
 /* ── דיווחי מעקב ברשימות (בית + כרטיס תלמיד) ── */
 /* ההערה מוגבלת לשתי שורות; לחיצה על השורה פותחת את כולה. בלי זה דיווח ארוך
    מתח את דף הבית ודחק את שאר התוכן מחוץ למסך. */
