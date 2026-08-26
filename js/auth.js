@@ -232,12 +232,14 @@
   }
 
   async function loadProfile(user) {
-    let role = 'צוות', name = user.email, perms = null, access_mode = null;
+    let role = 'צוות', name = user.email, perms = null, access_mode = null, tz = null;
     try {
       const { data } = await window.sb.from('profiles').select('*').eq('id', user.id).single();
-      if (data) { role = data.role || 'צוות'; name = data.name || user.email; perms = data.perms || null; access_mode = data.access_mode || null; }
+      if (data) { role = data.role || 'צוות'; name = data.name || user.email; perms = data.perms || null; access_mode = data.access_mode || null; tz = data.tz || null; }
     } catch (_) {}
-    setUser({ id: user.id, email: user.email, name, role, perms, access_mode });
+    // tz (=הטלפון) נחוץ כדי לפסול אותו כסיסמה חדשה. בלעדיו הבדיקה נשענה על
+    // פיצול המייל הסינתטי, וזה נכון רק כל עוד מוסכמת המייל לא משתנה.
+    setUser({ id: user.id, email: user.email, name, role, perms, access_mode, tz });
   }
 
   async function init() {
