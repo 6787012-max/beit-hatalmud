@@ -111,7 +111,8 @@
       '<div class="modal-card lb-card">' +
         '<div class="modal-head"><h3><i class="bi bi-tags-fill"></i> הדפסת מדבקות</h3>' +
           '<div class="lb-head-actions">' +
-            '<button class="btn-ghost sm" id="lbGuide"><i class="bi bi-question-circle"></i> מבנה קובץ אקסל</button>' +
+            '<button class="btn-ghost sm" id="lbImport"><i class="bi bi-file-earmark-excel"></i> ייבוא מאקסל</button>' +
+            '<button class="btn-ghost sm" id="lbGuide"><i class="bi bi-question-circle"></i> מבנה הקובץ</button>' +
             '<button class="btn-ghost sm" id="lbPdf"><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
             '<button class="btn-primary sm" id="lbPrint"><i class="bi bi-printer"></i> הדפסה</button>' +
           '</div>' +
@@ -170,10 +171,13 @@
         ) +
 
         sec('bi-fonts', 'מה כתוב על המדבקה',
-          fld('מקור התוכן', '<select class="inp mb0" id="lbSrc">' +
-            '<option value="students">תלמידי המכינה</option>' +
-            '<option value="text">טקסט שאני מקליד</option>' +
-            '<option value="file">קובץ אקסל / CSV</option></select>', 'wide') +
+          // ⚠️ היה select, ויוסף לא מצא בו את הייבוא מאקסל. שלושת המקורות
+          // הם הבחירה הראשונה בפאנל — הם צריכים להיות גלויים, לא מגולגלים.
+          '<div class="fld wide"><span>מקור התוכן</span><div class="lb-tabs" id="lbSrcTabs">' +
+            '<button type="button" data-src="students" class="on"><i class="bi bi-people-fill"></i> תלמידי המכינה</button>' +
+            '<button type="button" data-src="text"><i class="bi bi-pencil-square"></i> טקסט שאני מקליד</button>' +
+            '<button type="button" data-src="file"><i class="bi bi-file-earmark-excel"></i> קובץ אקסל / CSV</button>' +
+          '</div></div>' +
 
           // ── תלמידים ──
           '<div class="lb-when lb-students" style="grid-column:1/-1">' +
@@ -285,7 +289,8 @@
       st.mt = num($('#lbMt').value, 0); st.mb = num($('#lbMb').value, 0);
       st.ms = num($('#lbMs').value, 0); st.me = num($('#lbMe').value, 0);
       st.gx = num($('#lbGx').value, 0); st.gy = num($('#lbGy').value, 0);
-      st.src = $('#lbSrc').value;
+      const onTab = $('#lbSrcTabs').querySelector('.on');
+      st.src = onTab ? onTab.dataset.src : 'students';
       st.cls = [].map.call($('#lbCls').querySelectorAll('input:checked'), x => Number(x.value));
       st.fields = [].map.call($('#lbFields').querySelectorAll('input:checked'), x => x.value);
       st.sort = $('#lbSort').value;
@@ -317,7 +322,7 @@
       const mCustom = $('#lbMm').value === 'custom';
       ov.querySelectorAll('.lb-marg').forEach(e => e.style.display = mCustom ? '' : 'none');
       ov.querySelectorAll('.lb-fixedfont').forEach(e => e.style.display = $('#lbFontMode').value === 'fixed' ? '' : 'none');
-      const src = $('#lbSrc').value;
+      const src = st.src;
       ov.querySelector('.lb-students').style.display = src === 'students' ? '' : 'none';
       ov.querySelector('.lb-text').style.display = src === 'text' ? '' : 'none';
       ov.querySelector('.lb-file').style.display = src === 'file' ? '' : 'none';
@@ -608,8 +613,24 @@
       });
       el.addEventListener('change', draw);
     });
+    // הטאבים מזינים את ה-select המוסתר, שנשאר מקור האמת היחיד ל-read()
+    $('#lbSrcTabs').addEventListener('click', e => {
+      const btn = e.target.closest('[data-src]'); if (!btn) return;
+      setSrc(btn.dataset.src);
+    });
+    function setSrc(v) {
+      $('#lbSrcTabs').querySelectorAll('[data-src]').forEach(b =>
+        b.classList.toggle('on', b.dataset.src === v));
+      draw();
+    }
+    // "ייבוא מאקסל" — קיצור מלא: עובר למקור הקובץ ופותח מיד את בורר הקבצים
+    $('#lbImport').addEventListener('click', () => {
+      setSrc('file');
+      $('#lbFile').click();
+    });
+
     $('#lbZoom').addEventListener('change', () => zoomFit(geom()));
-    ['#lbMm', '#lbSrc', '#lbSort', '#lbFontMode', '#lbAlign', '#lbDir'].forEach(s => {
+    ['#lbMm', '#lbSort', '#lbFontMode', '#lbAlign', '#lbDir'].forEach(s => {
       $(s).addEventListener('change', draw);
     });
     ['#lbText', '#lbFont', '#lbPad', '#lbCopies', '#lbStart'].forEach(s => {
@@ -640,8 +661,7 @@
         $('#lbFileInfo').innerHTML = '<i class="bi bi-check-circle-fill" style="color:var(--ok,#2e7d32)"></i> ' +
           esc(f.name) + ' · ' + rows.length + ' שורות · ' + cols + ' עמודות' +
           (st.copyCol > -1 ? ' · עמודת כמות: ' + esc(rows[0][st.copyCol]) : '');
-        $('#lbSrc').value = 'file';
-        draw();
+        setSrc('file');
       } catch (e) {
         $('#lbFileInfo').innerHTML = '<i class="bi bi-x-circle-fill" style="color:var(--danger,#c62828)"></i> ' +
           esc(e.message || String(e));

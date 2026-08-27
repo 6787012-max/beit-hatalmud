@@ -691,7 +691,11 @@ body.mode-writeonly .att-pop .ap-act{display:flex !important}
 
 /* ===== פאנל הדפסת מדבקות (labels.js) ===== */
 .lb-card{max-width:min(1500px,97vw); width:97vw}
-.lb-head-actions{display:flex; gap:6px; flex-wrap:wrap; margin-inline-start:auto; margin-inline-end:34px}
+.lb-head-actions{display:flex; gap:6px; flex-wrap:wrap; margin-inline-start:auto; margin-inline-end:14px}
+/* בלי flex-shrink:0 הכפתורים נדחסים והאייקון נחתך */
+.lb-head-actions>button{flex:0 0 auto; white-space:nowrap}
+.lb-card .modal-head{gap:10px; flex-wrap:wrap}
+.lb-card .modal-head h3{flex:0 0 auto}
 .lb-body{display:grid; grid-template-columns:minmax(360px,430px) 1fr; gap:16px; align-items:start}
 @media (max-width:1100px){ .lb-body{grid-template-columns:1fr} }
 
@@ -705,6 +709,17 @@ body.mode-writeonly .att-pop .ap-act{display:flex !important}
 .lb-grid .fld>span{font-size:.74rem; color:var(--muted)}
 .lb-grid .fld>span small{font-weight:400}
 .lb-when .fld{margin-top:6px}
+
+/* שלושת מקורות התוכן — כפתורים גלויים, לא select מגולגל */
+.lb-tabs{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:4px}
+.lb-tabs button{font-family:inherit; font-size:.82rem; font-weight:700; cursor:pointer;
+  border:1px solid var(--line); background:var(--card); color:var(--muted);
+  border-radius:10px; padding:9px 6px; display:flex; flex-direction:column;
+  align-items:center; gap:4px; line-height:1.25; transition:background .15s, color .15s}
+.lb-tabs button .bi{font-size:1.05rem}
+.lb-tabs button:hover{background:var(--bg)}
+.lb-tabs button.on{background:var(--primary-dark); border-color:var(--primary-dark); color:#fff}
+.lb-tabs button.on .bi{color:var(--accent)}
 
 .lb-drop{border:2px dashed var(--line); border-radius:12px; padding:16px; text-align:center;
   background:var(--card); display:flex; flex-direction:column; align-items:center; gap:6px}
