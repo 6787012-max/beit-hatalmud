@@ -688,3 +688,95 @@ body.mode-writeonly .att-pop .ap-act{display:flex !important}
 .form-warn{background:#fff7ed; border:1px solid #fed7aa; border-radius:10px;
   padding:10px 12px; font-size:.86rem; line-height:1.5; color:#7c2d12}
 .form-warn b{display:block; margin-bottom:2px}
+
+/* ===== פאנל הדפסת מדבקות (labels.js) ===== */
+.lb-card{max-width:min(1500px,97vw); width:97vw}
+.lb-head-actions{display:flex; gap:6px; flex-wrap:wrap; margin-inline-start:auto; margin-inline-end:34px}
+.lb-body{display:grid; grid-template-columns:minmax(360px,430px) 1fr; gap:16px; align-items:start}
+@media (max-width:1100px){ .lb-body{grid-template-columns:1fr} }
+
+.lb-ctl{display:flex; flex-direction:column; gap:12px; max-height:76vh; overflow:auto; padding-inline-end:4px}
+.lb-sec{border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--bg)}
+.lb-sec h4{font-size:.9rem; font-weight:800; color:var(--primary-dark); margin-bottom:8px;
+  display:flex; align-items:center; gap:6px}
+.lb-sec h4 .bi{color:var(--accent)}
+.lb-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; align-items:end}
+.lb-grid .wide{grid-column:1/-1}
+.lb-grid .fld>span{font-size:.74rem; color:var(--muted)}
+.lb-grid .fld>span small{font-weight:400}
+.lb-when .fld{margin-top:6px}
+
+.lb-drop{border:2px dashed var(--line); border-radius:12px; padding:16px; text-align:center;
+  background:var(--card); display:flex; flex-direction:column; align-items:center; gap:6px}
+.lb-drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.lb-drop .bi{font-size:1.6rem; color:var(--accent)}
+
+.lb-side{min-width:0}
+.lb-statbar{display:flex; gap:8px; align-items:center}
+.lb-stat{flex:1; background:var(--primary-dark); color:#fff; border-radius:10px; padding:8px 12px; font-size:.86rem}
+.lb-zoom{width:auto; min-width:130px; flex:0 0 auto}
+.lb-warn{margin-top:8px; background:#fff7ed; border:1px solid #fed7aa; border-radius:10px;
+  padding:8px 12px; font-size:.82rem; line-height:1.5; color:#7c2d12; display:none}
+.lb-warn div+div{margin-top:4px}
+
+/* התצוגה המקדימה — גיליון אמיתי במידות מ"מ. --lb-z הוא קנה מידה לתצוגה
+   בלבד; ההדפסה תמיד ב-1:1, ולכן הוא לא נכנס לחישוב שום מידה. */
+.lb-prev{margin-top:10px; background:#e9edf2; border-radius:12px; padding:14px;
+  max-height:64vh; overflow:auto}
+#lbWrap{min-height:1px}
+body.dark .lb-prev{background:#0a1219}
+#lbWrap{transform-origin:top center; transform:scale(var(--lb-z,1))}
+.lb-page{position:relative; background:#fff; color:#111; margin:0 auto 16px;
+  box-shadow:0 4px 18px rgba(0,0,0,.18); overflow:hidden}
+.lb-cell{position:absolute; overflow:hidden; display:flex}
+.lb-page.bord .lb-cell{outline:1px dashed #b9c4cd; outline-offset:-1px}
+.lb-page.bold .lb-cell{font-weight:800}
+/* סימני חיתוך: קווים קצרים בפינות במקום מסגרת מלאה, כדי שגזירה ידנית
+   לא תשאיר קו שחור על המדבקה. */
+.lb-page.cut .lb-cell::before, .lb-page.cut .lb-cell::after{
+  content:''; position:absolute; inset-inline-start:0; width:100%; height:0;
+  border-top:1px solid #cbd5dd}
+.lb-page.cut .lb-cell::before{top:0} .lb-page.cut .lb-cell::after{bottom:0}
+.lb-in{flex:1; min-width:0; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:.12em; line-height:1.18; overflow:hidden}
+.lb-page.al-start .lb-in{align-items:flex-start; text-align:start}
+.lb-page.al-end .lb-in{align-items:flex-end; text-align:end}
+.lb-page.al-center .lb-in{align-items:center; text-align:center}
+.lb-l{white-space:nowrap; max-width:100%}
+/* שבירת שורה: שם ארוך יישבר לשתי שורות בגופן קריא במקום להתכווץ לכתב זעיר */
+.lb-page.wrapl .lb-l{white-space:normal; overflow-wrap:anywhere}
+.lb-l1{font-size:1.18em}
+.lb-l:not(.lb-l1){font-size:.78em; font-weight:600; color:#333}
+.lb-logo{height:1.5em; width:auto; margin-bottom:.1em}
+
+.lb-guide ul{margin:10px 4px 0 18px; display:flex; flex-direction:column; gap:6px; font-size:.88rem}
+.lb-guide code{background:var(--bg); border:1px solid var(--line); border-radius:5px; padding:0 4px}
+.lb-demo{font-size:.82rem; margin-top:8px}
+.lb-demo td:first-child, .lb-demo th:first-child{background:var(--bg); color:var(--muted); width:32px; text-align:center}
+
+/* ===== הדפסת גיליון המדבקות בלבד ===== */
+/* לא מסתמכים על כלל ה-visibility הכללי של המודאלים: שם הכרטיס נשאר בזרימה
+   והמדבקות היו זזות. כאן הגיליון עצמו הוא כל מה שנשאר בדף. */
+@media print{
+  body.printing-labels>*:not(.lb-ov){display:none !important}
+  body.printing-labels .lb-ov{position:static !important; inset:auto !important;
+    background:none !important; padding:0 !important; display:block !important; overflow:visible !important}
+  body.printing-labels .lb-card{max-width:none !important; width:auto !important; max-height:none !important;
+    box-shadow:none !important; border:0 !important; border-radius:0 !important; background:none !important}
+  body.printing-labels .modal-head,
+  body.printing-labels .lb-ctl,
+  body.printing-labels .lb-statbar,
+  body.printing-labels .lb-stat,
+  body.printing-labels .lb-warn,
+  body.printing-labels .login-hint{display:none !important}
+  body.printing-labels .lb-body{display:block !important; padding:0 !important}
+  body.printing-labels .modal-body{max-height:none !important; overflow:visible !important; padding:0 !important}
+  body.printing-labels .lb-prev{background:none !important; padding:0 !important; margin:0 !important;
+    height:auto !important; max-height:none !important; overflow:visible !important; border-radius:0 !important}
+  /* ⚠️ ביטול קנה המידה של התצוגה — בלעדיו הדף מודפס מוקטן */
+  body.printing-labels #lbWrap{transform:none !important}
+  body.printing-labels .lb-page{margin:0 !important; box-shadow:none !important;
+    break-after:page; page-break-after:always}
+  body.printing-labels .lb-page:last-child{break-after:auto; page-break-after:auto}
+  body.printing-labels .lb-page.bord .lb-cell{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+}

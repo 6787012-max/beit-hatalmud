@@ -244,6 +244,8 @@
           '<button class="btn-ghost sm" id="exPdf"><i class="bi bi-file-earmark-pdf"></i> הורד PDF</button>' +
           '<button class="btn-ghost sm" id="exSqueeze" title="מקטין את הטקסט עד שכל התוכן נכנס לעמוד אחד בגודל שנבחר">' +
             '<i class="bi bi-arrows-angle-contract"></i> דחוס לעמוד אחד</button>' +
+          '<button class="btn-ghost sm" id="exLabels" title="פאנל נפרד: גיליון מדבקות לפי גודל דף, עמודות, שורות ושוליים">' +
+            '<i class="bi bi-tags-fill"></i> מדבקות</button>' +
           '<button class="btn-primary sm" id="exPrint"><i class="bi bi-printer"></i> הדפסה</button>' +
         '</div></div>' +
       '<div class="qr-card"><div class="qr-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">' +
@@ -653,6 +655,13 @@
       const sh = page.querySelector('.ex-sheet');
       const got = sh ? Math.round(parseFloat(sh.style.fontSize) || 0) : 0;
       window.UI.toast(got ? ('הכל נדחס לעמוד אחד · גודל טקסט ' + got) : 'נדחס לעמוד אחד');
+    });
+
+    // פאנל המדבקות הוא עולם גיאומטרי משלו (מלבנים במ"מ במיקום מוחלט) ולכן
+    // הוא חלון נפרד ולא עוד מקור נתונים בטבלה הזאת.
+    $('#exLabels').addEventListener('click', () => {
+      if (!window.cv3Labels) { window.UI.toast('מודול המדבקות לא נטען', 'err'); return; }
+      window.cv3Labels.open();
     });
 
     $('#exPrint').addEventListener('click', () => {
