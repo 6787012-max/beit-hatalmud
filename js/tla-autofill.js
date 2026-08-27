@@ -188,9 +188,24 @@
     // כמה קבצים גורמת ל"כל הקבצים נכשלו" — וזה בדיוק מה שנעמי קיבלה.
     let r, d;
     for (let attempt = 0; ; attempt++) {
-      r = await fetch(API + '?key=' + encodeURIComponent(k),
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      d = await r.json();
+      // ⏱ timeout מפורש. בלעדיו קריאה שנתקעת משאירה את המסך על "מנתח
+      // קבוצה 1 מתוך 1" לנצח, בלי שגיאה ובלי דרך לדעת מה קרה.
+      const ctrl = new AbortController();
+      const tmr = setTimeout(() => ctrl.abort(), 180000);
+      try {
+        r = await fetch(API + '?key=' + encodeURIComponent(k),
+          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body), signal: ctrl.signal });
+      } catch (netErr) {
+        clearTimeout(tmr);
+        if (attempt >= 2) throw new Error(netErr.name === 'AbortError'
+          ? 'הניתוח לקח יותר מ-3 דקות ונעצר'
+          : 'אין תקשורת עם שירות הניתוח');
+        await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
+        continue;
+      }
+      clearTimeout(tmr);
+      d = await r.json().catch(() => ({}));
       if (r.ok) break;
       const retryable = r.status === 429 || r.status === 500 || r.status === 503;
       if (!retryable || attempt >= 3) {
@@ -216,7 +231,11 @@
   // ("The document has no pages") שנראית כמו קובץ פגום. לכן: קבוצות
   // קטנות, ואיחוד בקריאה נוספת. קבוצה שנכשלת נבדקת קובץ-קובץ, כך
   // שקובץ בעייתי בודד מזוהה בשמו במקום להפיל את כולם.
-  const BATCH_MB = 6, BATCH_N = 4;
+  // ⚠️ **הגודל נמדד ב-base64 ולא גולמי.** base64 מנפח ב-33%, ובגרסה הקודמת
+  // הספירה היתה על הגולמי — ארבעה אבחונים של 2.5MB הפכו ל-3.4MB בגוף
+  // הבקשה, וה-API החזיר 400 על כל האצווה. אצל אוליאל זה הפיל את כל ההרצה.
+  // 2.5MB לאצווה משאיר מרווח בטוח גם לכותרת ולסכימה.
+  const BATCH_MB = 2.5, BATCH_N = 3;
 
   function emptyOut() {
     return { 'רקע_ומגבלות': [], 'מנת_משכל': null, 'נתונים_סביבתיים': [],
@@ -242,7 +261,8 @@
       onStep('קורא (' + (i + 1) + '/' + docs.length + '): ' + f.name);
       try {
         const g = await grab(student, f);
-        loaded.push({ name: f.name, mime: g.mime, b64: g.b64, mb: g.b64.length * 0.75 / 1024 / 1024 });
+        // mb = הנפח בפועל בגוף הבקשה (base64), לא גודל הקובץ המקורי
+        loaded.push({ name: f.name, mime: g.mime, b64: g.b64, mb: g.b64.length / 1024 / 1024 });
       } catch (e) {
         failed.push({ name: f.name, why: e.message || String(e) });
       }
@@ -259,6 +279,8 @@
     loaded.forEach(it => {
       if (cur.length && (cur.length >= BATCH_N || mb + it.mb > BATCH_MB)) { batches.push(cur); cur = []; mb = 0; }
       cur.push(it); mb += it.mb;
+      // מסמך בודד שחורג מהתקרה נשלח לבדו — אין טעם לצרף לו עוד
+      if (it.mb >= BATCH_MB) { batches.push(cur); cur = []; mb = 0; }
     });
     if (cur.length) batches.push(cur);
 
@@ -268,12 +290,15 @@
       try {
         partials.push(await runBatch(header, batches[i]));
         batches[i].forEach(it => scanned.push(it.name));
-      } catch (_) {
-        // הקבוצה נכשלה — מנסים קובץ-קובץ כדי לבודד את הבעייתי
+      } catch (batchErr) {
+        // הקבוצה נכשלה — מנסים קובץ-קובץ כדי לבודד את הבעייתי.
+        // הסיבה נשמרת: "המודל לא הצליח לקרוא אותו" הסתיר גם 400 על נפח,
+        // גם מפתח שפג, וגם קובץ פגום — שלושה דברים שונים לגמרי.
+        console.warn('[tla-autofill] batch failed: ' + (batchErr.message || batchErr));
         for (const it of batches[i]) {
           onStep('בודק בנפרד: ' + it.name);
           try { partials.push(await runBatch(header, [it])); scanned.push(it.name); }
-          catch (e2) { failed.push({ name: it.name, why: 'המודל לא הצליח לקרוא אותו' }); }
+          catch (e2) { failed.push({ name: it.name, why: (e2.message || 'המודל לא הצליח לקרוא אותו').slice(0, 120) }); }
         }
       }
     }
