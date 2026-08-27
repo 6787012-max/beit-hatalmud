@@ -74,7 +74,7 @@
     marginMode: 'market', mt: 5, mb: 5, ms: 0, me: 0, gx: 0, gy: 0,
     src: 'students', cls: [], fields: ['full'], sort: 'family',
     text: '', fileRows: [], fileName: '', fileHead: true,
-    copies: 1, shuffle: false, startAt: 1, repeatOne: false,
+    copies: 1, shuffle: false, noNick: true, startAt: 1, repeatOne: false,
     fontMode: 'uniform', font: 14, bold: true, align: 'center', wrapLines: true,
     border: true, cut: false, logo: false, dir: 'rtl', pad: 2,
   });
@@ -191,7 +191,8 @@
                 '<option value="name">לפי שם מלא (א״ב)</option>' +
                 '<option value="cls">לפי שיעור ואז א״ב</option>' +
                 '<option value="none">כפי שהם במערכת</option></select>') +
-              fld('&nbsp;', '<label class="cb"><input type="checkbox" id="lbShuffle"> סדר אקראי (ערבוב)</label>') +
+              fld('&nbsp;', '<label class="cb"><input type="checkbox" id="lbShuffle"> סדר אקראי (ערבוב)</label>' +
+                '<label class="cb" style="margin-top:4px"><input type="checkbox" id="lbNick" checked> בלי כינוי בסוגריים</label>') +
             '</div>' +
           '</div>' +
 
@@ -289,6 +290,7 @@
       st.fields = [].map.call($('#lbFields').querySelectorAll('input:checked'), x => x.value);
       st.sort = $('#lbSort').value;
       st.shuffle = $('#lbShuffle').checked;
+      st.noNick = $('#lbNick').checked;
       st.text = $('#lbText').value;
       st.repeatOne = $('#lbRepeat').checked;
       st.fileHead = $('#lbHead').checked;
@@ -358,12 +360,15 @@
       let out = [];
       if (st.src === 'students') {
         let list = students.filter(s => st.cls.indexOf(Number(s.class_id)) > -1);
-        const nm = s => (window.UI && window.UI.fullName) ? window.UI.fullName(s) : (s.name || '');
-        const fam = s => String(s.family || '').trim();
+        // "דב בער (דובי) מלינוביץ" → "דב בער מלינוביץ". על מדבקה הכינוי
+        // גוזל שורה שלמה ומקטין את הכתב לכל הגיליון (הגודל אחיד).
+        const nick = t => st.noNick ? String(t).replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim() : String(t);
+        const nm = s => nick((window.UI && window.UI.fullName) ? window.UI.fullName(s) : (s.name || ''));
+        const fam = s => nick(String(s.family || '').trim());
         // שם פרטי = השם המלא פחות שם המשפחה. בנתונים המיובאים `name` הוא
         // כבר שם מלא ומכיל את המשפחה, ולכן חיתוך ולא שרשור.
         const first = s => {
-          const full = String(s.name || '').trim(), f = fam(s);
+          const full = nick(String(s.name || '').trim()), f = fam(s);
           if (!f) return full;
           const i = full.lastIndexOf(f);
           return (i > -1 ? (full.slice(0, i) + full.slice(i + f.length)) : full).replace(/\s+/g, ' ').trim() || full;
@@ -610,7 +615,7 @@
     ['#lbText', '#lbFont', '#lbPad', '#lbCopies', '#lbStart'].forEach(s => {
       $(s).addEventListener('input', draw);
     });
-    ['#lbShuffle', '#lbRepeat', '#lbHead', '#lbBold', '#lbWrapLines', '#lbBorder', '#lbCut', '#lbLogo'].forEach(s => {
+    ['#lbShuffle', '#lbNick', '#lbRepeat', '#lbHead', '#lbBold', '#lbWrapLines', '#lbBorder', '#lbCut', '#lbLogo'].forEach(s => {
       $(s).addEventListener('change', draw);
     });
     $('#lbCls').querySelectorAll('input').forEach(x => x.addEventListener('change', draw));
