@@ -617,6 +617,8 @@ body.mode-writeonly .att-pop .ap-act{display:flex !important}
   body.printing-sheet header,
   body.printing-sheet footer,
   body.printing-sheet #helpFab,
+  body.printing-sheet .help-fab,
+  body.printing-sheet .ai-fab,
   body.printing-sheet .toast-host,
   body.printing-sheet .modal-ov{display:none !important}
   body.printing-sheet #pages>*:not(.page.active){display:none !important}
@@ -794,4 +796,13 @@ body.dark .lb-prev{background:#0a1219}
     break-after:page; page-break-after:always}
   body.printing-labels .lb-page:last-child{break-after:auto; page-break-after:auto}
   body.printing-labels .lb-page.bord .lb-cell{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+}
+
+/* כפתורים צפים לא מודפסים — בשום מצב הדפסה. נשלט ב-class ולא ב-id:
+   כפתור צף שני (#aiFab) לא היה ברשימת ה-id-ים והודפס על גבי הגיליון. */
+@media print{
+  body.printing-sheet .help-fab, body.printing-sheet .ai-fab,
+  body.printing-labels .help-fab, body.printing-labels .ai-fab,
+  body.printing-card .help-fab, body.printing-card .ai-fab,
+  body.printing-sheet .toast-host, body.printing-labels .toast-host{display:none !important}
 }
