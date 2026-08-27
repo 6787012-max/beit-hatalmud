@@ -104,6 +104,7 @@
       },
     },
     reading: {
+      needs: 'cv3ReadAssess',
       label: 'מעקב קריאה', icon: 'bi-book-half',
       async cols(ctx) {
         const cats = window.cv3ReadAssess ? await window.cv3ReadAssess.cats() : [];
@@ -130,6 +131,7 @@
       async rows() { return []; },
     },
     passport: {
+      needs: 'cv3Passport',
       // אותם שדות כמו בחוברת הדרכון ובמסך הדרכון — כדי שהמודפס יתאים למה שרואים
       label: 'דרכון — סיכום שבועי', icon: 'bi-passport',
       cols: [
@@ -166,6 +168,7 @@
       },
     },
     docs: {
+      needs: 'cv3StudentDocs',
       // נעמי לוי ביקשה "לבדוק מה קיים בחומרים ומה לא" לפני בניית התל"אות.
       // לכן זו מטריצה אמיתית: עמודה לכל מסמך חובה, ולא רק "יש תיקייה".
       label: 'תיק מסמכים — מה קיים ומה חסר', icon: 'bi-folder2-open', slow: true,
@@ -250,7 +253,11 @@
         '</div></div>' +
       '<div class="qr-card"><div class="qr-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">' +
         '<label class="fld"><span>מה להפיק</span><select class="inp mb0" id="exSrc">' +
-          Object.keys(SOURCES).map(k => '<option value="' + k + '">' + esc(SOURCES[k].label) + '</option>').join('') +
+          // מקור שהמודול שלו לא נטען במופע הזה לא מוצג בכלל. אותו קובץ רץ
+          // גם בתלמוד תורה מעלה עמוס, שאין בו דרכון ותיק-מסמכים — ובלי
+          // הסינון הבחירה בהם הייתה נופלת על window.cv3Passport שהוא undefined.
+          Object.keys(SOURCES).filter(k => !SOURCES[k].needs || window[SOURCES[k].needs])
+            .map(k => '<option value="' + k + '">' + esc(SOURCES[k].label) + '</option>').join('') +
         '</select></label>' +
         '<label class="fld"><span>מיון</span><select class="inp mb0" id="exSort">' +
           SORTS.map(s => '<option value="' + s[0] + '">' + esc(s[1]) + '</option>').join('') + '</select></label>' +

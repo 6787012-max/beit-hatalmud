@@ -85,7 +85,9 @@
     const [classes, students, staff] = await Promise.all([
       window.store.list('classes'),
       window.cv3Students ? window.cv3Students.getStudents() : window.store.list('students'),
-      window.store.list('staff').catch(() => []),
+      // שם הטבלה שונה בין המופעים (staff בבית התלמוד, staff_directory
+      // בתלמוד תורה מעלה עמוס) — מנסים את שתיהן ולא נופלים על אף אחת.
+      window.store.list('staff').catch(() => window.store.list('staff_directory').catch(() => [])),
     ]);
     const inst = (window.CV3 || {}).INSTANCE_NAME || '';
     const hebYear = (window.UI && window.UI.hebYear) ? window.UI.hebYear() : '';
@@ -99,7 +101,7 @@
       if (!c) return '';
       if (c.melamed != null) {
         const s = staff.filter(x => x.id == c.melamed)[0];
-        if (s) return ((s.first_name || '') + ' ' + (s.last_name || '')).trim();
+        if (s) return (s.name || ((s.first_name || '') + ' ' + (s.last_name || ''))).trim();
       }
       const p = String(c.name || '').split(' - ');
       return p.length > 1 ? p.slice(1).join(' - ').trim() : '';
