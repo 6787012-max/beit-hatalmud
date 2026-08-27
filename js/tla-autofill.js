@@ -1,4 +1,6 @@
-// tla-autofill.js — "מלא אוטומטית מהאבחונים" בדף ההכנה של התל"א (2026-08-24).
+// tla-autofill.js — "הזמנת נתונים אוטומטית" בדף ההכנה של התל"א
+// (2026-08-24; הוסר 26/08 והוחזר באותו יום בשם החדש, עם שני שיפורים:
+// אפשרות **להוסיף לקיים** במקום לדרוס, וסימון ברור של מה שהמודל לא מצא).
 //
 // קורא את מסמכי האבחון של התלמיד מהדרייב, מפיק מהם תקציר לארבעת שדות דף
 // ההכנה, ומציג אותו **כטיוטה טעונת אישור**. לא נכתב כלום לתיק התלמיד עד
@@ -325,7 +327,7 @@
     const box = document.createElement('div');
     box.className = 'taf-result';
     box.innerHTML =
-      '<div class="taf-head"><i class="bi bi-magic"></i> טיוטה שנוצרה אוטומטית מהאבחונים' +
+      '<div class="taf-head"><i class="bi bi-cloud-download"></i> נתונים שהוזמנו מהאבחונים' +
       '<span class="taf-badge">טעון אישור</span></div>' +
       (warn.length ? '<div class="taf-warn"><b><i class="bi bi-exclamation-triangle"></i> התראות — דורשות בדיקה ידנית</b><ul>' +
         warn.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul></div>' : '') +
@@ -336,11 +338,17 @@
         ((res.skipped && res.skipped.length) ? '<div style="margin-top:4px"><b>לא נסרקו</b> (נבחרו האבחונים הרלוונטיים ביותר): ' +
           esc(res.skipped.join(' · ')) + '</div>' : '') +
       '</div>' +
-      Object.keys(FIELD_MAP).map(k =>
-        '<div class="taf-fld"><label>' + esc(labelOf(k)) + '</label>' +
-        '<textarea rows="6" data-taf="' + k + '">' + esc(asText(d[FIELD_MAP[k]])) + '</textarea></div>').join('') +
+      Object.keys(FIELD_MAP).map(k => {
+        const v = asText(d[FIELD_MAP[k]]);
+        // שדה שהמודל לא מצא לו מקור מסומן במפורש. קודם הוא פשוט הוצג ריק,
+        // ואי אפשר היה לדעת אם לא נמצא כלום או שהריצה נכשלה באמצע.
+        return '<div class="taf-fld"><label>' + esc(labelOf(k)) +
+          (v ? '' : ' <span class="taf-none">לא נמצא באבחונים</span>') + '</label>' +
+          '<textarea rows="6" data-taf="' + k + '">' + esc(v) + '</textarea></div>';
+      }).join('') +
       '<div class="taf-actions">' +
-        '<button class="btn-primary sm" data-taf-ok><i class="bi bi-check-lg"></i> אשר ושמור לתיק</button>' +
+        '<button class="btn-primary sm" data-taf-ok data-mode="replace"><i class="bi bi-check-lg"></i> החלף את התוכן</button>' +
+        '<button class="btn-ghost sm" data-taf-ok data-mode="append"><i class="bi bi-plus-lg"></i> הוסף למה שכבר כתוב</button>' +
         '<button class="btn-ghost sm" data-taf-cancel>ביטול</button>' +
       '</div>';
     host.appendChild(box);
@@ -361,6 +369,8 @@
       '.taf-warn ul{margin:6px 0 0;padding-inline-start:18px}' +
       '.taf-files{font-size:.82rem;color:var(--muted,#6b7280);margin-bottom:12px;line-height:1.6}' +
       '.taf-failed{color:#b91c1c;margin-top:4px}' +
+      '.taf-none{font-weight:400;font-size:.78rem;color:#b45309;background:#fff7ed;' +
+      'border-radius:20px;padding:1px 8px;margin-inline-start:6px}' +
       '.taf-fld{margin-bottom:10px}' +
       '.taf-fld label{display:block;font-weight:600;margin-bottom:4px;font-size:.9rem}' +
       '.taf-fld textarea{width:100%;padding:9px 11px;border:1px solid var(--line,#d1d5db);border-radius:8px;font:inherit;line-height:1.65}' +
@@ -384,7 +394,7 @@
     const bar = document.createElement('div');
     bar.className = 'tla-bar';
     bar.innerHTML = '<button class="btn-ghost sm" id="tafRun">' +
-      '<i class="bi bi-magic"></i> מלא אוטומטית מהאבחונים</button>' +
+      '<i class="bi bi-cloud-download"></i> הזמנת נתונים אוטומטית</button>' +
       '<span class="count-line" id="tafMsg"></span>';
     host.insertBefore(bar, host.firstChild);
     const msg = t => { bar.querySelector('#tafMsg').textContent = t || ''; };
@@ -407,13 +417,13 @@
         busy.remove();
         const box = paint(host, res);
         box.querySelector('[data-taf-cancel]').addEventListener('click', () => { box.remove(); msg(''); });
-        box.querySelector('[data-taf-ok]').addEventListener('click', () => {
+        box.querySelectorAll('[data-taf-ok]').forEach(b => b.addEventListener('click', () => {
           const vals = {};
           box.querySelectorAll('[data-taf]').forEach(t => { vals[t.dataset.taf] = t.value.trim(); });
-          onApply(vals);
+          onApply(vals, b.dataset.mode);
           box.remove();
           msg('הועתק לשדות — עדיין צריך ללחוץ "שמירת דף ההכנה"');
-        });
+        }));
         msg('');
       } catch (e) {
         busy.remove();
@@ -500,7 +510,7 @@
     const has = id => drafts.some(d => d.student_id === id && d.status === 'draft');
     const clsName = id => { const c = classes.find(x => x.id == id); return c ? c.name : 'ללא שיעור'; };
     const m = window.UI.modal({
-      title: 'מילוי אוטומטי לכל התלמידים', saveLabel: 'התחל',
+      title: 'הזמנת נתונים אוטומטית לכל התלמידים', saveLabel: 'התחל',
       bodyHTML:
         '<p style="margin:0 0 10px">המערכת תעבור תלמיד-תלמיד, תקרא את האבחונים ' +
         'שב"מסמך קביל", ותכין <b>טיוטה</b> לדף ההכנה.</p>' +
@@ -584,7 +594,7 @@
     box.className = 'qr-card';
     box.style.borderInlineStart = '4px solid var(--accent,#7c3aed)';
     box.innerHTML =
-      '<h3><i class="bi bi-magic"></i> טיוטות ממתינות לאישור ' +
+      '<h3><i class="bi bi-cloud-download"></i> נתונים שהוזמנו — ממתינים לאישור ' +
       '<span class="det-badge">' + open.length + '</span></h3>' +
       '<p class="tl-note" style="margin:.2rem 0 .7rem;font-size:.86rem">' +
       'נוצרו אוטומטית מהאבחונים. שום דבר לא נכנס לתיק עד אישור.</p>' +
