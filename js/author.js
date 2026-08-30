@@ -19,9 +19,22 @@
     if (loading) return loading;
     loading = (async () => {
       const m = {};
+      // ספריית הצוות לפני profiles: `prof_self_read` מתיר את הטבלה **רק
+      // למנהל**, ולכן לכל שאר הצוות המפה יצאה ריקה וכל "מי רשם" במערכת הציג
+      // "לא ידוע". `staff_directory()` מחזיר שם+תפקיד בלבד (בלי tz/מייל)
+      // לכל איש צוות פעיל — ראה migration_weekly_reports.sql.
+      try {
+        if (window.sb) {
+          const { data, error } = await window.sb.rpc('staff_directory');
+          if (!error) (data || []).forEach(p => { if (p && p.id) m[p.id] = { name: p.name || '', role: p.role || '', active: true }; });
+        }
+      } catch (e) { /* נופלים ל-profiles */ }
       try {
         const profs = await window.store.list('profiles');
-        (profs || []).forEach(p => { if (p && p.id) m[p.id] = { name: p.name || '', role: p.role || '' }; });
+        // ⚠️ שומרים גם אנשי צוות שכבר אינם פעילים — רשומות ישנות שלהם עדיין
+        // צריכות להציג שם ולא "לא ידוע". הדגל active מועבר הלאה כדי
+        // ש-all() יאפשר לסנן אותם ברשימות של "מי עוד לא עשה".
+        (profs || []).forEach(p => { if (p && p.id) m[p.id] = { name: p.name || '', role: p.role || '', active: p.active !== false }; });
       } catch (e) { /* בלי פרופילים פשוט לא יוצג שם */ }
       try {
         const staff = await window.store.list('staff');
@@ -83,6 +96,13 @@
     document.head.appendChild(s);
   }
 
+  // כל אנשי הצוות כמערך — למסכים שצריכים לדעת מי *לא* עשה משהו (למשל
+  // "טרם דיווחו" בסיכום השבועי), ולא רק לתרגם מזהה לשם.
+  function all() {
+    if (!map) return [];
+    return Object.keys(map).map(id => ({ id: id, name: map[id].name, role: map[id].role, active: map[id].active !== false }));
+  }
+
   style();
-  window.Author = { load, name, role, cell, line, get map() { return map; } };
+  window.Author = { load, name, role, cell, line, all, get map() { return map; } };
 })();

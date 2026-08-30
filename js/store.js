@@ -157,7 +157,8 @@
     expenses: 1, forms: 1, functioning: 1, income: 1, medications: 1,
     meetings: 1, passport: 1, projects: 1, reading: 1, reading_assessments: 1,
     student_docs: 1, tasks: 1, tests: 1, tla_class_templates: 1, tla_goals: 1,
-    tla_meetings: 1, tla_plans: 1, tla_schedule: 1, voice_reports: 1, writing: 1,
+    tla_meetings: 1, tla_plans: 1, tla_schedule: 1, voice_reports: 1, weekly_reports: 1,
+    writing: 1,
   };
 
   function stampAuthor(table, row) {

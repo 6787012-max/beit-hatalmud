@@ -13,6 +13,9 @@
     { id: 'attendance',    label: 'נוכחות',           icon: 'bi-calendar-check',  group: G1, color: '#1f8a5b' },
     { id: 'tests',         label: 'מבחנים',           icon: 'bi-card-checklist',  group: G1, color: '#d68910' },
     { id: 'readassess',    label: 'מעקב קריאה',       icon: 'bi-book-half',       group: G1, color: '#7d3c98' },
+    // סיכום שבועי — כל ר"מ מדווח מה נלמד והוסבר בכל תחום, וההנהלה רואה ריכוז
+    // שבועי של כולם במסך אחד (בקשת צבי וינברג, 30/08/2026).
+    { id: 'weekly',        label: 'סיכום שבועי',      icon: 'bi-calendar-week',   group: G1, color: '#1d6fa5' },
     { id: 'tla',           label: 'תל"א',             icon: 'bi-journal-bookmark', group: G1, color: '#8a5a2b' },
     { id: 'passport',      label: 'דרכון',            icon: 'bi-passport',        group: G1, color: '#b7791f' },
     { id: 'students',      label: 'תלמידים',          icon: 'bi-people-fill',     group: G2, color: '#2b7c98' },
