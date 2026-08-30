@@ -66,13 +66,17 @@
 
     const adminNote = isAdmin ? '<div class="tl-note" style="padding:4px 2px;font-size:.8rem"><i class="bi bi-shield-lock"></i> תצוגת מנהל · צפייה בלבד</div>' : '';
 
+    // מקטע שכר — מנהל בלבד (ה-RLS ממילא מחזיר ריק לאחרים)
+    let salarySec = '';
+    if (isAdmin && window.cv3Salary) { try { salarySec = await window.cv3Salary.cardSection(staffId); } catch (_) {} }
+
     m.el.querySelector('.modal-body').innerHTML =
       '<div class="det-head"><span class="ava lg">' + esc(initials(person.name)) + '</span>' +
         '<div><div class="det-name">' + esc(person.name || 'איש צוות') + '</div>' +
         (person.role ? '<span class="chip ok">' + esc(person.role) + '</span>' : '') +
         (phone ? ' <span class="tl-meta"><i class="bi bi-telephone"></i> <a href="tel:' + esc(phone) + '">' + esc(phone) + '</a></span>' : '') +
         '</div></div>' +
-      clsSec + tasksSec + behSec + adminNote;
+      clsSec + tasksSec + behSec + salarySec + adminNote;
   }
 
   window.cv3StaffCard = { open: open };

@@ -40,3 +40,7 @@ _psp_import.py
 # צילומי מסך של QA — מכילים שמות תלמידים אמיתיים, לא לריפו הציבורי
 _shot_*.png
 _qa_*.xlsx
+.local/drive_token.json
+
+# הזרעת שכר — שמות + סכומי משכורת אמיתיים, אסור לריפו ציבורי
+supabase/seed_staff_salary.sql
