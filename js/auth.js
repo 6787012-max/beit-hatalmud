@@ -78,7 +78,16 @@
       case 'מפקח':  return { perms: null, mode: 'readonly', scoped: false };       // הכל, ללא שינויים
       case 'מזכירה': return { perms: money, mode: 'full', scoped: false };          // כספים בלבד
       case 'מחנך':  return { perms: nonMoney, mode: 'full', scoped: true };        // הכל חוץ מכספים/ניהול, כיתתו בלבד
-      case 'מלמד':  return { perms: entry, mode: 'writeonly', scoped: false };      // הזנה בלבד (לכל התלמידים), בלי צפייה
+      // מלמד: **צפייה + הזנה** במסכי מעקב הלמידה שלו.
+      // עד 30/08/2026 הוא היה 'writeonly', כלומר ה-CSS הסתיר ממנו כל רשימה —
+      // גם את הרישומים שהוא עצמו הזין. בפועל אנשי צוות כמו אריה לייב קליין
+      // נכנסו וראו מסך ריק, וגם כשהמנהל שייך להם שיעורים במסך ההגדרות זה לא
+      // שינה כלום; רק המנהל ראה משהו. `writeonly` נשאר קיים כ-override ידני
+      // במסך ההגדרות למי שבאמת רוצים לחסום ממנו צפייה.
+      // scopeOptional: אם המנהל שייך למלמד שיעורים — הוא מוגבל אליהם; אם לא
+      // שויכו לו שיעורים כלל, הוא רואה את כל התלמידים (כמו שה-RLS ממילא
+      // מתיר לו). בלי זה חמשת המלמדים שאין להם שורת שיוץ היו מתאפסים לריק.
+      case 'מלמד':  return { perms: entry, mode: 'full', scoped: true, scopeOptional: true };
       default:      return { perms: null, mode: 'full', scoped: false };            // legacy מורה
     }
   }
@@ -94,6 +103,9 @@
     A.scope = null;                    // null = הכל; מערך = כיתות מורשות
     if (caps.scoped && window.store) {
       try { const acc = await window.store.list('user_class_access', { eq: { user_id: u.id } }); A.scope = acc.map(x => x.class_id); } catch (_) { A.scope = []; }
+      // מחנך בלי שיוץ = לא רואה אף אחד (וכך גם ה-RLS). מלמד בלי שיוץ = רואה
+      // את כולם — הוא מזין לכל המכינה, ורשימה ריקה היתה מרוקנת לו את המסך.
+      if (caps.scopeOptional && !A.scope.length) A.scope = null;
     }
     // אכיפת מצב צפייה/הזנה דרך class על ה-body (CSS מסתיר כפתורי פעולה / רשימות)
     document.body.classList.remove('mode-readonly', 'mode-writeonly');
@@ -264,6 +276,16 @@
   window.Auth = {
     init: init, logout: logout, changePassword: changeOwnPassword, get currentUser() { return A.currentUser; }, scopeClasses: function () { return A.scope; },
     get mode() { return A.mode || 'full'; }, isReadonly: function () { return A.mode === 'readonly'; },
+    // האם מותר לערוך/למחוק **רשומה מסוימת**. מלמד רואה מעכשיו את כל הרישומים
+    // של התלמידים שלו, אבל הוא לא הבעלים שלהם — הוא יכול לתקן רק מה שהוא
+    // עצמו רשם. מנהל/מחנך/מזכירה — הכל, כמו קודם. (נאכף גם ב-RLS בשרת;
+    // כאן זה רק כדי לא להציג כפתור שייכשל.)
+    canEditRow: function (row) {
+      const u = A.currentUser; if (!u) return false;
+      if (A.mode === 'readonly') return false;
+      if (u.role !== 'מלמד') return true;
+      return !row || row.created_by == null || String(row.created_by) === String(u.id);
+    },
     hasPermission: function (m) { const u = A.currentUser; if (!u) return false; return u.role === 'מנהל' || !m.adminOnly; },
     canAccess: function (id) {
       const u = A.currentUser; if (!u) return false;

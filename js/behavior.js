@@ -178,8 +178,12 @@
       (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
       '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
         ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
-      '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
-      '<button class="mini danger" data-del="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></div>';
+      // מלמד רואה את כל הדיווחים על התלמידים שלו אבל מתקן רק את שלו — ולכן
+      // הכפתורים נגזרים מהרשומה, לא מהמסך.
+      ((!window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(e))
+        ? '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+          '<button class="mini danger" data-del="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>'
+        : '') + '</div>';
     const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id)
       : g === 'by' ? (window.Author ? window.Author.name(e.created_by) : 'לא ידוע')
       : catOf(e.category_id) || 'ללא קטגוריה';

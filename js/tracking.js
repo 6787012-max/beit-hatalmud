@@ -52,8 +52,10 @@
           '<div class="tl-item"><span class="sev-dot mid"></span><div class="tl-main"><strong>' + esc(nameOf(x.student_id)) + '</strong> · ' +
           cfg.fields.map(f => esc(x[f.k])).filter(Boolean).join(' · ') + '</div><div class="tl-meta">' + esc(x[cfg.dateField || 'date'] || x.date || x.event_date || '') +
           ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(x.created_by) : '') + '</div>' +
-          '<button class="mini" data-edit="' + x.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
-          '<button class="mini danger" data-del="' + x.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></div>').join('');
+          ((!window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(x))
+            ? '<button class="mini" data-edit="' + x.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+              '<button class="mini danger" data-del="' + x.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>'
+            : '') + '</div>').join('');
         page.querySelector('#recEmpty-' + uid).hidden = data.length > 0;
         page.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
           const ok = await window.UI.confirm('למחוק?'); if (!ok) return;

@@ -11,7 +11,7 @@ window.CV3_GUIDE = {
     'מנהל':  { label: 'מנהל', screens: 'all' },
     'מפקח':  { label: 'מפקח', screens: 'all', note: 'צפייה בלבד — אלא אם המנהל הרחיב את ההרשאות באופן פרטני.' },
     'מחנך':  { label: 'מחנך', screens: ['behavior', 'attendance', 'tests', 'students', 'medical', 'forms', 'calendar', 'reports'], note: 'רואה את תלמידי כיתתו בלבד.' },
-    'מלמד':  { label: 'מלמד', screens: ['behavior', 'attendance', 'tests'], note: 'מסך הזנה בלבד — בלי רשימות ובלי מחיקה.' },
+    'מלמד':  { label: 'מלמד', screens: ['behavior', 'attendance', 'tests', 'readassess', 'passport'], note: 'רואה ומזין לתלמידי השיעורים שהוקצו לו (בלי הקצאה — לכל המכינה). מתקן ומוחק רק רישומים שהוא עצמו רשם.' },
     'מזכירה': { label: 'מזכירה', screens: ['pettycash'], note: 'כספים בלבד.' },
   },
   common: {
