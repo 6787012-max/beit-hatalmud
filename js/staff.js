@@ -43,6 +43,8 @@
           '<th>שם</th><th>מס׳</th><th>תפקיד</th><th>טלפון</th><th>תעודה</th><th>ת״ז</th><th>משתמש</th><th></th>' +
         '</tr></thead><tbody id="stBody"></tbody></table></div></div>';
 
+    async function refresh() { rows = await list(); draw(); }
+
     function draw() {
       // מיון אחיד גם לצוות — לפי שם משפחה ואז שם מלא
       rows.sort((a, b) =>
@@ -67,7 +69,7 @@
         : '<tr><td colspan="8" class="tl-note" style="padding:10px">אין אנשי צוות עדיין</td></tr>';
 
       host.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () =>
-        form(rows.find(r => String(r.id) === b.dataset.edit))));
+        form(rows.find(r => String(r.id) === b.dataset.edit), refresh)));
       host.querySelectorAll('[data-user]').forEach(b => b.addEventListener('click', () =>
         makeUser(rows.find(r => String(r.id) === b.dataset.user))));
       host.querySelectorAll('[data-file]').forEach(b => b.addEventListener('click', () => openFile(
@@ -147,49 +149,51 @@
       });
     }
 
-    function form(existing) {
-      const r = existing || {};
-      const inp = ([k, label, type]) =>
-        '<label class="fld"><span>' + esc(label) + '</span><input class="inp mb0" data-f="' + k + '"' +
-        (type ? ' type="' + type + '"' : '') + ' value="' + esc(r[k] == null ? '' : String(r[k]).slice(0, type === 'date' ? 10 : 999)) + '"></label>';
-      const tri = (k, label) => '<label class="fld"><span>' + esc(label) + '</span><select class="inp mb0" data-f="' + k + '">' +
-        [['', '—'], ['true', 'יש'], ['false', 'אין']].map(o =>
-          '<option value="' + o[0] + '"' + (String(r[k]) === o[0] || (r[k] == null && o[0] === '') ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
-        '</select></label>';
-      window.UI.modal({
-        title: existing ? ('עריכה — ' + esc(full(r))) : 'איש צוות חדש', saveLabel: 'שמירה',
-        bodyHTML: '<div class="form-grid">' + FIELDS.map(inp).join('') +
-          tri('has_cert', 'תעודה הוגשה') + tri('has_id_copy', 'צילום ת״ז הוגש') +
-          '<label class="fld"><span>פעיל</span><select class="inp mb0" data-f="active">' +
-            '<option value="true"' + (r.active !== false ? ' selected' : '') + '>כן</option>' +
-            '<option value="false"' + (r.active === false ? ' selected' : '') + '>לא</option></select></label>' +
-          '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" data-f="note" rows="3">' + esc(r.note || '') + '</textarea></label>' +
-          '</div>',
-        onSave: async (m) => {
-          const row = {};
-          m.querySelectorAll('[data-f]').forEach(el => {
-            const k = el.dataset.f; let v = (el.value || '').trim();
-            if (k === 'has_cert' || k === 'has_id_copy') row[k] = v === '' ? null : v === 'true';
-            else if (k === 'active') row[k] = v === 'true';
-            else row[k] = v === '' ? null : v;
-          });
-          if (!row.first_name) { window.UI.toast('שם פרטי חובה', 'err'); return false; }
-          let res;
-          if (existing) res = await window.store.update('staff', r.id, row);
-          else res = await window.store.add('staff', row);
-          // RLS חוסם בשקט: בלי בדיקת השורה שחזרה היינו מציגים "נשמר" שקרי
-          const okRow = res && res.ok !== false && !(Array.isArray(res.data) && !res.data.length && !res.demo);
-          if (!okRow) { window.UI.toast('השמירה נכשלה' + (res && res.error ? ': ' + res.error : ' (מנהל בלבד)'), 'err'); return false; }
-          rows = await list(); draw();
-          window.UI.toast(existing ? 'נשמר' : 'נוסף. אפשר לפתוח לו תיק אישי בדרייב מהכפתור בשורה.');
-          return true;
-        },
-      });
-    }
-
-    host.querySelector('#stAdd').addEventListener('click', () => form(null));
+    host.querySelector('#stAdd').addEventListener('click', () => form(null, refresh));
     draw();
   }
 
-  window.cv3Staff = { render, list };
+  function form(existing, onDone) {
+    const r = existing || {};
+    const inp = ([k, label, type]) =>
+      '<label class="fld"><span>' + esc(label) + '</span><input class="inp mb0" data-f="' + k + '"' +
+      (type ? ' type="' + type + '"' : '') + ' value="' + esc(r[k] == null ? '' : String(r[k]).slice(0, type === 'date' ? 10 : 999)) + '"></label>';
+    const tri = (k, label) => '<label class="fld"><span>' + esc(label) + '</span><select class="inp mb0" data-f="' + k + '">' +
+      [['', '—'], ['true', 'יש'], ['false', 'אין']].map(o =>
+        '<option value="' + o[0] + '"' + (String(r[k]) === o[0] || (r[k] == null && o[0] === '') ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+      '</select></label>';
+    window.UI.modal({
+      title: existing ? ('עריכה — ' + esc(full(r))) : 'איש צוות חדש', saveLabel: 'שמירה',
+      bodyHTML: '<div class="form-grid">' + FIELDS.map(inp).join('') +
+        tri('has_cert', 'תעודה הוגשה') + tri('has_id_copy', 'צילום ת״ז הוגש') +
+        '<label class="fld"><span>פעיל</span><select class="inp mb0" data-f="active">' +
+          '<option value="true"' + (r.active !== false ? ' selected' : '') + '>כן</option>' +
+          '<option value="false"' + (r.active === false ? ' selected' : '') + '>לא</option></select></label>' +
+        '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" data-f="note" rows="3">' + esc(r.note || '') + '</textarea></label>' +
+        '</div>',
+      onSave: async (m) => {
+        const row = {};
+        m.querySelectorAll('[data-f]').forEach(el => {
+          const k = el.dataset.f; let v = (el.value || '').trim();
+          if (k === 'has_cert' || k === 'has_id_copy') row[k] = v === '' ? null : v === 'true';
+          else if (k === 'active') row[k] = v === 'true';
+          else row[k] = v === '' ? null : v;
+        });
+        if (!row.first_name) { window.UI.toast('שם פרטי חובה', 'err'); return false; }
+        let res;
+        if (existing) res = await window.store.update('staff', r.id, row);
+        else res = await window.store.add('staff', row);
+        // RLS חוסם בשקט: בלי בדיקת השורה שחזרה היינו מציגים "נשמר" שקרי
+        const okRow = res && res.ok !== false && !(Array.isArray(res.data) && !res.data.length && !res.demo);
+        if (!okRow) { window.UI.toast('השמירה נכשלה' + (res && res.error ? ': ' + res.error : ' (מנהל בלבד)'), 'err'); return false; }
+        if (onDone) await onDone();
+        window.UI.toast(existing ? 'נשמר' : 'נוסף. אפשר לפתוח לו תיק אישי בדרייב מהכפתור בשורה.');
+        return true;
+      },
+    });
+  }
+
+  // form ברמת המודול (ולא בתוך render) כדי שפאנל "ניהול צוות" יפתח את
+  // אותו עורך תיק בדיוק, בלי לשכפל שדות ובלי לשכפל את בדיקת ה-RLS השקטה.
+  window.cv3Staff = { render, list, form, full };
 })();

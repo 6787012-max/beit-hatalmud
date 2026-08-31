@@ -231,5 +231,7 @@
       mine.map(line).join('') + '</div>';
   }
 
-  window.cv3Salary = { render, cardSection };
+  // form/rowTotal/addsOf נחשפים כדי שפאנל "ניהול צוות" (team.js) יפתח
+  // בדיוק את אותו עורך שכר ולא ישכפל את לוגיקת השמירה.
+  window.cv3Salary = { render, cardSection, form, load: loadAll, rowTotal, addsOf, nameOf: r => nameOf(r) };
 })();

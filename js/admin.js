@@ -19,16 +19,27 @@
     const userClasses = uid => access.filter(a => a.user_id == uid).map(a => a.class_id);
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>הגדרות והרשאות</h2></div>' +
+      // ── פאנל אחד לניהול הצוות (בקשת יוסף, 31/08/2026) ──────────────────
+      // עד היום היו כאן שלושה כרטיסים נפרדים — הרשאות, תיקים אישיים ושכר —
+      // ולאותו אדם היתה שורה נפרדת בכל אחד, בלי שום קשר ביניהן. עכשיו הם
+      // יושבים תחת פאנל אחד, ומעליהם טבלת סקירה מאוחדת (team.js) עם שורה
+      // אחת לאדם שמראה גם מה חסר לו.
+      // ⚠️ המזהים usrBody / usrAdd / staffCard / salaryCard נשארו בדיוק כפי
+      // שהיו — drawUsers, cv3Staff.render ו-cv3Salary.render ממשיכים לעבוד.
+      '<div class="qr-card team-panel"><div class="card-h-row"><h3><i class="bi bi-people-fill"></i> ניהול צוות</h3>' +
+        '<button class="btn-primary sm" id="usrAdd"><i class="bi bi-person-plus"></i> משתמש חדש</button></div>' +
+        '<div id="teamOverview"></div>' +
+        '<details class="tp-sec" id="tpPerms"><summary><i class="bi bi-shield-lock"></i> הרשאות וכניסה</summary>' +
+          '<div class="table-wrap"><table class="tbl"><thead><tr><th>שם</th><th>טלפון</th><th>תפקיד</th><th>כיתות</th><th>סיסמה</th><th></th></tr></thead><tbody id="usrBody"></tbody></table></div>' +
+          '<p class="login-hint" style="margin:8px 2px 0">סיסמת הכניסה הראשונית היא מספר הטלפון. מי שלא החליף ' +
+          'מקבל התראה בכניסה, ואחרי שבוע הוא נחסם עד שיחליף.</p></details>' +
+        '<details class="tp-sec"><summary><i class="bi bi-person-badge"></i> תיקים אישיים</summary><div id="staffCard"></div></details>' +
+        '<details class="tp-sec"><summary><i class="bi bi-cash-coin"></i> שכר</summary><div id="salaryCard"></div></details>' +
+      '</div>' +
       '<div class="qr-card"><h3><i class="bi bi-mortarboard"></i> כיתות</h3><div id="clsList" class="chip-list"></div>' +
         '<div class="qr-grid" style="grid-template-columns:1fr auto;margin-top:10px"><input class="inp mb0" id="newCls" placeholder="שם כיתה חדשה"><button class="btn-primary sm" id="addCls"><i class="bi bi-plus-lg"></i> הוסף</button></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-tags"></i> קטגוריות התנהגות</h3><p class="login-hint" style="margin:0 0 8px">הקטגוריות מופיעות בבחירה בעת דיווח התנהגות. ניתן להוסיף, לערוך ולמחוק.</p><div id="catList"></div>' +
         '<div class="qr-grid" style="grid-template-columns:1fr auto;margin-top:10px"><input class="inp mb0" id="newCat" placeholder="שם קטגוריה חדשה"><button class="btn-primary sm" id="addCat"><i class="bi bi-plus-lg"></i> הוסף</button></div></div>' +
-      '<div class="qr-card"><div class="card-h-row"><h3><i class="bi bi-people"></i> צוות והרשאות</h3><button class="btn-primary sm" id="usrAdd"><i class="bi bi-person-plus"></i> משתמש חדש</button></div>' +
-        '<div class="table-wrap"><table class="tbl"><thead><tr><th>שם</th><th>טלפון</th><th>תפקיד</th><th>כיתות</th><th>סיסמה</th><th></th></tr></thead><tbody id="usrBody"></tbody></table></div>' +
-        '<p class="login-hint" style="margin:8px 2px 0">סיסמת הכניסה הראשונית היא מספר הטלפון. מי שלא החליף ' +
-        'מקבל התראה בכניסה, ואחרי שבוע הוא נחסם עד שיחליף.</p></div>' +
-      '<div id="staffCard"></div>' +
-      '<div id="salaryCard"></div>' +
       '<div class="qr-card"><h3><i class="bi bi-clock-history"></i> יומן פעולות</h3><div id="audList"></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-bug"></i> בקשות תיקון</h3><div class="qr-grid" style="grid-template-columns:auto 2fr auto"><select class="inp mb0" id="fbKind"><option value="bug">באג</option><option value="idea">רעיון</option></select><textarea class="inp mb0 ta-auto" id="fbBody" rows="2" placeholder="תיאור…"></textarea><button class="btn-primary sm" id="fbSave"><i class="bi bi-send"></i> שלח</button></div><div id="fbList" style="margin-top:10px"></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-info-circle"></i> אודות</h3><ul class="about-list"><li>מערכת מעקב — מכינה בית התלמוד · גרסה 0.2</li><li>ארכיטקטורה: GitHub Pages + Supabase (RLS)</li><li>מוסד: <b id="aboutInst"></b></li></ul></div>';
@@ -238,7 +249,15 @@
     });
     if (window.cv3Staff) window.cv3Staff.render(page.querySelector('#staffCard'));
     if (window.cv3Salary) window.cv3Salary.render(page.querySelector('#salaryCard'));
+    // openUserForm חי בתוך הסגור של renderSettings (users/classes/access), ולכן
+    // הוא נחשף כאן במקום להיות משוכפל: team.js פותח את אותו טופס הרשאות.
+    window.cv3Admin = {
+      userForm: openUserForm,
+      reloadUsers: drawUsers,
+      findUser: id => users.find(u => String(u.id) === String(id)),
+    };
     drawCls(); drawCats(); drawUsers(); drawFb();
+    if (window.cv3Team) window.cv3Team.render(page.querySelector('#teamOverview'));
   }
 
   // מסך שכר הלימוד הוסר (2026-08-23): גוף חיצוני מטפל בגבייה, ולכן אין

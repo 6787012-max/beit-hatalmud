@@ -850,3 +850,35 @@ body.dark .lb-prev{background:#0a1219}
 .wk-own>summary::-webkit-details-marker{display:none}
 .wk-own[open]>summary{border-bottom:1px solid var(--line)}
 .wk-own .qr-card{margin:12px}
+
+/* ===== פאנל "ניהול צוות" (team.js) ===== */
+.team-panel>.card-h-row{margin-bottom:10px}
+.tp-sec{border:1px solid var(--line); border-radius:12px; background:var(--bg); margin-top:12px}
+.tp-sec>summary{cursor:pointer; padding:11px 14px; font-weight:700; color:var(--primary-dark);
+  display:flex; align-items:center; gap:8px; list-style:none}
+.tp-sec>summary::-webkit-details-marker{display:none}
+.tp-sec>summary::after{content:'\F282'; font-family:'bootstrap-icons'; margin-inline-start:auto; font-weight:400; color:var(--muted); transition:transform .2s}
+.tp-sec[open]>summary::after{transform:rotate(180deg)}
+.tp-sec[open]>summary{border-bottom:1px solid var(--line)}
+.tp-sec .qr-card{margin:12px; box-shadow:none}
+.tp-sec>.table-wrap,.tp-sec>p{margin:12px}
+.tm-bar{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 2px 10px}
+.tm-tabs{display:flex; gap:6px; flex-wrap:wrap}
+.tm-tab{border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:20px;
+  padding:5px 14px; font-size:.86rem; font-family:inherit; cursor:pointer; font-weight:600}
+.tm-tab:hover{border-color:var(--primary)}
+.tm-tab.on{background:var(--primary); border-color:var(--primary); color:#fff}
+.tm-total{font-size:.9rem; color:var(--muted)}
+.tm-total b{color:var(--primary-dark); font-variant-numeric:tabular-nums}
+.tm-tbl{min-width:900px}
+.tm-tbl td{vertical-align:middle; font-size:.9rem}
+/* שמות ארוכים ("הרב יהונתן היינמן") נשברו לשתי שורות ודחסו את השורה כולה */
+.tm-tbl th:first-child,.tm-tbl td:first-child{min-width:158px}
+.tm-tbl th:nth-child(2),.tm-tbl td:nth-child(2){white-space:nowrap}
+.tm-tbl .tl-note{font-size:.78rem}
+.tm-off{opacity:.55}
+.tm-gap{color:#b45309; font-size:.84rem; font-style:italic}
+.tm-gap-dot{color:#d68910; font-size:.7rem; vertical-align:middle}
+.chip.warn{background:color-mix(in srgb,#d68910 15%,transparent); color:#8a5a00; border-color:#d68910}
+.tm-pick{display:flex; flex-direction:column; gap:6px}
+@media (max-width:760px){ .tm-bar{flex-direction:column; align-items:flex-start} }
