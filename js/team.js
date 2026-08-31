@@ -142,6 +142,11 @@
         : true);
       const withGaps = people.filter(p => p.gaps.length && !p.inactive).length;
       const totalPay = people.filter(p => !p.inactive).reduce((s, p) => s + p.pay, 0);
+      // אדם מושבת ששורת השכר שלו נשארה פעילה. הסכום הכולל מתעלם ממנו בכוונה
+      // (הוא לא בסגל), אבל אז ההפרש מול המסד נעלם בשקט ואיש לא ידע שממשיכים
+      // לשלם למי שכבר לא כאן — לכן הוא מוצג במפורש.
+      const ghosts = people.filter(p => p.inactive && p.pay > 0);
+      const ghostPay = ghosts.reduce((s, p) => s + p.pay, 0);
 
       host.innerHTML =
         '<div class="tm-bar">' +
@@ -152,6 +157,12 @@
           '</div>' +
           '<span class="tm-total">סה״כ שכר חודשי (פעילים): <b>' + nis(totalPay) + '</b></span>' +
         '</div>' +
+        (ghosts.length
+          ? '<div class="wk-missing" style="margin:0 2px 10px"><i class="bi bi-exclamation-triangle"></i> <span>' +
+            'שורת שכר פעילה למי שמסומן לא-פעיל: ' +
+            ghosts.map(p => esc(p.name) + ' (' + nis(p.pay) + ')').join(' · ') +
+            ' — סה״כ ' + nis(ghostPay) + ' שאינם נכללים בסכום שלמעלה.</span></div>'
+          : '') +
         '<div class="table-wrap"><table class="tbl tm-tbl"><thead><tr>' +
           '<th>שם</th><th>טלפון</th><th>הרשאות</th><th>כניסה</th><th>תיק אישי</th><th>שכר</th><th style="width:132px"></th>' +
         '</tr></thead><tbody>' +
