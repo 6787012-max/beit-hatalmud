@@ -173,6 +173,27 @@
 
   /* ───────────────── קריאה למודל ───────────────── */
 
+  // קריאה למודל דרך פרוקסי ה-Edge Function `ai` — למשתמשים שהסינון שלהם
+  // חוסם את generativelanguage.googleapis.com מהדפדפן. אותו מפתח, אותו גוף;
+  // רק הצינור שונה. דורש התחברות (הפונקציה מאמתת את ה-JWT).
+  async function viaProxy(key, body, ctrl) {
+    const cfg = window.CV3 || {};
+    const base = cfg.SUPABASE_URL || '';
+    let jwt = '';
+    try {
+      const s = window.sb && window.sb.auth && (await window.sb.auth.getSession());
+      jwt = (s && s.data && s.data.session && s.data.session.access_token) || '';
+    } catch (_) {}
+    if (!base || !jwt) throw new Error('אין חיבור Supabase');
+    return fetch(base + '/functions/v1/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+        'apikey': cfg.SUPABASE_ANON_KEY || '', 'Authorization': 'Bearer ' + jwt },
+      body: JSON.stringify({ model: MODEL, key: key, body: body }),
+      signal: ctrl && ctrl.signal,
+    });
+  }
+
   async function callModel(parts) {
     const k = (typeof window.geminiKey === 'function') ? window.geminiKey() : '';
     if (!k) throw new Error('אין מפתח AI מוגדר');
@@ -198,11 +219,19 @@
             body: JSON.stringify(body), signal: ctrl.signal });
       } catch (netErr) {
         clearTimeout(tmr);
-        if (attempt >= 2) throw new Error(netErr.name === 'AbortError'
-          ? 'הניתוח לקח יותר מ-3 דקות ונעצר'
-          : 'אין תקשורת עם שירות הניתוח');
-        await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
-        continue;
+        // כשל רשת בקריאה ישירה = כנראה סינון שחוסם את גוגל אצל המשתמש
+        // (קרה לנעמי 1.9.26). מנסים דרך פרוקסי ה-Edge Function — Supabase
+        // מאושר אצל כולם, אחרת לא היו מצליחים בכלל להתחבר למערכת.
+        if (netErr.name !== 'AbortError') {
+          try { r = await viaProxy(k, body, ctrl); } catch (_proxyErr) { r = null; }
+        }
+        if (!r) {
+          if (attempt >= 2) throw new Error(netErr.name === 'AbortError'
+            ? 'הניתוח לקח יותר מ-3 דקות ונעצר'
+            : 'אין תקשורת עם שירות הניתוח');
+          await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
+          continue;
+        }
       }
       clearTimeout(tmr);
       d = await r.json().catch(() => ({}));
