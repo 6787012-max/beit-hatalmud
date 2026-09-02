@@ -109,6 +109,10 @@ body{
   border-top:1px solid var(--line); background:var(--card);
 }
 .foot-sep{margin:0 6px; opacity:.5}
+.foot-credit{
+  font-size:.85rem; font-weight:700; color:var(--accent,#a87830); margin-bottom:6px;
+}
+.foot-credit a{color:inherit; text-decoration:underline}
 
 @media (max-width:520px){
   .appbar{padding:10px 14px}
