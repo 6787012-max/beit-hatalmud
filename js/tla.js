@@ -669,7 +669,9 @@
       '<h1>תיק תלמיד</h1><h2>שנה"ל ' + esc(plan.year_label || '') + '</h2>' +
       '<div class="cv-fields"><div>שם התלמיד: <b>' + esc(fullName(stud)) + '</b></div>' +
       '<div>ת.ז.: <b>' + esc(stud.tz || '') + '</b></div>' +
-      '<div>כיתה: <b>' + esc(plan.class_label || '') + '</b></div></div></section>';
+      '<div>כיתה: <b>' + esc(plan.class_label || '') + '</b></div></div>' +
+      '<div class="cv-credit">מערכת ניהול תלמידים — פותחה ע"י יוסף שלום שניידר · 0556742853 · 6742853@gmail.com</div>' +
+      '</section>';
 
     h += '<section class="page">' + hdr('מערכת שעות אישית') + meta +
       '<table class="grid sched"><thead><tr><th></th>' + DAYS.map(d => '<th>' + esc(d) + '</th>').join('') + '</tr></thead><tbody>';
@@ -757,6 +759,7 @@
       '.cover{text-align:center;padding-top:30mm}.cover .lh{max-width:70mm;margin-bottom:8mm}' +
       '.cover h1{font-size:34pt;color:#003048;margin:0 0 4mm}.cover h2{font-size:20pt;color:#a87830;font-weight:normal;margin:0 0 20mm}' +
       '.cv-fields{font-size:15pt;line-height:2.2;display:inline-block;text-align:right}' +
+      '.cv-credit{position:absolute;bottom:10mm;left:0;right:0;text-align:center;font-size:8.5pt;color:#999}' +
       '@media print{.noprint{display:none}}' +
       '.pdfbtn{left:112px !important;background:#a87830 !important}.noprint{position:fixed;top:8px;left:8px;background:#003048;color:#fff;border:0;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer;z-index:9}';
 
