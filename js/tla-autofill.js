@@ -149,26 +149,45 @@
   async function grab(student, f) {
     // Word/Sheets/Docs → PDF בשרת. preview עושה בדיוק את זה.
     const act = (isOffice(f.mimeType) || !canModelRead(f.mimeType)) ? 'preview' : 'download';
-    const d = await drive(act, { studentId: student.id, fileId: f.id });
-    if (!d || !d.dataB64) throw new Error('לא התקבל תוכן');
-    const size = (d.size || 0) / 1024 / 1024;
-    if (size > MAX_MB) throw new Error('גדול מדי (' + size.toFixed(1) + 'MB)');
-    const mime = d.mimeType || f.mimeType;
-    if (!canModelRead(mime)) throw new Error('סוג קובץ שאינו נתמך (' + mime + ')');
-    // ⚠️ קובץ פגום אחד מפיל את *כל* הקריאה למודל ("The document has no
-    // pages"), ואז 15 מסמכים תקינים הולכים לאיבוד. בודקים כאן את חתימת
-    // הקובץ ומוציאים את הפגום לרשימת הכשלים במקום לשלוח אותו.
-    const head = atob(String(d.dataB64).slice(0, 32));
-    const bytes = [];
-    for (let i = 0; i < Math.min(8, head.length); i++) bytes.push(head.charCodeAt(i));
-    const isPdf = head.slice(0, 4) === '%PDF';
-    const isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
-    const isPng = bytes[0] === 0x89 && head.slice(1, 4) === 'PNG';
-    if (/pdf/.test(mime) && !isPdf) throw new Error('קובץ PDF פגום או ריק');
-    if (/^image\/jpe?g/.test(mime) && !isJpg) throw new Error('תמונה פגומה');
-    if (/^image\/png/.test(mime) && !isPng) throw new Error('תמונה פגומה');
-    if ((d.size || 0) < 512) throw new Error('קובץ ריק');
-    return { b64: d.dataB64, mime: mime };
+    let lastErr;
+    // ⚠️ **תגלית 02/09/2026:** לפעמים תעבורת הרשת חותכת את גוף ה-JSON באמצע —
+    // תקין בצד ה-Edge Function (buf.length נכון), קטוע כשהוא מגיע לדפדפן.
+    // התוצאה מטעה: לא שגיאת HTTP, לא חתימת קובץ פגומה (הראש תקין) — סתם
+    // base64 קצר, שהמודל מקבל כתמונה שבורה ומחזיר עליה "אין טקסט קריא",
+    // בדיוק כמו קובץ שבאמת ריק. קרה חי לתלמיד-הדגמה שנבנה לצורך נעמי לוי.
+    // ריטריי בודד לפני שמוותרים על הקובץ.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const d = await drive(act, { studentId: student.id, fileId: f.id });
+        if (!d || !d.dataB64) throw new Error('לא התקבל תוכן');
+        const size = (d.size || 0) / 1024 / 1024;
+        if (size > MAX_MB) throw new Error('גדול מדי (' + size.toFixed(1) + 'MB)');
+        const mime = d.mimeType || f.mimeType;
+        if (!canModelRead(mime)) throw new Error('סוג קובץ שאינו נתמך (' + mime + ')');
+        const expectLen = Math.ceil((d.size || 0) / 3) * 4;
+        if (expectLen && d.dataB64.length < expectLen - 4) {
+          throw new Error('התוכן שהתקבל קטוע (' + d.dataB64.length + '/' + expectLen + ' תווים)');
+        }
+        // קובץ פגום אחד מפיל את *כל* הקריאה למודל ("The document has no
+        // pages"), ואז 15 מסמכים תקינים הולכים לאיבוד. בודקים כאן את חתימת
+        // הקובץ ומוציאים את הפגום לרשימת הכשלים במקום לשלוח אותו.
+        const head = atob(String(d.dataB64).slice(0, 32));
+        const bytes = [];
+        for (let i = 0; i < Math.min(8, head.length); i++) bytes.push(head.charCodeAt(i));
+        const isPdf = head.slice(0, 4) === '%PDF';
+        const isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+        const isPng = bytes[0] === 0x89 && head.slice(1, 4) === 'PNG';
+        if (/pdf/.test(mime) && !isPdf) throw new Error('קובץ PDF פגום או ריק');
+        if (/^image\/jpe?g/.test(mime) && !isJpg) throw new Error('תמונה פגומה');
+        if (/^image\/png/.test(mime) && !isPng) throw new Error('תמונה פגומה');
+        if ((d.size || 0) < 512) throw new Error('קובץ ריק');
+        return { b64: d.dataB64, mime: mime };
+      } catch (e) {
+        lastErr = e;
+        if (attempt === 0) await new Promise(res => setTimeout(res, 800));
+      }
+    }
+    throw lastErr;
   }
 
   /* ───────────────── קריאה למודל ───────────────── */
