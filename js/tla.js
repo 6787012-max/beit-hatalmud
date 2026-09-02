@@ -290,6 +290,15 @@
       '<div class="tla-save"><button class="btn-primary sm" id="tpSave"><i class="bi bi-check-lg"></i> שמירת דף ההכנה</button></div>';
     // "הזמנת נתונים אוטומטית" — קורא את האבחונים ומציע תוכן כטיוטה בלבד.
     // השמירה לתיק נשארת בידי המשתמש, דרך "שמירת דף ההכנה" שלמטה.
+    // "תיק מסמכים" — נעמי ביקשה שיהיה אפשר לראות כאן, ליד הכפתור האוטומטי,
+    // גם את המסמכים עצמם (לא רק את התוצאה שהמודל מפיק מהם).
+    if (window.cv3StudentDocs && stud && stud.id) {
+      const docsBtn = document.createElement('button');
+      docsBtn.className = 'btn-ghost sm'; docsBtn.style.marginInlineStart = '8px';
+      docsBtn.innerHTML = '<i class="bi bi-folder2-open"></i> מסמכי התלמיד (דרייב)';
+      docsBtn.addEventListener('click', () => window.cv3StudentDocs.openManager(stud, () => {}));
+      host.insertBefore(docsBtn, host.firstChild);
+    }
     if (window.cv3TlaAutofill && stud) {
       window.cv3TlaAutofill.mount(host, stud, (vals, mode) => {
         Object.keys(vals).forEach(k => {
