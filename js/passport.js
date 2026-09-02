@@ -30,8 +30,8 @@
   const FIELDS = [
     { k: 'shacharit',    t: 'שחרית בזמן',   sub: 'ימים 0–6',   max: 7,    w: 96 },
     { k: 'study_min',    t: 'לימוד בשב״ק',  sub: 'דקות',       max: 1440, w: 96 },
-    { k: 'test_written', t: 'מבחן בכתב',    sub: 'גמרא עיון',  max: 100,  w: 96 },
-    { k: 'test_oral',    t: 'מבחן בע״פ',    sub: 'שקו״ט',      max: 100,  w: 96 },
+    { k: 'test_written', t: 'מבחן בכתב',    sub: 'גמרא עיון',  max: 120,  w: 96 },
+    { k: 'test_oral',    t: 'מבחן בע״פ',    sub: 'שקו״ט',      max: 120,  w: 96 },
   ];
 
   function currentWeek() {
@@ -49,8 +49,8 @@
     const parts = [];
     if (r.shacharit != null) parts.push(Math.min(100, (r.shacharit / 6) * 100));
     if (r.study_min != null) parts.push(Math.min(100, (r.study_min / 120) * 100));
-    if (r.test_written != null) parts.push(r.test_written);
-    if (r.test_oral != null) parts.push(r.test_oral);
+    if (r.test_written != null) parts.push(Math.min(100, r.test_written));
+    if (r.test_oral != null) parts.push(Math.min(100, r.test_oral));
     return parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : null;
   }
   const chip = v => v == null ? '<span style="color:var(--muted)">—</span>'
@@ -105,7 +105,7 @@
       const cell = (s, f) => {
         const r = byKey[s.id + '|' + wk];
         const v = r && r[f.k] != null ? r[f.k] : '';
-        return '<td><input class="inp mb0 psp-in" type="number" min="0" max="' + f.max + '" ' +
+        return '<td><input class="inp mb0 psp-in" type="number" step="any" min="0" max="' + f.max + '" ' +
           'style="width:' + f.w + 'px;padding:5px 8px;text-align:center" ' +
           'data-sid="' + s.id + '" data-f="' + f.k + '" value="' + esc(v) + '"></td>';
       };
@@ -141,12 +141,14 @@
           const raw = inp.value.trim();
           const val = raw === '' ? null : num(raw);
           const fld = FIELDS.find(x => x.k === f);
-          if (val != null && (val < 0 || val > fld.max)) {
-            window.UI.toast('ערך חייב להיות בין 0 ל-' + fld.max, 'err');
-            inp.value = ''; return;
-          }
           const key = sid + '|' + wk;
           const cur = byKey[key];
+          if (val != null && (val < 0 || val > fld.max)) {
+            window.UI.toast('ערך חייב להיות בין 0 ל-' + fld.max, 'err');
+            // לא מוחקים — משחזרים את הערך השמור הקודם כדי שהזנה שגויה לא תמחק נתונים
+            inp.value = (cur && cur[f] != null) ? cur[f] : '';
+            return;
+          }
           inp.classList.add('psp-saving');
           try {
             if (cur) {

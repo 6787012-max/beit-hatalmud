@@ -368,9 +368,13 @@
       let d = null;
       try { d = JSON.parse(sig); } catch (_) { d = null; }
       if (!d || !d.s || !d.s.length) return '<span style="color:var(--muted)">אין חתימה שמורה</span>';
-      const w = d.w || 600, h = d.h || 160;
+      // ⚠️ הקואורדינטות מגיעות מהורה דרך טופס ציבורי (submit_public_form פתוח ל-anon).
+      // חובה לכפות מספריות לפני הזרקה ל-innerHTML, אחרת מחרוזת עם "/> יוצאת מה-SVG
+      // ומזריקה HTML שרץ בסשן המנהל (Stored XSS). num מסנן גם NaN/±Infinity.
+      const num = n => { const x = Number(n); return isFinite(x) ? x : 0; };
+      const w = num(d.w) || 600, h = num(d.h) || 160;
       const paths = d.s.filter(st => st && st.length).map(st =>
-        '<path d="M' + st.map(pt => pt[0] + ' ' + pt[1]).join(' L') + '"/>').join('');
+        '<path d="M' + st.map(pt => num(pt && pt[0]) + ' ' + num(pt && pt[1])).join(' L') + '"/>').join('');
       return '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" ' +
         'style="width:100%;max-width:340px;height:auto;background:#fff;border:1px solid var(--line,#ccc);border-radius:8px" ' +
         'fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +

@@ -79,7 +79,7 @@
       st.innerHTML = seen
         ? '<span class="ym-badge" style="background:' + (live ? '#d7f5e4' : '#f5e0e0') + ';color:' + (live ? '#166b42' : '#8c2f2f') + '">' +
           (live ? '● המסך פעיל' : '○ המסך לא מדווח') + '</span> ' +
-          (live ? (rt.videoCount || 0) + ' סרטונים' : 'נראה לאחרונה לפני ' + mins + ' דק׳')
+          (live ? (Number(rt.videoCount) || 0) + ' סרטונים' : 'נראה לאחרונה לפני ' + mins + ' דק׳')
         : '<span class="ym-note">המסך עוד לא דיווח על עצמו</span>';
     }
     page.querySelector('#lbBody').innerHTML =
@@ -394,11 +394,14 @@
     pane.querySelector('#lbSaveBday').addEventListener('click', async () => {
       // נשמר תאריך עברי בלבד (יום/חודש/שנה) — המסך גוזר ממנו כל יום את החגיגה
       // הקרובה ואת הגיל, ולכן הרשימה נשארת נכונה גם בלי לחשב אותה מחדש.
+      // ⚠️ פרטיות: lobby_config קריא ל-anon (המסך על הקיר קורא בלי התחברות),
+      // ולכן כל מה שנשמר כאן חשוף לכל האינטרנט. אין לשמור שם משפחה/כיתה של
+      // קטינים — רק שם פרטי + תאריך עברי, כדי שהמסך יציג "מזל טוב לאיציק" בלי
+      // לחשוף מזהה אישי מלא. (המסך נופל אוטומטית ל-first כשאין name.)
       cfg.birthdays = {
         updatedAt: new Date().toISOString(),
         items: (bdayCalc || []).filter(b => b.show && !b.miss)
-          .map(b => ({ sid: b.sid, name: b.name, first: b.first, cls: b.cls,
-            d: b.hebD, m: b.hebM, by: b.hebY, heb: b.hebTxt, show: true })),
+          .map(b => ({ first: b.first, d: b.hebD, m: b.hebM, by: b.hebY, heb: b.hebTxt, show: true })),
       };
       if (await save('birthdays')) drawBday(pane, page);
     });
@@ -479,7 +482,7 @@
       '<div class="qr-card"><h3><i class="bi bi-hdd-network"></i> מחשב הלובי</h3>' +
       '<div class="ym-note">' +
         (rt.seenAt ? 'דיווח אחרון: ' + new Date(rt.seenAt).toLocaleString('he-IL') +
-          ' · תיקייה: ' + esc(rt.root || '—') + ' · ' + (rt.videoCount || 0) + ' סרטונים' +
+          ' · תיקייה: ' + esc(rt.root || '—') + ' · ' + (Number(rt.videoCount) || 0) + ' סרטונים' +
           (rt.exists === false ? ' <b style="color:#8c2f2f">— הנתיב לא נמצא במחשב</b>' : '')
           : 'המסך עוד לא דיווח. הפעל את הקיצור "מסך לובי" במחשב שבלובי.') +
       '</div>' +
