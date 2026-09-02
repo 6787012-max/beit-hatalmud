@@ -20,6 +20,32 @@
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const nm = s => (window.UI && window.UI.fullName) ? window.UI.fullName(s) : (s && s.name) || '';
+
+  // ⚠️ פרטיות (02/09/2026): "הזנת נתונים" מוציא טקסט אבחוני ושולח אותו ל-Gemini
+  // (מודל של גוגל). כדי שמידע רפואי **מזהה** של קטין לא יעזוב לצד שלישי,
+  // מטשטשים מהטקסט את השם, ת"ז, שם משפחה ופרטי ההורים לפני השליחה. ה-AI לא
+  // צריך את הזהות כדי לחלץ רקע/מוקדי כוח/חולשות. חילוץ הטקסט עצמו נעשה ב-OCR
+  // של Drive (חשבון Workspace של המכינה — לא מאמן מודלים על התוכן).
+  function makeRedactor(student) {
+    const terms = [];
+    const add = v => { const s = String(v == null ? '' : v).trim(); if (s.length >= 2) terms.push(s); };
+    add(nm(student)); add(student && student.name); String((student && student.name) || '').split(/\s+/).forEach(add);
+    add(student && student.family); add(student && student.tz);
+    add(student && student.parent_name); add(student && student.parent_phone);
+    const reg = (student && student.reg) || {};
+    Object.keys(reg).forEach(k => {
+      if (/שם|טלפון|נייד|אב|אם|הור|משפח/.test(k)) { add(reg[k]); String(reg[k] || '').split(/\s+/).forEach(add); }
+    });
+    const uniq = Array.from(new Set(terms)).filter(Boolean).sort((a, b) => b.length - a.length);
+    const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return function (txt) {
+      let out = String(txt || '');
+      uniq.forEach(t => { try { out = out.replace(new RegExp(esc(t), 'g'), '⟪הושמט⟫'); } catch (_) { /* ignore */ } });
+      out = out.replace(/\b\d{9}\b/g, '⟪ת"ז⟫');                    // כל תעודת זהות ישראלית
+      out = out.replace(/\b0\d{1,2}[-\s]?\d{7}\b/g, '⟪טלפון⟫');     // מספרי טלפון
+      return out;
+    };
+  }
   const MODEL = 'gemini-2.5-flash';
   const API = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
 
@@ -145,46 +171,21 @@
   const isOffice = m => /officedocument|msword|ms-excel|vnd\.google-apps\.(document|spreadsheet)/.test(m || '');
   const canModelRead = m => /^application\/pdf$|^image\//.test(m || '') || /^text\//.test(m || '');
 
-  /** מוריד קובץ ומחזיר base64 + mime שהמודל יכול לקרוא. */
+  /** מחלץ את **הטקסט** מהמסמך (OCR בצד השרת, בחשבון ה-Workspace של המכינה),
+   *  ומחזיר אותו בלי הבייטים של הקובץ. כך אפשר לטשטש שם/ת"ז לפני שליחה ל-AI,
+   *  ומידע רפואי מזהה של קטין לעולם לא נשלח ל-Gemini. */
   async function grab(student, f) {
-    // Word/Sheets/Docs → PDF בשרת. preview עושה בדיוק את זה.
-    const act = (isOffice(f.mimeType) || !canModelRead(f.mimeType)) ? 'preview' : 'download';
     let lastErr;
-    // ⚠️ **תגלית 02/09/2026:** לפעמים תעבורת הרשת חותכת את גוף ה-JSON באמצע —
-    // תקין בצד ה-Edge Function (buf.length נכון), קטוע כשהוא מגיע לדפדפן.
-    // התוצאה מטעה: לא שגיאת HTTP, לא חתימת קובץ פגומה (הראש תקין) — סתם
-    // base64 קצר, שהמודל מקבל כתמונה שבורה ומחזיר עליה "אין טקסט קריא",
-    // בדיוק כמו קובץ שבאמת ריק. קרה חי לתלמיד-הדגמה שנבנה לצורך נעמי לוי.
-    // ריטריי בודד לפני שמוותרים על הקובץ.
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const d = await drive(act, { studentId: student.id, fileId: f.id });
-        if (!d || !d.dataB64) throw new Error('לא התקבל תוכן');
-        const size = (d.size || 0) / 1024 / 1024;
-        if (size > MAX_MB) throw new Error('גדול מדי (' + size.toFixed(1) + 'MB)');
-        const mime = d.mimeType || f.mimeType;
-        if (!canModelRead(mime)) throw new Error('סוג קובץ שאינו נתמך (' + mime + ')');
-        const expectLen = Math.ceil((d.size || 0) / 3) * 4;
-        if (expectLen && d.dataB64.length < expectLen - 4) {
-          throw new Error('התוכן שהתקבל קטוע (' + d.dataB64.length + '/' + expectLen + ' תווים)');
-        }
-        // קובץ פגום אחד מפיל את *כל* הקריאה למודל ("The document has no
-        // pages"), ואז 15 מסמכים תקינים הולכים לאיבוד. בודקים כאן את חתימת
-        // הקובץ ומוציאים את הפגום לרשימת הכשלים במקום לשלוח אותו.
-        const head = atob(String(d.dataB64).slice(0, 32));
-        const bytes = [];
-        for (let i = 0; i < Math.min(8, head.length); i++) bytes.push(head.charCodeAt(i));
-        const isPdf = head.slice(0, 4) === '%PDF';
-        const isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
-        const isPng = bytes[0] === 0x89 && head.slice(1, 4) === 'PNG';
-        if (/pdf/.test(mime) && !isPdf) throw new Error('קובץ PDF פגום או ריק');
-        if (/^image\/jpe?g/.test(mime) && !isJpg) throw new Error('תמונה פגומה');
-        if (/^image\/png/.test(mime) && !isPng) throw new Error('תמונה פגומה');
-        if ((d.size || 0) < 512) throw new Error('קובץ ריק');
-        return { b64: d.dataB64, mime: mime };
+        const d = await drive('ocrtext', { studentId: student.id, fileId: f.id });
+        if (!d || typeof d.text !== 'string') throw new Error('לא התקבל טקסט');
+        const text = d.text.trim();
+        if (text.length < 10) throw new Error('לא חולץ טקסט קריא מהמסמך');
+        return { text: text, name: f.name };
       } catch (e) {
         lastErr = e;
-        if (attempt === 0) await new Promise(res => setTimeout(res, 800));
+        if (attempt === 0) await new Promise(res => setTimeout(res, 1200));
       }
     }
     throw lastErr;
@@ -291,17 +292,20 @@
   }
 
   async function runBatch(header, items) {
+    // נשלח **טקסט מטושטש בלבד** — בלי שם קובץ (שמות קבצים כוללים שם תלמיד)
+    // ובלי הבייטים של הקובץ. הטשטוש כבר הופעל ב-analyze.
     const parts = [{ text: header }];
-    items.forEach(it => {
-      parts.push({ text: '\n=== קובץ: ' + it.name + ' ===\n' });
-      parts.push({ inline_data: { mime_type: it.mime, data: it.b64 } });
+    items.forEach((it, i) => {
+      parts.push({ text: '\n=== מסמך ' + (i + 1) + ' ===\n' + it.text + '\n' });
     });
     return callModel(parts);
   }
 
   async function analyze(student, docs, onStep) {
-    const header = 'ת.ז: ' + (student.tz || '—') + '\nשם: ' + nm(student) +
-      '\nכיתה: ' + (student._cls || '') + '\n\nמסמכי האבחון:\n';
+    // ⚠️ אין לשלוח שם/ת"ז/כיתה ל-AI. הכותרת נייטרלית, והטקסט עבר טשטוש.
+    const header = 'לפניך טקסט ממסמכי אבחון של תלמיד אחד. פרטים מזהים ' +
+      '(שם, ת"ז, שמות/טלפוני הורים) הושמטו ומופיעים כ-⟪הושמט⟫ — התעלם מהם.\n\n';
+    const redact = makeRedactor(student);
     const failed = [], scanned = [], loaded = [];
 
     for (let i = 0; i < docs.length; i++) {
@@ -309,8 +313,9 @@
       onStep('קורא (' + (i + 1) + '/' + docs.length + '): ' + f.name);
       try {
         const g = await grab(student, f);
-        // mb = הנפח בפועל בגוף הבקשה (base64), לא גודל הקובץ המקורי
-        loaded.push({ name: f.name, mime: g.mime, b64: g.b64, mb: g.b64.length / 1024 / 1024 });
+        // טשטוש מזהים לפני שהטקסט נכנס לתור השליחה ל-AI
+        const clean = redact(g.text);
+        loaded.push({ name: f.name, text: clean, mb: clean.length / (1024 * 1024) });
       } catch (e) {
         failed.push({ name: f.name, why: e.message || String(e) });
       }

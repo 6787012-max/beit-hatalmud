@@ -116,6 +116,37 @@ Content-Type: ${mime}
   }
 }
 
+// חילוץ טקסט ממסמך דרך OCR של Google Drive. הטריק זהה להמרת ה-PDF: העלאה
+// חוזרת ליצירת Google Doc זמני **עם OCR עברי** (עובד גם על PDF סרוק וגם על
+// תמונה), ייצוא טקסט, ומחיקה מיד. הכל בחשבון ה-Workspace של המכינה — לא יוצא
+// לשום מודל AI. המטרה: להוציא את התוכן הקליני בלבד, כדי שהלקוח יטשטש ממנו
+// שם/ת"ז/פרטי הורים לפני שהוא נשלח ל-Gemini. כך מידע רפואי מזהה של קטין
+// לעולם לא עוזב לצד שלישי.
+async function ocrToText(buf: Uint8Array, mime: string): Promise<string | null> {
+  let tmpId = '';
+  try {
+    const boundary = 'cv' + crypto.randomUUID().replace(/-/g, '');
+    const enc = new TextEncoder();
+    const meta = JSON.stringify({ name: 'tmp-ocr', mimeType: 'application/vnd.google-apps.document' });
+    const head = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`);
+    const tail = enc.encode(`\r\n--${boundary}--\r\n`);
+    const body = new Uint8Array(head.length + buf.length + tail.length);
+    body.set(head, 0); body.set(buf, head.length); body.set(tail, head.length + buf.length);
+    const up = await gFetch(`${UPLOAD}/files?uploadType=multipart&ocrLanguage=iw&fields=id`, {
+      method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body,
+    });
+    if (!up.ok) return null;
+    tmpId = (await up.json()).id;
+    const ex = await gFetch(`${DRIVE}/files/${tmpId}/export?mimeType=text/plain`);
+    if (!ex.ok) return null;
+    return await ex.text();
+  } catch (_) {
+    return null;
+  } finally {
+    if (tmpId) { try { await gFetch(`${DRIVE}/files/${tmpId}`, { method: 'DELETE' }); } catch (_) { /* ignore */ } }
+  }
+}
+
 // אילו תיקיות דרייב מותרות למשתמש הזה — לפי RLS, לא לפי הדפדפן.
 // שני נושאים: תלמיד (student_docs, לפי can_read_student) ואיש צוות (staff, מנהל בלבד).
 // בשני המקרים השאילתה נשלחת **עם ה-JWT של המשתמש**, ולכן ה-RLS הוא שמחליט:
@@ -293,6 +324,43 @@ Deno.serve(async (req) => {
         if (conv) { buf = conv.buf; outMime = 'application/pdf'; outName = conv.name; }
       }
       return json({ ok: true, name: outName, mimeType: outMime, size: buf.length, dataB64: b64(buf) });
+    }
+
+    // ── חילוץ טקסט (OCR) לצורך טשטוש לפני AI ──
+    // מחזיר טקסט בלבד, בלי הבייטים של הקובץ. הלקוח מטשטש שם/ת"ז ושולח ל-Gemini.
+    if (action === 'ocrtext') {
+      const fileId = u.searchParams.get('fileId') || '';
+      const f = await fileInAllowed(fileId, folders);
+      if (!f) return fail('הקובץ אינו בתיקיית התלמיד', 403);
+      const isGoogleDoc = String(f.mimeType || '').startsWith('application/vnd.google-apps');
+      if (isGoogleDoc) {
+        const ex = await gFetch(`${DRIVE}/files/${fileId}/export?mimeType=text/plain`);
+        if (!ex.ok) return fail('חילוץ הטקסט נכשל', 502);
+        return json({ ok: true, name: f.name, text: await ex.text() });
+      }
+      let raw: Uint8Array | null = null;
+      let srcMime = String(f.mimeType || 'application/pdf');
+      const r = await gFetch(`${DRIVE}/files/${fileId}?alt=media`);
+      if (r.ok) {
+        raw = new Uint8Array(await r.arrayBuffer());
+        srcMime = r.headers.get('content-type') || srcMime;
+      } else if (r.status === 403 && GAS_URL) {
+        // קובץ ישן — דרך גשר ה-Apps Script (כמו ב-download)
+        const g = await fetch(`${GAS_URL}?type=fileget&sid=${encodeURIComponent(studentId)}` +
+          `&fid=${encodeURIComponent(fileId)}&token=${encodeURIComponent(jwt)}&callback=cb`, { redirect: 'follow' });
+        const txt = await g.text();
+        const mm = txt.match(/^[^(]*\(([\s\S]*)\)\s*;?\s*$/);
+        let d: Record<string, unknown> | null = null;
+        try { d = mm ? JSON.parse(mm[1]) : JSON.parse(txt); } catch (_) { d = null; }
+        if (d && d.ok && d.dataB64) {
+          raw = Uint8Array.from(atob(String(d.dataB64)), c => c.charCodeAt(0));
+          srcMime = String(d.mimeType || srcMime);
+        }
+      }
+      if (!raw) return fail('אין הרשאת הורדה לקובץ הזה', 403);
+      const text = await ocrToText(raw, srcMime);
+      if (text == null) return fail('חילוץ הטקסט נכשל', 502);
+      return json({ ok: true, name: f.name, text });
     }
 
     // ── מחיקה (לפח האשפה של דרייב, לא לצמיתות — ניתן לשחזור) ──
