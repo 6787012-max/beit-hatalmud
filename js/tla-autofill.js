@@ -46,8 +46,7 @@
       return out;
     };
   }
-  const MODEL = 'gemini-2.5-flash';
-  const API = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+  const MODEL = 'gemini-2.5-flash';   // כל הקריאות עוברות דרך window.cv3call (מפתח בשרת)
 
   // ⚠️ **רק "מסמך קביל"** — בקשה מפורשת של נעמי לוי (24/08).
   // קודם נסרקו גם "החלטת ועדה" ו"היסטוריית טיפול", ואצל אוליאל זה הביא
@@ -193,30 +192,7 @@
 
   /* ───────────────── קריאה למודל ───────────────── */
 
-  // קריאה למודל דרך פרוקסי ה-Edge Function `ai` — למשתמשים שהסינון שלהם
-  // חוסם את generativelanguage.googleapis.com מהדפדפן. אותו מפתח, אותו גוף;
-  // רק הצינור שונה. דורש התחברות (הפונקציה מאמתת את ה-JWT).
-  async function viaProxy(key, body, ctrl) {
-    const cfg = window.CV3 || {};
-    const base = cfg.SUPABASE_URL || '';
-    let jwt = '';
-    try {
-      const s = window.sb && window.sb.auth && (await window.sb.auth.getSession());
-      jwt = (s && s.data && s.data.session && s.data.session.access_token) || '';
-    } catch (_) {}
-    if (!base || !jwt) throw new Error('אין חיבור Supabase');
-    return fetch(base + '/functions/v1/ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-        'apikey': cfg.SUPABASE_ANON_KEY || '', 'Authorization': 'Bearer ' + jwt },
-      body: JSON.stringify({ model: MODEL, key: key, body: body }),
-      signal: ctrl && ctrl.signal,
-    });
-  }
-
   async function callModel(parts) {
-    const k = (typeof window.geminiKey === 'function') ? window.geminiKey() : '';
-    if (!k) throw new Error('אין מפתח AI מוגדר');
     const body = {
       systemInstruction: { parts: [{ text: SYS }] },
       contents: [{ parts: parts }],
@@ -227,6 +203,8 @@
     };
     // 429/503 = עומס או מגבלת קצב, לא תקלה אמיתית. בלי ריטריי, ריצה עם
     // כמה קבצים גורמת ל"כל הקבצים נכשלו" — וזה בדיוק מה שנעמי קיבלה.
+    // הקריאה עוברת דרך window.cv3call: המפתח שמור בשרת, ויש נפילה-לאחור
+    // אוטומטית לפרוקסי אצל משתמשים שהסינון חוסם להם את גוגל (נעמי 1.9.26).
     let r, d;
     for (let attempt = 0; ; attempt++) {
       // ⏱ timeout מפורש. בלעדיו קריאה שנתקעת משאירה את המסך על "מנתח
@@ -234,24 +212,14 @@
       const ctrl = new AbortController();
       const tmr = setTimeout(() => ctrl.abort(), 180000);
       try {
-        r = await fetch(API + '?key=' + encodeURIComponent(k),
-          { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body), signal: ctrl.signal });
+        r = await window.cv3call(MODEL, body, ctrl.signal);
       } catch (netErr) {
         clearTimeout(tmr);
-        // כשל רשת בקריאה ישירה = כנראה סינון שחוסם את גוגל אצל המשתמש
-        // (קרה לנעמי 1.9.26). מנסים דרך פרוקסי ה-Edge Function — Supabase
-        // מאושר אצל כולם, אחרת לא היו מצליחים בכלל להתחבר למערכת.
-        if (netErr.name !== 'AbortError') {
-          try { r = await viaProxy(k, body, ctrl); } catch (_proxyErr) { r = null; }
-        }
-        if (!r) {
-          if (attempt >= 2) throw new Error(netErr.name === 'AbortError'
-            ? 'הניתוח לקח יותר מ-3 דקות ונעצר'
-            : 'אין תקשורת עם שירות הניתוח');
-          await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
-          continue;
-        }
+        if (attempt >= 2) throw new Error(netErr && netErr.name === 'AbortError'
+          ? 'הניתוח לקח יותר מ-3 דקות ונעצר'
+          : 'אין תקשורת עם שירות הניתוח');
+        await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
+        continue;
       }
       clearTimeout(tmr);
       d = await r.json().catch(() => ({}));

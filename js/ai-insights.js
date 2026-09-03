@@ -15,36 +15,27 @@
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const MODEL = 'gemini-2.5-flash';
-  const API = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
   const nm = s => (window.UI && window.UI.fullName) ? window.UI.fullName(s) : (s && s.name) || '';
   // מסמכי החובה בכל תיק (אפיון + החלטת ועדה שנעמי הוסיפה) — זהה ל-student-docs.js
   const NEED = ['ויתור סודיות', 'שאלון הפניה', 'אבחונים ורקע קודם', 'מסמך קביל', 'החלטת ועדה'];
 
-  function key() {
-    try { if (typeof window.geminiKey === 'function') return window.geminiKey(); } catch (_) {}
-    try { return localStorage.getItem('cv3_gemini_key') || ''; } catch (_) { return ''; }
-  }
-
+  // כל קריאות ה-AI עוברות דרך window.cv3call (ai-proxy.js): המפתח בשרת בלבד.
   async function gemini(prompt, maxTokens) {
-    const k = key();
-    if (!k) throw new Error('אין מפתח AI מוגדר');
-    const res = await fetch(API + '?key=' + encodeURIComponent(k), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: maxTokens || 1200,
-          // ⚠️ gemini-2.5 מוציא טוקני "חשיבה" *מתוך* maxOutputTokens — נמדדו
-          // 1,535 טוקני חשיבה על בקשה של 57 טוקן. עם תקרה של 600 התשובה
-          // נחתכה (finishReason=MAX_TOKENS) והמשתמש ראה כותרת בלי תוכן.
-          // כאן אין צורך בחשיבה: הסיכום נגזר ישירות מהנתונים שנשלחו.
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
-    });
-    const d = await res.json();
-    if (!res.ok) throw new Error((d.error && d.error.message) || ('שגיאה ' + res.status));
+    const body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: maxTokens || 1200,
+        // ⚠️ gemini-2.5 מוציא טוקני "חשיבה" *מתוך* maxOutputTokens — נמדדו
+        // 1,535 טוקני חשיבה על בקשה של 57 טוקן. עם תקרה של 600 התשובה
+        // נחתכה (finishReason=MAX_TOKENS) והמשתמש ראה כותרת בלי תוכן.
+        // כאן אין צורך בחשיבה: הסיכום נגזר ישירות מהנתונים שנשלחו.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    };
+    const res = await window.cv3call(MODEL, body);
+    const d = await res.json().catch(() => null);
+    if (!res.ok || !d) throw new Error((d && d.error && d.error.message) || ('שגיאה ' + res.status));
     const t = (((d.candidates || [])[0] || {}).content || {}).parts || [];
     const out = t.map(p => p.text || '').join('').trim();
     if (!out) throw new Error('לא התקבלה תשובה');

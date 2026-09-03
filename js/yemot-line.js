@@ -162,11 +162,9 @@
   async function genVoice() {
     const p = pane('msg'), txt = p.querySelector('#ylText').value.trim(), out = p.querySelector('#ylMsgOut');
     if (!txt) { out.textContent = 'כתבו קודם את ההודעה.'; return; }
-    const key = window.geminiKey && window.geminiKey();
-    if (!key) { out.textContent = 'חסר מפתח Gemini — הגדירו אותו בכרטיס "הודעה חדשה לשלוחה" למטה.'; return; }
     const btn = p.querySelector('#ylGen'); btn.disabled = true; out.textContent = 'יוצר קול…';
     try {
-      blob = await window.geminiSpeak(txt, key);
+      blob = await window.geminiSpeak(txt);
       showPrev(URL.createObjectURL(blob));
       p.querySelector('#ylUpload').disabled = false;
       out.textContent = 'הקול מוכן — האזינו ואז העלו.';

@@ -1,19 +1,12 @@
 // ai-help.js — עוזר חכם (עזרה ראשונית) למערכת בית התלמוד.
 // שלב ראשון פשוט: בונה "מאגר ידע" אוטומטי מתוך guide-data.js (מקור האמת של
 // ההדרכה, מתעדכן לבד ככל שמעדכנים את ההדרכה), ומאפשר לשאול שאלות חופשיות
-// על המערכת. הקריאה ל-Gemini נעשית ישירות מהדפדפן — בדיוק כמו טקסט→שמע
-// בקו ימות (נטפרי מאשר את generativelanguage), עם אותו מפתח (window.geminiKey).
+// על המערכת. הקריאה ל-Gemini עוברת דרך window.cv3call (ai-proxy.js) — המפתח
+// שמור בשרת (Supabase secret), לא בקוד הלקוח.
 (function () {
   'use strict';
   const MODEL = 'gemini-2.5-flash';
-  const URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-  // מפתח: מעדיפים את הפונקציה המשותפת מ-yemot.js; נופלים ל-localStorage.
-  function key() {
-    try { if (typeof window.geminiKey === 'function') return window.geminiKey(); } catch (_) {}
-    try { return localStorage.getItem('cv3_gemini_key') || ''; } catch (_) { return ''; }
-  }
 
   // ── בניית מאגר הידע מתוך guide-data (מתעדכן אוטומטית) + עובדות המערכת ──
   function knowledgeBase() {
@@ -86,8 +79,6 @@
   const history = []; // { role:'user'|'model', text }
 
   async function ask(question) {
-    const k = key();
-    if (!k) throw new Error('אין מפתח זמין לעוזר החכם.');
     // הקשר הנתונים נבנה בדפדפן דרך ה-store, כלומר עובר את ה-RLS של המשתמש:
     // מורה מקבל רק את הכיתות שלו, מנהל מקבל הכל. אין כאן דרך לעקוף הרשאה.
     let dataCtx = '';
@@ -112,8 +103,7 @@
         maxOutputTokens: 4000,
       },
     };
-    const r = await fetch(URL + '?key=' + encodeURIComponent(k),
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await window.cv3call(MODEL, body);
     const j = await r.json().catch(() => null);
     if (!r.ok || !j) throw new Error((j && j.error && j.error.message) || 'שגיאת תקשורת');
     const parts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;

@@ -8,20 +8,13 @@
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const API = 'https://www.call2all.co.il/ym/api';
-  // טקסט→שמע: קריאה ישירה ל-Gemini מהדפדפן (נטפרי מאשר את generativelanguage).
-  // המפתח נשמר מקומית במכשיר המנהל בלבד (localStorage) — לא ב-repo הציבורי.
-  const GEMINI_TTS = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent';
+  // טקסט→שמע: דרך window.cv3call (ai-proxy.js). המפתח שמור כסוד בשרת (Supabase
+  // secret GEMINI_KEY) ואינו נמצא עוד בקוד הלקוח / ב-repo הציבורי.
+  const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
   const GKEY_LS = 'cv3_gemini_key';
-  // מפתח ברירת-מחדל מעורבל (XOR 0x5A + base64) — לא בטקסט גלוי כדי לא להתגלות
-  // ע"י סורקי סודות. מפתח שמוזן ידנית (localStorage) גובר עליו.
-  const K_ENC = 'GxMgOwkjGRMRACscEhgsIygdEhgoERMNbBAMbmxiHR0ANmwRLGgD';
-  function defaultKey() {
-    try { const b = atob(K_ENC); let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b.charCodeAt(i) ^ 0x5A); return s; }
-    catch (_) { return ''; }
-  }
-  // מפתח שמור נחשב רק אם הוא בפורמט תקין (AIza…); אחרת חוזרים למוטמע.
-  // כך קוד שגוי שנשמר בטעות (כמו קוד OAuth) לא שובר את היצירה.
-  const gKey = () => { try { const k = localStorage.getItem(GKEY_LS) || ''; return /^AIza[\w-]{20,}$/.test(k) ? k : defaultKey(); } catch (_) { return defaultKey(); } };
+  // מפתח אופציונלי שמנהל יכול להזין ידנית (localStorage) לעקיפת השרת — לרוב אין.
+  // נחשב רק אם הוא בפורמט תקין (AIza…); אחרת מתעלמים ומשתמשים בשרת.
+  const gKey = () => { try { const k = localStorage.getItem(GKEY_LS) || ''; return /^AIza[\w-]{20,}$/.test(k) ? k : ''; } catch (_) { return ''; } };
   const setGKey = k => { try { k ? localStorage.setItem(GKEY_LS, k) : localStorage.removeItem(GKEY_LS); } catch (_) {} };
   const SS_KEY = 'cv3_yemot_token';
   const DEFAULT_LINE = '0733518751';   // קו המכינה "תשע תלמוד". 033060570 הוא קו החיידר — לא כאן.
@@ -38,14 +31,13 @@
     for (let i = 0; i < dataLen; i++) dv.setUint8(44 + i, bin.charCodeAt(i));
     return new Blob([buf], { type: 'audio/wav' });
   }
-  async function geminiSpeak(text, key) {
+  async function geminiSpeak(text) {
     const body = {
       contents: [{ parts: [{ text: 'קרא בקול רגוע, ברור ומקצועי המתאים להודעה טלפונית: ' + text }] }],
       generationConfig: { responseModalities: ['AUDIO'],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } } }
     };
-    const r = await fetch(GEMINI_TTS + '?key=' + encodeURIComponent(key),
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await window.cv3call(TTS_MODEL, body);
     const j = await r.json().catch(() => null);
     if (!r.ok || !j) throw new Error((j && j.error && j.error.message) || 'שגיאת Gemini');
     const inline = j.candidates && j.candidates[0] && j.candidates[0].content
@@ -254,7 +246,7 @@
   // ----- טקסט → שמע (Gemini ישירות מהדפדפן) -----
   function wireTts(page) {
     const keyRow = page.querySelector('#ymKeyRow');
-    keyRow.hidden = !!gKey();  // מוסתר כשיש מפתח (ברירת-מחדל או שמור)
+    keyRow.hidden = true;  // המפתח בשרת — אין צורך להזין. הכפתור למטה לעקיפה ידנית בלבד.
     page.querySelector('#ymKeyChange').addEventListener('click', () => {
       keyRow.hidden = false;
       const inp = page.querySelector('#ymGKey'); inp.value = ''; inp.focus();
@@ -273,15 +265,14 @@
       const text = page.querySelector('#ymText').value.trim();
       const msg = page.querySelector('#ymTtsMsg'), prev = page.querySelector('#ymTtsPrev');
       if (!text) { msg.textContent = 'כתבו טקסט קודם.'; return; }
-      if (!gKey()) { keyRow.hidden = false; msg.textContent = 'הזינו מפתח Gemini פעם אחת כדי להפעיל יצירת קול.'; return; }
       msg.textContent = 'יוצר קול…';
       try {
-        state.ttsBlob = await geminiSpeak(text, gKey());
+        state.ttsBlob = await geminiSpeak(text);
         prev.src = URL.createObjectURL(state.ttsBlob); prev.style.display = '';
         msg.textContent = '✓ הקול מוכן — האזינו והעלו לשלוחה.';
       } catch (e) {
         const em = String(e && e.message || e);
-        if (/API key|invalid|expired/i.test(em)) { keyRow.hidden = false; msg.textContent = 'המפתח נדחה. הזינו מפתח Gemini תקין.'; }
+        if (/API key|invalid|expired/i.test(em)) { keyRow.hidden = false; msg.textContent = 'מפתח ה-AI נדחה — פנו למנהל המערכת.'; }
         else msg.textContent = 'יצירת הקול נכשלה: ' + em;
       }
     });

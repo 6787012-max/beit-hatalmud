@@ -6,7 +6,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const DEFAULT_FOLDER = 'ivr2:/9';   // שלוחת "דיווח קולי - צוות המכינה" בקו 0733518751.
   // ⚠️ שלוחה 4 היא go_to_folder של קבוצת הצינתוק ואין בה הקלטות — אל תחזיר אותה.
-  const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+  const MODEL = 'gemini-2.5-flash';   // התמלול עובר דרך window.cv3call (מפתח בשרת)
 
   let students = [];
 
@@ -99,8 +99,6 @@
 
   async function transcribe(page, btn) {
     const path = btn.dataset.tx;
-    const key = window.geminiKey && window.geminiKey();
-    if (!key) { window.UI.toast('מפתח Gemini חסר — הגדירו בעמוד קו ימות', 'err'); return; }
     btn.disabled = true; const orig = btn.innerHTML; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> מתמלל…';
     try {
       const res = await fetch(window.Yemot.downloadUrl(path));
@@ -113,10 +111,9 @@
         'report_type (behavior/functioning/general), report_text — ניסוח מקצועי, מכובד ומדויק בגוף שלישי, מתאים לתיק תלמיד).';
       const body = { contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: b64 } }] }],
         generationConfig: { responseMimeType: 'application/json' } };
-      const r = await fetch(GEMINI + '?key=' + encodeURIComponent(key),
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const j = await r.json();
-      if (!r.ok) throw new Error((j.error && j.error.message) || 'שגיאת תמלול');
+      const r = await window.cv3call(MODEL, body);
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) throw new Error((j && j.error && j.error.message) || 'שגיאת תמלול');
       const out = JSON.parse(j.candidates[0].content.parts[0].text);
       const reports = Array.isArray(out.reports) && out.reports.length ? out.reports : [{ report_text: out.transcript, severity: 'ניטרלי', report_type: 'general' }];
       let saved = 0;

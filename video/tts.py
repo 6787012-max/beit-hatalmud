@@ -28,10 +28,12 @@ os.makedirs(CACHE, exist_ok=True)
 
 
 def _key():
-    """המפתח מוטמע מעורפל ב-yemot.js — אותו מפתח שמריץ את כל ה-AI במערכת."""
-    s = io.open(os.path.join(os.path.dirname(_HERE), 'js', 'yemot.js'), encoding='utf-8').read()
-    m = re.search(r"K_ENC\s*=\s*'([^']+)'", s)
-    return ''.join(chr(b ^ 0x5A) for b in base64.b64decode(m.group(1)))
+    """המפתח נלקח ממשתנה הסביבה GEMINI_KEY — לא מוטמע בקוד ולא ב-repo.
+    זהו אותו סוד ששמור בשרת (Supabase secret). לבנייה מקומית: set GEMINI_KEY=..."""
+    k = os.environ.get('GEMINI_KEY', '').strip()
+    if not re.match(r'^AIza[\w-]{20,}$', k):
+        raise SystemExit('חסר מפתח Gemini. הגדירו משתנה סביבה GEMINI_KEY לפני ההרצה.')
+    return k
 
 
 _KEY = None

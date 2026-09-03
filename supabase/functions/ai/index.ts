@@ -7,7 +7,8 @@
 // התחברות בכלל), ולכן הקריאה עוברת דרך כאן.
 //
 // אבטחה: רק משתמש מחובר — ה-JWT נבדק מול Supabase לפני כל העברה. המפתח
-// מגיע מהלקוח (אותו מפתח שכבר מוטמע באתר); אין כאן סוד חדש בצד שרת.
+// שמור כסוד צד-שרת (Supabase secret GEMINI_KEY) ואינו נחשף ללקוח כלל.
+// מפתח מהלקוח מתקבל רק כגיבוי, אם מנהל הזין מפתח משלו ידנית.
 // ה-body מועבר כמו שהוא ל-generateContent של המודל המבוקש, ותו לא.
 const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -38,8 +39,10 @@ Deno.serve(async (req) => {
   try { payload = await req.json(); } catch { return fail('גוף בקשה לא תקין'); }
   const model = String(payload.model || 'gemini-2.5-flash');
   if (!ALLOWED_MODELS.test(model)) return fail('מודל לא מורשה');
-  const key = String(payload.key || '');
-  if (!/^AIza[\w-]{20,}$/.test(key)) return fail('מפתח חסר או לא תקין');
+  // המפתח מגיע מצד-שרת (Supabase secret GEMINI_KEY) ואינו נחשף ללקוח.
+  // מפתח מהלקוח מתקבל רק כגיבוי אם המשתמש הזין מפתח משלו ידנית.
+  const key = String(payload.key || '') || (Deno.env.get('GEMINI_KEY') || '');
+  if (!/^AIza[\w-]{20,}$/.test(key)) return fail('מפתח AI לא מוגדר בשרת', 500);
   if (!payload.body || typeof payload.body !== 'object') return fail('חסר body');
 
   const r = await fetch(
