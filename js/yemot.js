@@ -14,7 +14,7 @@
   const GKEY_LS = 'cv3_gemini_key';
   // מפתח אופציונלי שמנהל יכול להזין ידנית (localStorage) לעקיפת השרת — לרוב אין.
   // נחשב רק אם הוא בפורמט תקין (AIza…); אחרת מתעלמים ומשתמשים בשרת.
-  const gKey = () => { try { const k = localStorage.getItem(GKEY_LS) || ''; return /^AIza[\w-]{20,}$/.test(k) ? k : ''; } catch (_) { return ''; } };
+  const gKey = () => { try { const k = localStorage.getItem(GKEY_LS) || ''; return /^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(k) ? k : ''; } catch (_) { return ''; } };
   const setGKey = k => { try { k ? localStorage.setItem(GKEY_LS, k) : localStorage.removeItem(GKEY_LS); } catch (_) {} };
   const SS_KEY = 'cv3_yemot_token';
   const DEFAULT_LINE = '0733518751';   // קו המכינה "תשע תלמוד". 033060570 הוא קו החיידר — לא כאן.
@@ -252,12 +252,12 @@
       const inp = page.querySelector('#ymGKey'); inp.value = ''; inp.focus();
     });
     // ניקוי מפתח שגוי שנשמר בטעות בעבר (למשל קוד OAuth) — כדי לא לדרוס את המוטמע
-    try { const st = localStorage.getItem(GKEY_LS); if (st && !/^AIza[\w-]{20,}$/.test(st)) setGKey(''); } catch (_) {}
+    try { const st = localStorage.getItem(GKEY_LS); if (st && !/^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(st)) setGKey(''); } catch (_) {}
     page.querySelector('#ymGKeySave').addEventListener('click', () => {
       // ניקוי רעשי-הדבקה: רווחים, מרכאות, תווים נסתרים
       const k = page.querySelector('#ymGKey').value.replace(/[\s"'`​-‏]/g, '');
       const msg = page.querySelector('#ymTtsMsg');
-      if (!/^AIza[\w-]{20,}$/.test(k)) { msg.textContent = 'זה לא מפתח Gemini. מפתח תקין מתחיל ב-AIza. (קוד AQ… הוא לא מפתח.)'; return; }
+      if (!/^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(k)) { msg.textContent = 'זה לא מפתח Gemini תקין. מפתח מתחיל ב-AIza או ב-AQ.'; return; }
       setGKey(k); keyRow.hidden = true;
       msg.textContent = '✓ המפתח נשמר. לחצו "צור קול" כדי לבדוק.';
     });

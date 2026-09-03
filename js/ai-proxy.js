@@ -19,7 +19,7 @@
   function userKey() {
     try {
       var k = localStorage.getItem('cv3_gemini_key') || '';
-      return /^AIza[\w-]{20,}$/.test(k) ? k : '';
+      return /^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(k) ? k : '';
     } catch (_) { return ''; }
   }
 
@@ -53,8 +53,8 @@
     if (uk) {
       // יש מפתח-מנהל מקומי → ניסיון ישיר מהיר, נפילה-לאחור לפרוקסי בכשל רשת.
       try {
-        var r = await fetch(GEN + model + ':generateContent?key=' + encodeURIComponent(uk),
-          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        var r = await fetch(GEN + model + ':generateContent',
+          { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': uk },
             body: JSON.stringify(body), signal: signal });
         return r;
       } catch (e) {

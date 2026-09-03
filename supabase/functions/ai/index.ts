@@ -42,13 +42,14 @@ Deno.serve(async (req) => {
   // המפתח מגיע מצד-שרת (Supabase secret GEMINI_KEY) ואינו נחשף ללקוח.
   // מפתח מהלקוח מתקבל רק כגיבוי אם המשתמש הזין מפתח משלו ידנית.
   const key = String(payload.key || '') || (Deno.env.get('GEMINI_KEY') || '');
-  if (!/^AIza[\w-]{20,}$/.test(key)) return fail('מפתח AI לא מוגדר בשרת', 500);
+  // מפתחות Google: פורמט ישן AIza… או חדש AQ.… (גוגל החלה במעבר ב-2025)
+  if (!/^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(key)) return fail('מפתח AI לא מוגדר בשרת', 500);
   if (!payload.body || typeof payload.body !== 'object') return fail('חסר body');
 
+  // המפתח נשלח ב-header x-goog-api-key (לא ב-URL) — נקי יותר ותומך בשני הפורמטים
   const r = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + model +
-    ':generateContent?key=' + encodeURIComponent(key),
-    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
+    { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(payload.body) },
   );
   const text = await r.text();
