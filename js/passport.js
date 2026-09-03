@@ -56,6 +56,34 @@
   const chip = v => v == null ? '<span style="color:var(--muted)">—</span>'
     : '<span class="chip ' + (v >= 85 ? 'ok' : 'off') + '">' + v + '</span>';
 
+  // חישוב שכר בש"ח לפי טבלת הרב וינברג (03/09/2026):
+  //   שחרית: 5→1  6→2  <5→0  (מעל 6: +1 לכל יום — לפי הרצף שהוגדר)
+  //   לימוד: 20→1  40→1.5  60→3  80→4  ומכאן כל +20 דק'=+2
+  //   מבחן:  <80→0  [80,90)→1  [90,100)→2  100+→3   (בכתב ובע״פ באותה טבלה)
+  const shcShacharit = d => d == null || d < 5 ? 0 : d === 5 ? 1 : 2 + (d - 6);
+  const shcStudy = m => {
+    if (m == null || m < 20) return 0;
+    if (m < 40) return 1;
+    if (m < 60) return 1.5;
+    if (m < 80) return 3;
+    if (m < 100) return 4;
+    return 4 + 2 * Math.floor((m - 80) / 20);
+  };
+  const shcTest = t => t == null || t < 80 ? 0 : t < 90 ? 1 : t < 100 ? 2 : 3;
+  function shekels(r) {
+    if (!r) return 0;
+    return shcShacharit(r.shacharit) + shcStudy(r.study_min) + shcTest(r.test_written) + shcTest(r.test_oral);
+  }
+  // חוט הפירוט למעל הצ׳יפ — כדי שיראו מאיפה הגיע הסכום
+  const shcTip = r => !r ? '' :
+    'שחרית ' + shcShacharit(r.shacharit) + ' · לימוד ' + shcStudy(r.study_min) +
+    ' · בכתב ' + shcTest(r.test_written) + ' · בע״פ ' + shcTest(r.test_oral);
+  const fmtShc = v => (Math.round(v * 10) / 10).toString().replace(/\.0$/, '');
+  const shcChip = r => {
+    const v = shekels(r);
+    return '<span class="chip ' + (v > 0 ? 'ok' : 'off') + '" title="' + esc(shcTip(r)) + '">' + fmtShc(v) + ' ₪</span>';
+  };
+
   async function render(page) {
     const [students, classes, rows] = await Promise.all([
       window.cv3Students ? window.cv3Students.getStudents() : window.store.list('students'),
@@ -114,21 +142,24 @@
         '<td><span class="name-link" data-view="' + s.id + '">' + esc(nm(s)) + '</span></td>' +
         '<td>' + esc(clsOf(s)) + '</td>' +
         FIELDS.map(f => cell(s, f)).join('') +
-        '<td class="psp-score">' + chip(score(byKey[s.id + '|' + wk])) + '</td></tr>';
+        '<td class="psp-score">' + chip(score(byKey[s.id + '|' + wk])) + '</td>' +
+        '<td class="psp-shc">' + shcChip(byKey[s.id + '|' + wk]) + '</td></tr>';
 
       page.querySelector('#pspWrap').innerHTML =
         '<table class="tbl"><thead><tr><th style="width:44px">#</th><th>תלמיד</th><th>שיעור</th>' +
         FIELDS.map(f => '<th>' + esc(f.t) + '<div class="tl-note" style="font-size:.7rem;font-weight:400">' + esc(f.sub) + '</div></th>').join('') +
-        '<th>ניקוד</th></tr></thead><tbody>' +
+        '<th>ניקוד</th><th>ש״ח<div class="tl-note" style="font-size:.7rem;font-weight:400">לפי טבלת וינברג</div></th></tr></thead><tbody>' +
         (window.cv3Sort ? window.cv3Sort.rows(page, 'psp', list, clsOf, row, 8)
                         : list.map((s, i) => row(s, i + 1)).join('')) +
         '</tbody></table>';
 
       const done = list.filter(s => byKey[s.id + '|' + wk]).length;
       const sc = list.map(s => score(byKey[s.id + '|' + wk])).filter(x => x != null);
+      const shcTotal = list.reduce((a, s) => a + shekels(byKey[s.id + '|' + wk]), 0);
       page.querySelector('#pspSum').textContent =
         'פרשת ' + WEEKS[wk - 1][0] + ' · הוזנו ' + done + ' מתוך ' + list.length +
-        (sc.length ? ' · ממוצע ניקוד ' + avg(sc) : '');
+        (sc.length ? ' · ממוצע ניקוד ' + avg(sc) : '') +
+        ' · סה״כ שכר השבוע ' + fmtShc(shcTotal) + ' ₪';
       wireInputs(wk);
     }
 
@@ -162,7 +193,17 @@
               byKey[key] = (r.data && r.data[0]) || payload;
             }
             const tr = page.querySelector('[data-row="' + sid + '"]');
-            if (tr) tr.querySelector('.psp-score').innerHTML = chip(score(byKey[key]));
+            if (tr) {
+              tr.querySelector('.psp-score').innerHTML = chip(score(byKey[key]));
+              const cShc = tr.querySelector('.psp-shc');
+              if (cShc) cShc.innerHTML = shcChip(byKey[key]);
+            }
+            // רענון סה"כ השכר בשורת הסיכום
+            const sumEl = page.querySelector('#pspSum');
+            if (sumEl) {
+              const total = visible().reduce((a, st) => a + shekels(byKey[st.id + '|' + wk]), 0);
+              sumEl.textContent = sumEl.textContent.replace(/סה״כ שכר השבוע [^·]*₪/, 'סה״כ שכר השבוע ' + fmtShc(total) + ' ₪');
+            }
             inp.classList.remove('psp-saving');
             inp.classList.add('psp-saved');
             setTimeout(() => inp.classList.remove('psp-saved'), 900);
@@ -185,6 +226,7 @@
         const scores = mine.map(score).filter(x => x != null);
         const sum = k => { const a = mine.map(r => r && r[k]).filter(x => x != null); return a.length ? a.reduce((x, y) => x + y, 0) : null; };
         const av = k => { const a = mine.map(r => r && r[k]).filter(x => x != null); return avg(a); };
+        const shcSum = mine.reduce((a, r) => a + shekels(r), 0);
         return '<tr><td class="idx">' + n + '</td><td>' + esc(nm(s)) + '</td><td>' + esc(clsOf(s)) + '</td>' +
           '<td>' + scores.length + '/' + WEEKS.length + '</td>' +
           '<td>' + (sum('shacharit') != null ? sum('shacharit') : '—') + '</td>' +
@@ -192,6 +234,7 @@
           '<td>' + (av('test_written') != null ? av('test_written') : '—') + '</td>' +
           '<td>' + (av('test_oral') != null ? av('test_oral') : '—') + '</td>' +
           '<td>' + chip(avg(scores)) + '</td>' +
+          '<td><span class="chip ' + (shcSum > 0 ? 'ok' : 'off') + '">' + fmtShc(shcSum) + ' ₪</span></td>' +
           '<td class="psp-spark">' + WEEKS.map((w, i) => {
             const v = score(mine[i]);
             return '<i title="' + esc(w[0]) + (v == null ? ' — לא הוזן' : ' · ' + v) + '" style="background:' +
@@ -201,13 +244,14 @@
       page.querySelector('#pspWrap').innerHTML =
         '<table class="tbl"><thead><tr><th style="width:44px">#</th><th>תלמיד</th><th>שיעור</th>' +
         '<th>שבועות</th><th>סה״כ שחרית</th><th>סה״כ לימוד</th><th>ממוצע בכתב</th><th>ממוצע בע״פ</th>' +
-        '<th>ניקוד כללי</th><th>מגמה לאורך השנה</th></tr></thead><tbody>' +
+        '<th>ניקוד כללי</th><th>סה״כ ש״ח</th><th>מגמה לאורך השנה</th></tr></thead><tbody>' +
         (window.cv3Sort ? window.cv3Sort.rows(page, 'psp', list, clsOf, row, 10)
                         : list.map((s, i) => row(s, i + 1)).join('')) +
         '</tbody></table>';
       const filled = Object.keys(byKey).length;
+      const shcAll = list.reduce((a, s) => a + WEEKS.reduce((b, w, i) => b + shekels(byKey[s.id + '|' + (i + 1)]), 0), 0);
       page.querySelector('#pspSum').textContent =
-        'סיכום ' + WEEKS.length + ' שבועות · ' + list.length + ' תלמידים · ' + filled + ' רשומות שהוזנו';
+        'סיכום ' + WEEKS.length + ' שבועות · ' + list.length + ' תלמידים · ' + filled + ' רשומות שהוזנו · סה״כ שכר עד כה ' + fmtShc(shcAll) + ' ₪';
     }
 
     const draw = () => (page.querySelector('#pspView').value === 'all' ? drawAll() : drawWeek());
@@ -277,10 +321,13 @@
     const sum = k => { const a = pick(k); return a.length ? a.reduce((x, y) => x + y, 0) : null; };
     const av = k => { const a = pick(k); return a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null; };
     const val = v => v == null ? '—' : v;
+    const shcTotal = rows.reduce((a, r) => a + shekels(r), 0);
     return head +
       '<div class="det-grid">' +
         '<div class="det-row"><span class="det-lbl">ניקוד ממוצע</span><span class="det-val">' +
           (sc.length ? chip(Math.round(sc.reduce((a, b) => a + b, 0) / sc.length)) : '—') + '</span></div>' +
+        '<div class="det-row"><span class="det-lbl">סה״כ שכר בש״ח</span><span class="det-val">' +
+          '<span class="chip ' + (shcTotal > 0 ? 'ok' : 'off') + '">' + fmtShc(shcTotal) + ' ₪</span></span></div>' +
         '<div class="det-row"><span class="det-lbl">סה״כ שחרית בזמן</span><span class="det-val">' + val(sum('shacharit')) + ' ימים</span></div>' +
         '<div class="det-row"><span class="det-lbl">סה״כ לימוד בשב״ק</span><span class="det-val">' +
           (sum('study_min') != null ? Math.round(sum('study_min') / 60) + ' שעות' : '—') + '</span></div>' +
@@ -292,6 +339,7 @@
         ' · שחרית ' + val(r.shacharit) + ' · לימוד ' + val(r.study_min) + ' דק׳' +
         (r.test_written != null ? ' · בכתב ' + r.test_written : '') +
         (r.test_oral != null ? ' · בע״פ ' + r.test_oral : '') +
+        ' · <strong>' + fmtShc(shekels(r)) + ' ₪</strong>' +
         '</span><span class="di-meta">' + esc(r.heb_date || '') + '</span></div>').join(''), rows.length) +
       '</div>';
   }
@@ -300,7 +348,7 @@
     return n > 5 ? '<div class="det-scroll">' + html + '</div>' : html;
   }
 
-  window.cv3Passport = { WEEKS, FIELDS, score, currentWeek, cardSection };
+  window.cv3Passport = { WEEKS, FIELDS, score, shekels, currentWeek, cardSection };
   const R = window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
   R.passport = render;
 })();
