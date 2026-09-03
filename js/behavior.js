@@ -11,6 +11,9 @@
   const hebDate = iso => window.UI.hebDate(iso);
 
   const sevClass = s => s === 'גבוהה' ? 'hi' : s === 'נמוכה' ? 'lo' : 'mid';
+  // תזכורת — אותו עיקרון כמו tasks.js: תאריך יעד רגיל, "באיחור" מחושב כאן
+  // ולא בשרת. רלוונטי רק כל עוד הדיווח עדיין פתוח למעקב.
+  const isOverdue = e => !!(e.due_date && e.followup && e.due_date < today());
 
   // כל הנתונים דרך המאגר המרכזי (store.js)
   async function students() { return (window.cv3Students ? await window.cv3Students.getStudents() : []); }
@@ -77,6 +80,7 @@
           '<label class="fld"><span>מעקב</span><span style="display:flex;align-items:center;gap:6px;padding-top:7px">' +
             '<input type="checkbox" id="ee_follow"' + (cur.followup ? ' checked' : '') + '> ' +
             '<span style="font-weight:400;font-size:.85rem">דיווח פתוח שדורש טיפול המשך</span></span></label>' +
+          '<label class="fld"><span>תזכורת (תאריך יעד למעקב)</span><input class="inp mb0" id="ee_due" type="date" value="' + esc(cur.due_date || '') + '"></label>' +
           '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="5">' + esc(cur.note || '') + '</textarea></label>' +
         '</div>',
       onSave: async (mel) => {
@@ -88,6 +92,7 @@
           severity: mel.querySelector('#ee_sev').value,
           note: mel.querySelector('#ee_note').value.trim() || null,
           followup: mel.querySelector('#ee_follow').checked,
+          due_date: mel.querySelector('#ee_due').value || null,
         };
         if (!row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
         const r = isNew ? await addEvent(row) : await updEvent(ev.id, row);
@@ -251,6 +256,11 @@
       return '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
       '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + esc(catOf(e.category_id)) +
       (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') +
+      (e.due_date ? ' <span class="chip" style="' + (isOverdue(e)
+          ? 'background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)'
+          : 'background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)') + '">' +
+        '<i class="bi bi-calendar' + (isOverdue(e) ? '-x' : '-event') + '"></i> ' + esc(hebDate(e.due_date) || e.due_date) +
+        (isOverdue(e) ? ' · באיחור' : '') + '</span>' : '') +
       (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
       '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
         ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
@@ -395,7 +405,11 @@
     const clsOf = sid => { const s = studs.find(x => x.id == sid); const c = s && cls.find(x => x.id == s.class_id); return c ? c.name : 'ללא כיתה'; };
     const cmtsOf = id => allCmts.filter(c => c.event_id == id)
       .sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
-    let list = evs.filter(e => e.followup);
+    // ממוין לפי דחיפות — מי שבאיחור או קרוב לתזכורת קודם; ללא תזכורת נדחק לסוף.
+    let list = evs.filter(e => e.followup).sort((a, b) => {
+      const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
+      return ad < bd ? -1 : ad > bd ? 1 : 0;
+    });
 
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
@@ -412,6 +426,11 @@
             esc(nameOf(e.student_id)) + ' <span class="tl-note" style="font-weight:400">· ' + esc(clsOf(e.student_id)) + '</span></h3>' +
           '<button class="btn-ghost sm" data-resolve="' + e.id + '"><i class="bi bi-check2-circle"></i> טופל — הסרה מהמעקב</button>' +
         '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:.85rem">' +
+          '<span style="color:var(--muted)"><i class="bi bi-alarm"></i> תזכורת:</span>' +
+          '<input class="inp mb0" data-duedate="' + e.id + '" type="date" value="' + esc(e.due_date || '') + '" style="width:auto;padding:4px 8px">' +
+          (isOverdue(e) ? '<span style="color:var(--danger);font-weight:700"><i class="bi bi-exclamation-triangle-fill"></i> באיחור</span>' : '') +
+        '</div>' +
         '<div class="tl-item" style="margin:8px 0 10px">' +
           '<div class="tl-main">' + esc(catOf(e.category_id)) + (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
           '<div class="tl-meta">דיווח מקורי · ' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
@@ -427,10 +446,22 @@
     }
 
     function draw() {
-      page.querySelector('#fuCount').textContent = list.length + ' במעקב';
+      const overdueN = list.filter(isOverdue).length;
+      page.querySelector('#fuCount').textContent = list.length + ' במעקב' + (overdueN ? ' · ' + overdueN + ' באיחור' : '');
       page.querySelector('#fuList').innerHTML = list.map(cardHtml).join('');
       page.querySelector('#fuEmpty').hidden = list.length > 0;
 
+      page.querySelectorAll('[data-duedate]').forEach(inp => inp.addEventListener('change', async () => {
+        const ev = list.find(x => x.id == inp.dataset.duedate); if (!ev) return;
+        const r = await updEvent(ev.id, { due_date: inp.value || null });
+        if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
+        ev.due_date = inp.value || null;
+        list.sort((a, b) => {
+          const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
+          return ad < bd ? -1 : ad > bd ? 1 : 0;
+        });
+        draw(); window.UI.toast('התזכורת עודכנה');
+      }));
       page.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', async () => {
         const ev = list.find(x => x.id == b.dataset.resolve); if (!ev) return;
         if (!(await window.UI.confirm('להסיר את "' + nameOf(ev.student_id) + '" מרשימת המעקב?'))) return;

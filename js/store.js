@@ -47,7 +47,7 @@
     ],
     subjects: [{ id: 1, name: 'חומש' }, { id: 2, name: 'משנה' }, { id: 3, name: 'גמרא' }, { id: 4, name: 'הלכה' }],
     behavior_events: [
-      { id: 1, student_id: 1, category_id: 1, severity: 'בינונית', event_date: daysAgo(1), event_time: '09:15', note: 'הפריע בתפילה — לדבר עם אמא', followup: true },
+      { id: 1, student_id: 1, category_id: 1, severity: 'בינונית', event_date: daysAgo(1), event_time: '09:15', note: 'הפריע בתפילה — לדבר עם אמא', followup: true, due_date: daysAgo(2) },
       { id: 2, student_id: 1, category_id: 2, severity: 'נמוכה', event_date: daysAgo(4), event_time: '11:00', note: 'שיפור בכתיבה' },
       { id: 3, student_id: 2, category_id: 4, severity: 'נמוכה', event_date: daysAgo(2), event_time: '13:30', note: 'שיחה עם ההורים על התקדמות' },
       { id: 4, student_id: 3, category_id: 5, severity: 'נמוכה', event_date: daysAgo(3), event_time: '10:20', note: 'שיחת עידוד' },
