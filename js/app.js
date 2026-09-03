@@ -10,6 +10,9 @@
     { id: 'tasks',         label: 'משימות ופרויקטים', icon: 'bi-kanban',          group: G1, color: '#6c3fc0', feature: true },
     // מסך מעקב אחד מרכז את הכל — הקטגוריה בוחרת את סוג הרישום (משמעת/כתיבה-קריאה/מוגנות/שיחות...)
     { id: 'behavior',      label: 'מעקב',             icon: 'bi-clipboard-check', group: G1, color: '#c0392b' },
+    // ריכוז כל הדיווחים שסומנו "במעקב" בכל הכיתות — לשונית נפרדת כדי שלא
+    // יאבדו בתוך רשימת כל הדיווחים (בקשת יוסף, 03/09/2026).
+    { id: 'followup',      label: 'מעקב דחוף',        icon: 'bi-flag-fill',       group: G1, color: '#a4161a' },
     { id: 'attendance',    label: 'נוכחות',           icon: 'bi-calendar-check',  group: G1, color: '#1f8a5b' },
     { id: 'tests',         label: 'מבחנים',           icon: 'bi-card-checklist',  group: G1, color: '#d68910' },
     { id: 'readassess',    label: 'מעקב קריאה',       icon: 'bi-book-half',       group: G1, color: '#7d3c98' },
@@ -150,12 +153,14 @@
         '<div class="tl-item hr-item" data-ev="' + e.id + '"><span class="sev-dot ' + sevc(e.severity) + '"></span>' +
         '<div class="tl-main">' +
           '<div class="hr-head"><strong>' + _esc(nameOf(e.student_id)) + '</strong>' +
-            (catOf(e.category_id) ? ' · ' + _esc(catOf(e.category_id)) : '') + '</div>' +
+            (catOf(e.category_id) ? ' · ' + _esc(catOf(e.category_id)) : '') +
+            (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
           (e.note ? '<div class="tl-note hr-note" data-note>' + _esc(e.note) + '</div>' : '') +
         '</div>' +
         '<div class="tl-meta">' + _esc(hebDate(e.event_date) || e.event_date || '') + (e.event_time ? ' · ' + _esc(e.event_time) : '') + '</div>' +
         '<div class="hr-act">' +
           '<button class="mini" data-card="' + e.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-vcard"></i></button>' +
+          '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
           '<button class="mini" data-edit="' + e.id + '" title="עריכת הדיווח"><i class="bi bi-pencil"></i></button>' +
         '</div></div>').join('')
         : '<div class="empty-state" style="padding:12px"><i class="bi bi-clipboard-check"></i><div>אין דיווחים עדיין — הקש "דיווח חדש"</div></div>';
@@ -172,6 +177,13 @@
       }));
       list.querySelectorAll('[data-card]').forEach(b => b.addEventListener('click', () => {
         if (window.cv3Students && window.cv3Students.openCard) window.cv3Students.openCard(b.dataset.card);
+      }));
+      list.querySelectorAll('[data-follow]').forEach(b => b.addEventListener('click', async () => {
+        const e = rows.find(x => String(x.id) === b.dataset.follow);
+        if (!e || !window.cv3Behavior) return;
+        const r = await window.cv3Behavior.toggleFollowup(e);
+        if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
+        renderHomeReports();
       }));
       list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
         const e = rows.find(x => String(x.id) === b.dataset.edit);

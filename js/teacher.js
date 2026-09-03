@@ -44,6 +44,7 @@
           '<input class="inp mb0" id="thDate" type="date" value="' + today() + '" title="תאריך">' +
           '<input class="inp mb0" id="thTime" type="time" title="שעה">' +
           '<textarea class="inp mb0 fld-wide ta-auto" id="thNote" rows="3" placeholder="הערה (רשות) — אפשר כמה שורות" style="grid-column:1/-2"></textarea>' +
+          '<label style="display:flex;align-items:center;gap:5px;font-size:.85rem;color:var(--muted);white-space:nowrap;cursor:pointer"><input type="checkbox" id="thFollow"> מעקב — דורש טיפול המשך</label>' +
           '<button class="btn-primary" id="thSave"><i class="bi bi-check-lg"></i> שמור רישום</button>' +
         '</div><div id="thMsg" class="count-line" style="margin-top:8px;min-height:1.2em"></div></div>' +
       '<div class="teacher-actions">' + allowed.map(goBtn).join('') + '</div>';
@@ -54,10 +55,11 @@
       const sid = pick.value();
       if (!sid) { window.UI.toast('בחר תלמיד', 'err'); return; }
       const cat = host.querySelector('#thCat').value;
-      const row = { student_id: Number(sid), category_id: cat ? Number(cat) : null, event_date: host.querySelector('#thDate').value || today(), event_time: host.querySelector('#thTime').value, note: host.querySelector('#thNote').value.trim() };
+      const row = { student_id: Number(sid), category_id: cat ? Number(cat) : null, event_date: host.querySelector('#thDate').value || today(), event_time: host.querySelector('#thTime').value, note: host.querySelector('#thNote').value.trim(), followup: host.querySelector('#thFollow').checked };
       const r = await window.store.add('behavior_events', row);
       if (r.ok) {
         host.querySelector('#thNote').value = ''; host.querySelector('#thTime').value = '';
+        host.querySelector('#thFollow').checked = false;
         pick.reset();
         host.querySelector('#thMsg').textContent = '✓ הרישום נשמר בהצלחה';
         window.UI.toast('נשמר');

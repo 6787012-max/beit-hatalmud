@@ -24,6 +24,18 @@
   async function addEvent(row) { const r = await window.store.add('behavior_events', row); return { ok: r.ok, data: r.data }; }
   async function delEvent(id) { return window.store.remove('behavior_events', id); }
   async function updEvent(id, row) { return window.store.update('behavior_events', id, row); }
+  async function toggleFollowup(ev) {
+    const next = !ev.followup;
+    const r = await updEvent(ev.id, { followup: next });
+    if (r && r.ok !== false) ev.followup = next;
+    return r;
+  }
+
+  // תגובות מעקב — ציר-זמן מתוארך של עדכונים על דיווח בודד (למשל: "דיברתי עם
+  // ההורים", ואחר-כך "צריך להפנות לאבחון"), בלי לפתוח דיווח נפרד לכל עדכון.
+  async function allComments() { return window.store.list('behavior_comments'); }
+  async function addComment(eventId, row) { return window.store.add('behavior_comments', Object.assign({ event_id: eventId }, row)); }
+  async function delComment(id) { return window.store.remove('behavior_comments', id); }
 
   async function classes() { return window.cv3Students ? await window.cv3Students.getClasses() : []; }
 
@@ -62,6 +74,9 @@
           '<label class="fld"><span>תאריך</span><input class="inp mb0" id="ee_date" type="date" value="' + esc(String(cur.event_date || today()).slice(0, 10)) + '"></label>' +
           '<label class="fld"><span>שעה</span><input class="inp mb0" id="ee_time" type="time" value="' + esc(cur.event_time || '') + '"></label>' +
           '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev">' + sevSel + '</select></label>' +
+          '<label class="fld"><span>מעקב</span><span style="display:flex;align-items:center;gap:6px;padding-top:7px">' +
+            '<input type="checkbox" id="ee_follow"' + (cur.followup ? ' checked' : '') + '> ' +
+            '<span style="font-weight:400;font-size:.85rem">דיווח פתוח שדורש טיפול המשך</span></span></label>' +
           '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="5">' + esc(cur.note || '') + '</textarea></label>' +
         '</div>',
       onSave: async (mel) => {
@@ -72,6 +87,7 @@
           event_time: mel.querySelector('#ee_time').value || null,
           severity: mel.querySelector('#ee_sev').value,
           note: mel.querySelector('#ee_note').value.trim() || null,
+          followup: mel.querySelector('#ee_follow').checked,
         };
         if (!row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
         const r = isNew ? await addEvent(row) : await updEvent(ev.id, row);
@@ -91,10 +107,67 @@
     window.UI.toast('נמחק');
     if (onDone) { try { await onDone(); } catch (_) {} }
   }
-  window.cv3Behavior = { open: openEventForm, remove: removeEvent };
+
+  function commentRowHtml(c) {
+    return '<div class="tl-item" style="padding:9px 12px;margin-bottom:7px">' +
+      '<div class="tl-main"><span class="tl-note" style="white-space:pre-wrap">' + esc(c.note) + '</span></div>' +
+      '<div class="tl-meta">' + esc(hebDate(c.comment_date) || c.comment_date) +
+        ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(c.created_by) : '') + '</div>' +
+      ((!window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(c))
+        ? '<button class="mini danger" data-cmtdel="' + c.id + '" title="מחיקת עדכון"><i class="bi bi-trash"></i></button>'
+        : '') +
+      '</div>';
+  }
+  // מודאל תגובות משותף — נפתח גם ממסך "מעקב תלמידים" וגם מלשונית "מעקב דחוף".
+  // לא נסגר לבד אחרי הוספה/מחיקה: אפשר לצבור כמה עדכונים ברצף על אותו דיווח
+  // (למשל "דיברתי עם ההורים" ואז "צריך הפניה לאבחון") בלי לפתוח כל פעם מחדש.
+  async function openComments(ev, opts) {
+    opts = opts || {};
+    let list = (await window.store.list('behavior_comments', { eq: { event_id: ev.id } }))
+      .slice().sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
+    const m = window.UI.modal({
+      title: 'עדכוני מעקב' + (opts.title ? ' — ' + esc(opts.title) : ''),
+      cancelLabel: 'סגירה',
+      bodyHTML:
+        '<div id="cmtList"></div>' +
+        '<div class="form-grid" style="margin-top:8px">' +
+          '<label class="fld"><span>תאריך</span><input class="inp mb0" id="cmtDate" type="date" value="' + today() + '"></label>' +
+          '<label class="fld fld-wide"><span>עדכון חדש</span><textarea class="inp mb0 ta-auto" id="cmtNote" rows="2" placeholder="למשל: דיברתי עם ההורים, הם יודעים"></textarea></label>' +
+        '</div>' +
+        '<button class="btn-primary sm" id="cmtAdd" type="button" style="margin-top:4px"><i class="bi bi-plus-lg"></i> הוספת עדכון</button>',
+    });
+    const body = m.el.querySelector('.modal-body');
+    const notify = () => { if (opts.onChange) { try { opts.onChange(list.length); } catch (_) {} } };
+    function draw() {
+      const host = body.querySelector('#cmtList');
+      host.innerHTML = list.length ? list.map(commentRowHtml).join('')
+        : '<div class="tl-note" style="padding:6px 2px">אין עדכונים עדיין</div>';
+      host.querySelectorAll('[data-cmtdel]').forEach(b => b.addEventListener('click', async () => {
+        if (!(await window.UI.confirm('למחוק את העדכון?'))) return;
+        const r = await delComment(Number(b.dataset.cmtdel));
+        if (!r || r.ok === false) { window.UI.toast('המחיקה נכשלה', 'err'); return; }
+        list = list.filter(c => c.id != b.dataset.cmtdel);
+        draw(); notify(); window.UI.toast('נמחק');
+      }));
+    }
+    draw();
+    body.querySelector('#cmtAdd').addEventListener('click', async () => {
+      const note = body.querySelector('#cmtNote').value.trim();
+      if (!note) { window.UI.toast('כתוב עדכון', 'err'); return; }
+      const row = { comment_date: body.querySelector('#cmtDate').value || today(), note };
+      const r = await addComment(ev.id, row);
+      if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return; }
+      list = list.concat([(r.data && r.data[0]) || Object.assign({ id: Date.now(), event_id: ev.id }, row)]);
+      body.querySelector('#cmtNote').value = '';
+      draw(); notify(); window.UI.toast('העדכון נוסף');
+    });
+  }
+  window.cv3Behavior = { open: openEventForm, remove: removeEvent, comments: openComments, toggleFollowup: toggleFollowup };
 
   async function renderBehavior(page) {
-    const [studs, cs, evs, cls] = await Promise.all([students(), cats(), events(), classes()]);
+    const [studs, cs, evs, cls, allCmts] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
+    const cmtCounts = {};
+    allCmts.forEach(c => { cmtCounts[c.event_id] = (cmtCounts[c.event_id] || 0) + 1; });
     if (window.Author) await window.Author.load();
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
@@ -121,6 +194,7 @@
             '<span class="heb-date" id="qDateHeb" style="font-size:.72rem;color:var(--muted,#888);padding-right:2px"></span></div>' +
           '<input class="inp mb0" id="qTime" type="time" title="שעה">' +
           '<textarea class="inp mb0 fld-wide ta-auto" id="qNote" rows="3" placeholder="הערה — אפשר לכתוב כמה שורות" style="grid-column:1/-2"></textarea>' +
+          '<label style="display:flex;align-items:center;gap:5px;font-size:.82rem;color:var(--muted);white-space:nowrap;cursor:pointer"><input type="checkbox" id="qFollow"> מעקב</label>' +
           '<button class="btn-primary sm" id="qSave"><i class="bi bi-plus-lg"></i> רישום</button>' +
         '</div></div>' +
       // "מי דיווח" — מי שרשם את הדיווח. הרשימה נבנית מהדיווחים עצמם ולא
@@ -172,18 +246,23 @@
         (!fc || String(e.category_id) === fc) &&
         (!fb || authorKey(e) === fb));
     };
-    const itemHtml = e =>
-      '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
+    const itemHtml = e => {
+      const cn = cmtCounts[e.id] || 0;
+      return '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
       '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + esc(catOf(e.category_id)) +
+      (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') +
       (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
       '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
         ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
+      '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
+      '<button class="mini" data-cmt="' + e.id + '" title="עדכוני מעקב"' + (cn ? ' style="width:auto;padding:0 8px"' : '') + '><i class="bi bi-chat-left-text"></i>' + (cn ? ' ' + cn : '') + '</button>' +
       // מלמד רואה את כל הדיווחים על התלמידים שלו אבל מתקן רק את שלו — ולכן
       // הכפתורים נגזרים מהרשומה, לא מהמסך.
       ((!window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(e))
         ? '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
           '<button class="mini danger" data-del="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>'
         : '') + '</div>';
+    };
     const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id)
       : g === 'by' ? (window.Author ? window.Author.name(e.created_by) : 'לא ידוע')
       : catOf(e.category_id) || 'ללא קטגוריה';
@@ -258,6 +337,19 @@
       page.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
         const ev = list.find(x => x.id == b.dataset.edit); if (ev) editEvent(ev);
       }));
+      page.querySelectorAll('[data-follow]').forEach(b => b.addEventListener('click', async () => {
+        const ev = list.find(x => x.id == b.dataset.follow); if (!ev) return;
+        const r = await toggleFollowup(ev);
+        if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
+        draw(); window.UI.toast(ev.followup ? 'סומן למעקב' : 'הוסר מהמעקב');
+      }));
+      page.querySelectorAll('[data-cmt]').forEach(b => b.addEventListener('click', () => {
+        const ev = list.find(x => x.id == b.dataset.cmt); if (!ev) return;
+        window.cv3Behavior.comments(ev, {
+          title: nameOf(ev.student_id),
+          onChange: n => { cmtCounts[ev.id] = n; draw(); },
+        });
+      }));
     }
     // עטיפה דקה סביב הטופס המשותף — אותו מסלול בדיוק כמו מהבית ומכרטיס
     // התלמיד, כדי שלא יהיו שני מסלולים שונים לאותו נתון.
@@ -279,12 +371,84 @@
     page.querySelector('#qSave').addEventListener('click', async () => {
       const sid = pick.value(), cid = page.querySelector('#qCat').value;
       if (!sid) { window.UI.toast('בחר תלמיד', 'err'); return; }
-      const row = { student_id: Number(sid), category_id: cid ? Number(cid) : null, event_date: page.querySelector('#qDate').value || today(), event_time: page.querySelector('#qTime').value, note: page.querySelector('#qNote').value.trim() };
+      const row = { student_id: Number(sid), category_id: cid ? Number(cid) : null, event_date: page.querySelector('#qDate').value || today(), event_time: page.querySelector('#qTime').value, note: page.querySelector('#qNote').value.trim(), followup: page.querySelector('#qFollow').checked };
       const r = await addEvent(row); if (!r.ok) { window.UI.toast('שגיאה', 'err'); return; }
       list = [(r.data && r.data[0]) || row].concat(list);
-      page.querySelector('#qNote').value = ''; page.querySelector('#qTime').value = ''; page.querySelector('#qCat').selectedIndex = 0;
+      page.querySelector('#qNote').value = ''; page.querySelector('#qTime').value = ''; page.querySelector('#qCat').selectedIndex = 0; page.querySelector('#qFollow').checked = false;
       draw(); window.UI.toast('דווח בהצלחה');
     });
+    draw();
+  }
+
+  // ── מעקב דחוף ────────────────────────────────────────────────────────
+  // לשונית מרוכזת של כל הדיווחים שסומנו "במעקב" בכל הכיתות (בקשת יוסף):
+  // מלמד/מחנך רואה רק את התלמידים שלו (אותו scope כמו בכל מסך אחר, דרך
+  // accessibleIds ב-events()); מנהל/מפקח רואים הכל. כל כרטיס מציג את
+  // הדיווח המקורי + ציר-הזמן המלא של העדכונים עליו + טופס הוספת עדכון
+  // מיידי, כדי לראות את כל הסיפור (התקרית → שיחת הורים → הפניה לאבחון...)
+  // במקום אחד בלי לפתוח כל דיווח בנפרד.
+  async function renderFollowup(page) {
+    const [studs, cs, evs, cls, allCmts] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
+    if (window.Author) await window.Author.load();
+    const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
+    const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
+    const clsOf = sid => { const s = studs.find(x => x.id == sid); const c = s && cls.find(x => x.id == s.class_id); return c ? c.name : 'ללא כיתה'; };
+    const cmtsOf = id => allCmts.filter(c => c.event_id == id)
+      .sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
+    let list = evs.filter(e => e.followup);
+
+    page.innerHTML =
+      '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
+        '<h2><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h2>' +
+      '<div class="head-actions"><span class="count-line" id="fuCount"></span></div></div>' +
+      '<div id="fuList"></div>' +
+      '<div id="fuEmpty" class="empty-state" hidden><i class="bi bi-emoji-smile"></i><div>אין כרגע דיווחים במעקב — כל הפתוח טופל</div></div>';
+
+    function cardHtml(e) {
+      const cmts = cmtsOf(e.id);
+      return '<div class="qr-card">' +
+        '<div class="card-h-row">' +
+          '<h3 style="margin:0"><span class="sev-dot ' + sevClass(e.severity) + '"></span> ' +
+            esc(nameOf(e.student_id)) + ' <span class="tl-note" style="font-weight:400">· ' + esc(clsOf(e.student_id)) + '</span></h3>' +
+          '<button class="btn-ghost sm" data-resolve="' + e.id + '"><i class="bi bi-check2-circle"></i> טופל — הסרה מהמעקב</button>' +
+        '</div>' +
+        '<div class="tl-item" style="margin:8px 0 10px">' +
+          '<div class="tl-main">' + esc(catOf(e.category_id)) + (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
+          '<div class="tl-meta">דיווח מקורי · ' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
+            ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
+        '</div>' +
+        (cmts.length ? cmts.map(commentRowHtml).join('') : '<div class="tl-note" style="padding:2px 2px 8px">אין עדיין עדכוני מעקב</div>') +
+        '<div class="form-grid" style="margin-top:4px">' +
+          '<label class="fld"><span>תאריך</span><input class="inp mb0" id="fuDate-' + e.id + '" type="date" value="' + today() + '"></label>' +
+          '<label class="fld fld-wide"><span>הוספת עדכון</span><textarea class="inp mb0 ta-auto" id="fuNote-' + e.id + '" rows="2" placeholder="למשל: דיברתי עם ההורים, הם יודעים"></textarea></label>' +
+        '</div>' +
+        '<button class="btn-primary sm" data-addcmt="' + e.id + '"><i class="bi bi-plus-lg"></i> הוספת עדכון</button>' +
+      '</div>';
+    }
+
+    function draw() {
+      page.querySelector('#fuCount').textContent = list.length + ' במעקב';
+      page.querySelector('#fuList').innerHTML = list.map(cardHtml).join('');
+      page.querySelector('#fuEmpty').hidden = list.length > 0;
+
+      page.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', async () => {
+        const ev = list.find(x => x.id == b.dataset.resolve); if (!ev) return;
+        if (!(await window.UI.confirm('להסיר את "' + nameOf(ev.student_id) + '" מרשימת המעקב?'))) return;
+        const r = await updEvent(ev.id, { followup: false });
+        if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
+        list = list.filter(x => x.id !== ev.id); draw(); window.UI.toast('הוסר מהמעקב');
+      }));
+      page.querySelectorAll('[data-addcmt]').forEach(b => b.addEventListener('click', async () => {
+        const id = b.dataset.addcmt;
+        const noteEl = page.querySelector('#fuNote-' + id), dateEl = page.querySelector('#fuDate-' + id);
+        const note = noteEl.value.trim();
+        if (!note) { window.UI.toast('כתוב עדכון', 'err'); return; }
+        const r = await addComment(Number(id), { comment_date: dateEl.value || today(), note });
+        if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return; }
+        allCmts.push((r.data && r.data[0]) || { id: Date.now(), event_id: Number(id), comment_date: dateEl.value || today(), note });
+        draw(); window.UI.toast('העדכון נוסף');
+      }));
+    }
     draw();
   }
 
@@ -331,6 +495,7 @@
 
   window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
   window.PAGE_RENDERERS.behavior = renderBehavior;
+  window.PAGE_RENDERERS.followup = renderFollowup;
   window.PAGE_RENDERERS.reading = makeLog('reading', 'קידום קריאה', 'bi-book');
   window.PAGE_RENDERERS.writing = makeLog('writing', 'מעקב כתיבה', 'bi-pencil-square');
 })();

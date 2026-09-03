@@ -47,12 +47,16 @@
     ],
     subjects: [{ id: 1, name: 'חומש' }, { id: 2, name: 'משנה' }, { id: 3, name: 'גמרא' }, { id: 4, name: 'הלכה' }],
     behavior_events: [
-      { id: 1, student_id: 1, category_id: 1, severity: 'בינונית', event_date: daysAgo(1), event_time: '09:15', note: 'הפריע בתפילה' },
+      { id: 1, student_id: 1, category_id: 1, severity: 'בינונית', event_date: daysAgo(1), event_time: '09:15', note: 'הפריע בתפילה — לדבר עם אמא', followup: true },
       { id: 2, student_id: 1, category_id: 2, severity: 'נמוכה', event_date: daysAgo(4), event_time: '11:00', note: 'שיפור בכתיבה' },
       { id: 3, student_id: 2, category_id: 4, severity: 'נמוכה', event_date: daysAgo(2), event_time: '13:30', note: 'שיחה עם ההורים על התקדמות' },
       { id: 4, student_id: 3, category_id: 5, severity: 'נמוכה', event_date: daysAgo(3), event_time: '10:20', note: 'שיחת עידוד' },
       { id: 5, student_id: 4, category_id: 3, severity: 'גבוהה', event_date: daysAgo(1), event_time: '08:45', note: 'נושא מוגנות — טופל' },
       { id: 6, student_id: 2, category_id: 1, severity: 'נמוכה', event_date: daysAgo(6), event_time: '12:10', note: '' },
+    ],
+    behavior_comments: [
+      { id: 1, event_id: 1, comment_date: daysAgo(1), note: 'דיברתי עם ההורים — הם יודעים על כך.' },
+      { id: 2, event_id: 1, comment_date: daysAgo(0), note: 'צריך להפנות לאבחון.' },
     ],
     attendance: [
       { id: 1, student_id: 1, date: T(), status: 'present' }, { id: 2, student_id: 2, date: T(), status: 'late' },
@@ -153,7 +157,7 @@
   // יוסף) חייב לכלול גם מסכים שייכתבו בעתיד. כל טבלה ברשימה הזאת אכן מכילה
   // עמודת created_by — הוספת טבלה בלעדיה תפיל את ה-insert.
   const AUTHORED = {
-    attendance: 1, behavior_events: 1, calendar_events: 1, conversations: 1,
+    attendance: 1, behavior_comments: 1, behavior_events: 1, calendar_events: 1, conversations: 1,
     expenses: 1, forms: 1, functioning: 1, income: 1, medications: 1,
     meetings: 1, passport: 1, projects: 1, reading: 1, reading_assessments: 1,
     student_docs: 1, tasks: 1, tests: 1, tla_class_templates: 1, tla_goals: 1,
