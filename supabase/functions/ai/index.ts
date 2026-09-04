@@ -12,8 +12,35 @@
 // ה-body מועבר כמו שהוא ל-generateContent של המודל המבוקש, ותו לא.
 const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY')!;
+const SB_SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const ALLOWED_MODELS = /^gemini-[\w.-]+$/;
+
+// מכסה קשיחה — יוסף כבר חויב בפועל מאות שקלים על שימוש לא-מוגבל בפרוקסי
+// הזה (2026-09-04). שמרני בכוונה; להקל רק במכוון אם מתברר שזה חוסם שימוש
+// לגיטימי. ראה migration_ai_usage_cap.sql.
+const DAILY_CAP = 200;
+const MONTHLY_CAP = 3000;
+
+// בודק+מגדיל אטומית את מונה השימוש. בכשל בבדיקה עצמה (לא בגלל המכסה) —
+// מעדיפים לתת לקריאה לעבור על פני לחסום שימוש לגיטימי בגלל תקלה בספירה.
+async function checkUsageCap(): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const r = await fetch(SB_URL + '/rest/v1/rpc/ai_usage_bump', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SB_SERVICE, Authorization: 'Bearer ' + SB_SERVICE },
+      body: JSON.stringify({ p_day: today }),
+    });
+    if (!r.ok) return { ok: true };
+    const rows = await r.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) return { ok: true };
+    if (row.day_calls > DAILY_CAP) return { ok: false, reason: 'מכסת ה-AI היומית (' + DAILY_CAP + ') נוצלה — נסו שוב מחר' };
+    if (row.month_calls > MONTHLY_CAP) return { ok: false, reason: 'מכסת ה-AI החודשית (' + MONTHLY_CAP + ') נוצלה — פנו למנהל המערכת' };
+    return { ok: true };
+  } catch { return { ok: true }; }
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +61,10 @@ Deno.serve(async (req) => {
     headers: { Authorization: auth, apikey: SB_ANON },
   });
   if (!u.ok) return fail('לא מחובר', 401);
+
+  // מכסה — נבדק לפני כל קריאה בפועל ל-Gemini, לא אחריה.
+  const usage = await checkUsageCap();
+  if (!usage.ok) return fail(usage.reason || 'מכסת שימוש', 429);
 
   let payload: { model?: string; key?: string; body?: unknown };
   try { payload = await req.json(); } catch { return fail('גוף בקשה לא תקין'); }
