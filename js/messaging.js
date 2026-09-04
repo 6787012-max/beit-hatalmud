@@ -29,6 +29,7 @@
 
   // מצב הפאנל — נשמר בזיכרון בזמן ניווט בין הטאבים
   const state = { audience: 'all', classId: '', selectedIds: new Set(),
+                  individual: { name: '', email: '' }, staffIds: new Set(),
                   channel: 'mail', tpl: null, audioBlob: null, audioName: '' };
 
   async function render(page) {
@@ -103,7 +104,11 @@
           '<label><input type="radio" name="msgAud" value="class"' + (state.audience === 'class' ? ' checked' : '') + '> ' +
           '<span>לפי כיתה</span></label>' +
           '<label><input type="radio" name="msgAud" value="custom"' + (state.audience === 'custom' ? ' checked' : '') + '> ' +
-          '<span>בחירה ידנית</span></label></div>' +
+          '<span>בחירה ידנית (תלמידים)</span></label>' +
+          '<label><input type="radio" name="msgAud" value="staff"' + (state.audience === 'staff' ? ' checked' : '') + '> ' +
+          '<span>צוות</span></label>' +
+          '<label><input type="radio" name="msgAud" value="individual"' + (state.audience === 'individual' ? ' checked' : '') + '> ' +
+          '<span>אדם פרטי</span></label></div>' +
         '<div id="msgAudCls" hidden style="margin-top:8px"><label class="lbl">כיתה</label>' +
           '<select class="inp mb0" id="msgClassSel"></select></div>' +
         '<div id="msgAudList" hidden style="margin-top:8px">' +
@@ -112,6 +117,12 @@
             '<button class="btn-ghost sm" id="msgSelAll"><i class="bi bi-check2-square"></i> בחר הכל בסינון</button>' +
             '<button class="btn-ghost sm" id="msgSelNone"><i class="bi bi-square"></i> נקה הכל</button></div>' +
           '<div id="msgStuList" class="msg-stu-list"></div></div>' +
+        '<div id="msgAudStaff" hidden style="margin-top:8px">' +
+          '<div id="msgStaffList" class="msg-stu-list"><div class="empty-state" style="padding:14px">טוען…</div></div></div>' +
+        '<div id="msgAudIndividual" hidden style="margin-top:8px">' +
+          '<label class="lbl">שם הנמען</label><input class="inp mb0" id="msgIndName" placeholder="שם (רשות)" style="margin-bottom:8px">' +
+          '<label class="lbl">כתובת מייל</label><input class="inp mb0" id="msgIndEmail" type="email" dir="ltr" placeholder="name@example.com" style="text-align:left">' +
+          '<p class="login-hint" style="margin-top:6px"><i class="bi bi-info-circle"></i> לאדם פרטי אפשר לשלוח רק מייל — ערוץ קולי/צינתוק זמין רק להורי תלמידים הרשומים בקו.</p></div>' +
         '<div id="msgAudSum" class="msg-aud-sum">…</div></div>' +
 
       // תיבה 6: שליחה
@@ -147,6 +158,7 @@
       .msg-chan:hover{background:var(--bg-elev)}
       .msg-chan.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent) inset}
       .msg-chan.on i{color:var(--brand)}
+      .msg-chan.disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
       .msg-tpls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
       .msg-tpl{border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;position:relative}
       .msg-tpl:hover{background:var(--bg-elev)}
@@ -333,31 +345,67 @@
   }
 
   // ---------- נמענים ----------
-  let students = [], classes = [];
+  let students = [], classes = [], staff = [];
+  // profiles חסום ב-RLS למנהל/בעל-הרשומה בלבד (prof_self_read) — מזכירה
+  // (שהפאנל הזה גם פתוח לה) לא הייתה רואה אף איש צוות חוץ מעצמה. ה-RPC
+  // staff_directory_with_email גדור לשני התפקידים האלה בדיוק ומחזיר email.
+  async function loadStaffDirectory() {
+    if (window.sb) {
+      try {
+        const { data, error } = await window.sb.rpc('staff_directory_with_email');
+        if (!error && data) return data;
+      } catch (_) {}
+    }
+    const r = await window.db.list('profiles', { eq: { active: true }, order: 'name' });
+    return (r.ok && r.data) || [];
+  }
   async function loadStudents(page) {
-    const [rs, rc] = await Promise.all([
+    const [rs, rc, rp] = await Promise.all([
       window.db.list('students', { eq: { status: 'פעיל' }, order: 'name' }),
-      window.db.list('classes', { order: 'name' })
+      window.db.list('classes', { order: 'name' }),
+      loadStaffDirectory()
     ]);
     students = (rs.ok && rs.data) || [];
     classes = (rc.ok && rc.data) || [];
+    staff = rp || [];
     // מלא סלקטור כיתה
     const csel = page.querySelector('#msgClassSel');
     csel.innerHTML = classes.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
     if (state.classId) csel.value = state.classId;
     renderStuList(page);
+    renderStaffList(page);
     updateAudSum(page);
   }
   function wireAudience(page) {
+    // ערוץ קולי/צינתוק תלוי בהורים הרשומים בקו — לא קיים ל"צוות"/"אדם פרטי".
+    // עוברים אוטומטית ל"מייל בלבד" כדי לא להציע פעולה שלא באמת עובדת.
+    const syncChannelForAudience = () => {
+      if ((state.audience === 'staff' || state.audience === 'individual') && state.channel !== 'mail') {
+        state.channel = 'mail';
+        page.querySelectorAll('.msg-chan').forEach(x => x.classList.toggle('on', x.dataset.c === 'mail'));
+        updateChannelUi(page);
+      }
+      page.querySelectorAll('.msg-chan').forEach(x => {
+        const disable = x.dataset.c !== 'mail' && (state.audience === 'staff' || state.audience === 'individual');
+        x.classList.toggle('disabled', disable);
+        x.querySelector('input').disabled = disable;
+      });
+    };
     page.querySelectorAll('input[name="msgAud"]').forEach(r => r.addEventListener('change', () => {
       state.audience = r.value;
       page.querySelector('#msgAudCls').hidden = state.audience !== 'class';
       page.querySelector('#msgAudList').hidden = state.audience !== 'custom';
+      page.querySelector('#msgAudStaff').hidden = state.audience !== 'staff';
+      page.querySelector('#msgAudIndividual').hidden = state.audience !== 'individual';
+      syncChannelForAudience();
       updateAudSum(page);
     }));
     // מפעיל UI התחלתי לפי state
     page.querySelector('#msgAudCls').hidden = state.audience !== 'class';
     page.querySelector('#msgAudList').hidden = state.audience !== 'custom';
+    page.querySelector('#msgAudStaff').hidden = state.audience !== 'staff';
+    page.querySelector('#msgAudIndividual').hidden = state.audience !== 'individual';
+    syncChannelForAudience();
     page.querySelector('#msgClassSel').addEventListener('change', e => { state.classId = e.target.value; updateAudSum(page); });
     page.querySelector('#msgStuFilter').addEventListener('input', () => renderStuList(page));
     page.querySelector('#msgSelAll').addEventListener('click', () => {
@@ -368,6 +416,8 @@
     page.querySelector('#msgSelNone').addEventListener('click', () => {
       state.selectedIds.clear(); renderStuList(page); updateAudSum(page);
     });
+    page.querySelector('#msgIndName').addEventListener('input', e => { state.individual.name = e.target.value; });
+    page.querySelector('#msgIndEmail').addEventListener('input', e => { state.individual.email = e.target.value; updateAudSum(page); });
   }
   function filteredStudents(q) {
     const qq = (q || '').trim();
@@ -390,14 +440,65 @@
       updateAudSum(page);
     }));
   }
+  // אנשי צוות עם מייל בלבד — בלי מייל אין למה לשלוח.
+  function staffWithEmail() { return staff.filter(p => (p.email || '').trim()); }
+  function renderStaffList(page) {
+    const box = page.querySelector('#msgStaffList'); if (!box) return;
+    const list = staffWithEmail();
+    box.innerHTML = list.length ? list.map(p => {
+      const on = state.staffIds.has(p.id);
+      return '<label class="row"><input type="checkbox" data-pid="' + esc(p.id) + '"' + (on ? ' checked' : '') + '> ' +
+        '<b>' + esc(p.name || p.email) + '</b>' + (p.role ? ' <span class="chip">' + esc(p.role) + '</span>' : '') + '</label>';
+    }).join('') : '<div class="empty-state" style="padding:14px">אין אנשי צוות עם כתובת מייל רשומה</div>';
+    box.querySelectorAll('input[type=checkbox]').forEach(cb => cb.addEventListener('change', () => {
+      const id = cb.dataset.pid;
+      if (cb.checked) state.staffIds.add(id); else state.staffIds.delete(id);
+      updateAudSum(page);
+    }));
+  }
   function recipientsForSend() {
     let list = [];
     if (state.audience === 'all') list = students;
     else if (state.audience === 'class') list = students.filter(s => String(s.class_id) === String(state.classId));
-    else list = students.filter(s => state.selectedIds.has(s.id));
+    else if (state.audience === 'custom') list = students.filter(s => state.selectedIds.has(s.id));
     return list;
   }
+  // רשימת נמעני המייל בפועל — לכל סוגי הקהל, כולל צוות/אדם פרטי שאינם
+  // "תלמידים" ולכן לא עוברים דרך recipientsForSend/reg (מבנה הרישום).
+  function mailRecipientsForSend() {
+    if (state.audience === 'individual') {
+      const email = (state.individual.email || '').trim();
+      if (!email) return [];
+      const name = state.individual.name.trim();
+      return [{ email, student_name: '', class_name: '', parent_name: name }];
+    }
+    if (state.audience === 'staff') {
+      return staffWithEmail().filter(p => state.staffIds.has(p.id))
+        .map(p => ({ email: p.email, student_name: '', class_name: '', parent_name: p.name || '' }));
+    }
+    const out = [];
+    recipientsForSend().forEach(s => {
+      const reg = s.reg || {};
+      const cls = classes.find(c => c.id === s.class_id);
+      const emailFather = (reg['אימייל אב'] || '').trim();
+      const emailMother = (reg['אימייל אם'] || '').trim();
+      if (emailFather) out.push({ email: emailFather, student_name: s.name, class_name: cls && cls.name, parent_name: reg['שם האב'] || s.parent_name });
+      if (emailMother) out.push({ email: emailMother, student_name: s.name, class_name: cls && cls.name, parent_name: reg['שם האם'] || s.parent_name });
+    });
+    return out;
+  }
   function updateAudSum(page) {
+    const box = page.querySelector('#msgAudSum');
+    if (state.audience === 'individual') {
+      const email = (state.individual.email || '').trim();
+      box.innerHTML = '<i class="bi bi-person"></i> ' + (email ? '<b>' + esc(state.individual.name.trim() || email) + '</b> · ' + esc(email) : 'הזינו כתובת מייל');
+      return;
+    }
+    if (state.audience === 'staff') {
+      const n = staffWithEmail().filter(p => state.staffIds.has(p.id)).length;
+      box.innerHTML = '<i class="bi bi-person-badge"></i> אנשי צוות נבחרו: <b>' + n + '</b>';
+      return;
+    }
     const list = recipientsForSend();
     let mails = 0;
     list.forEach(s => {
@@ -405,7 +506,6 @@
       if ((reg['אימייל אב'] || '').trim()) mails++;
       if ((reg['אימייל אם'] || '').trim()) mails++;
     });
-    const box = page.querySelector('#msgAudSum');
     box.innerHTML = '<i class="bi bi-people"></i> תלמידים נבחרו: <b>' + list.length + '</b>' +
       ' · <i class="bi bi-envelope"></i> כתובות מייל: <b>' + mails + '</b>';
   }
@@ -455,8 +555,14 @@
 
   // ---------- שליחה ----------
   async function confirmAndSend(page) {
-    const list = recipientsForSend();
-    if (!list.length) { window.UI.toast('אין נמענים', 'err'); return; }
+    // "אדם פרטי"/"צוות" לא עוברים דרך רשימת התלמידים — הספירה/הקיום נבדקים
+    // לפי נמעני המייל בפועל, לא לפי recipientsForSend (שמחזירה [] עבורם).
+    const isStudentAud = state.audience === 'all' || state.audience === 'class' || state.audience === 'custom';
+    const audienceCount = isStudentAud ? recipientsForSend().length
+      : state.audience === 'staff' ? staffWithEmail().filter(p => state.staffIds.has(p.id)).length
+      : (state.individual.email || '').trim() ? 1 : 0;
+    const mailRecipients = mailRecipientsForSend();
+    if (!audienceCount) { window.UI.toast('אין נמענים', 'err'); return; }
     const mailOn = /mail/.test(state.channel);
     const voiceOn = /voice/.test(state.channel);
     const subj = page.querySelector('#msgSubject') ? page.querySelector('#msgSubject').value.trim() : '';
@@ -465,12 +571,7 @@
     if (mailOn && !body) { window.UI.toast('חסר גוף המייל', 'err'); return; }
     if (voiceOn && !state.audioBlob) { window.UI.toast('חסר קובץ שמע להודעה הקולית', 'err'); return; }
 
-    let mailCount = 0;
-    list.forEach(s => {
-      const reg = s.reg || {};
-      if ((reg['אימייל אב'] || '').trim()) mailCount++;
-      if ((reg['אימייל אם'] || '').trim()) mailCount++;
-    });
+    const mailCount = mailRecipients.length;
     const parts = [];
     if (mailOn) parts.push('מייל: ' + mailCount + ' כתובות');
     if (voiceOn && state.channel === 'voice') parts.push('העלאה לשלוחה + צינתוק לנרשמים');
@@ -491,7 +592,7 @@
       subject: subj || null,
       audience_kind: state.audience,
       audience_class_id: state.audience === 'class' ? Number(state.classId) || null : null,
-      audience_count: list.length,
+      audience_count: audienceCount,
     };
 
     let mailSent = 0, mailFailed = 0, voiceMsg = 'none', audioPath = null, notesArr = [];
@@ -499,15 +600,7 @@
     // ── מייל ──
     if (mailOn) {
       try {
-        const recipients = [];
-        list.forEach(s => {
-          const reg = s.reg || {};
-          const cls = classes.find(c => c.id === s.class_id);
-          const emailFather = (reg['אימייל אב'] || '').trim();
-          const emailMother = (reg['אימייל אם'] || '').trim();
-          if (emailFather) recipients.push({ email: emailFather, student_name: s.name, class_name: cls && cls.name, parent_name: reg['שם האב'] || s.parent_name });
-          if (emailMother) recipients.push({ email: emailMother, student_name: s.name, class_name: cls && cls.name, parent_name: reg['שם האם'] || s.parent_name });
-        });
+        const recipients = mailRecipients;
         if (!recipients.length) { notesArr.push('אין כתובות מייל בקרב הנמענים'); }
         else {
           const gasUrl = window.CV3 && window.CV3.GAS_URL;

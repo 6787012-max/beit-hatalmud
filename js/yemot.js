@@ -396,7 +396,9 @@
         e.stopPropagation();
         const ok = await window.UI.confirm('למחוק לצמיתות את שלוחה ' + b.dataset.del + ' וכל תוכנה? לא ניתן לשחזר.');
         if (!ok) return;
-        const r = await call('FileAction', { action: 'delete', path: b.dataset.delpath });
+        // FileAction דורש את הפרמטר "what" — לא "path" (טעות פרמטר שגרמה למחיקות
+        // להיכשל בשקט: הבקשה חוזרת OK-ish בלי לבצע כלום כי הפרמטר לא מזוהה).
+        const r = await call('FileAction', { action: 'delete', what: b.dataset.delpath });
         window.UI.toast(r.responseStatus === 'OK' ? 'שלוחה ' + b.dataset.del + ' נמחקה' : 'המחיקה נכשלה', r.responseStatus === 'OK' ? 'ok' : 'err');
         loadDir(page, state.path);
       }));
@@ -515,12 +517,22 @@
       const extPath = (base ? base + '/' : '') + num;
       msg.textContent = 'יוצר שלוחה…';
       try {
-        // יצירת התיקייה ע"י העלאת קובץ קול שקט, ואז כתיבת ext.ini
+        // UploadFile/UploadTextFile מחזירים responseStatus:OK גם כשהתיקייה לא
+        // קיימת בפועל — והקובץ נעלם בשקט (תקרית מתועדת: 51 קבצים "הועלו" ואף
+        // אחד לא נשמר). UpdateExtension הוא היחיד שבאמת יוצר את התיקייה —
+        // חובה להריץ אותו ראשון, לפני כל העלאה.
+        const mk = await call('UpdateExtension', { path: 'ivr2:/' + extPath, type });
+        if (mk.responseStatus !== 'OK') { msg.textContent = 'יצירת התיקייה נכשלה: ' + esc(mk.message || ''); return; }
+        // עכשיו אפשר להעלות קובץ קול שקט (יוצר את 000.wav) ואת ext.ini
         const up = await uploadBlob(extPath, silentWav(), '000.wav');
         if (up.responseStatus !== 'OK') { msg.textContent = 'יצירת השלוחה נכשלה: ' + esc(up.message || ''); return; }
         const ini = 'type=' + type + (title ? '\ntitle=' + title : '') + '\n';
         const w = await putText('ivr2:/' + extPath + '/ext.ini', ini);
         if (w.responseStatus !== 'OK') { msg.textContent = 'התיקייה נוצרה אך ההגדרות נכשלו: ' + esc(w.message || ''); return; }
+        // אימות אמיתי — לא מסתמכים על "OK" בלבד (זו בדיוק התקלה שקרתה בעבר):
+        // קוראים בחזרה את הקובץ שנשמר ובודקים שיש בו תוכן אמיתי.
+        const verify = await getText('ivr2:/' + extPath + '/ext.ini');
+        if (!verify || !verify.trim()) { msg.textContent = 'השלוחה "נוצרה" אך האימות נכשל — כנראה לא נשמרה בפועל.'; return; }
         msg.textContent = '✓ שלוחה ' + esc(num) + ' נוצרה';
         window.UI.toast('שלוחה ' + num + ' נוצרה', 'ok');
         card.hidden = true;
