@@ -3,4 +3,4 @@ window.CV3.DEMO=!window.CV3.SUPABASE_URL||!window.CV3.SUPABASE_ANON_KEY;
 // כתובת ה-Web App של Apps Script (חשבון המכינה) — לשליחת מיילים מהפאנל.
 // אינדוקס מייל/דרייב לכרטיס תלמיד כבר עובד ברקע (Apps Script פותר ל-Supabase).
 // כתובת ה-web app מתעדכנת בכל deploy — לעדכן פה.
-window.CV3.GAS_URL='https://script.google.com/macros/s/AKfycbxQdAwyNw6CaLzF4xxY8O4hl7blF-FlQNPMXZGe7WmL317x-DJPtX6YahFLCZP4fjH_/exec';
+window.CV3.GAS_URL='https://script.google.com/macros/s/AKfycbzUwbrUA-NkklgRolmYdmT2uznAJIuj4mtLvWJ_KhCgetSD5iB-2QysdkZDaUon9Lmp/exec';
