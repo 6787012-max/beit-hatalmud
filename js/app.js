@@ -137,22 +137,25 @@
     const nb = $('#homeNewReport'); if (nb) nb.addEventListener('click', () => showPage('behavior'));
     const al = $('#homeAllReports'); if (al) al.addEventListener('click', (e) => { e.preventDefault(); showPage('behavior'); });
     try {
-      const [studs, cats, evs] = await Promise.all([
+      const [studs, cats, evs, allCmts] = await Promise.all([
         (window.cv3Students ? window.cv3Students.getStudents() : Promise.resolve([])),
-        window.store.list('categories'), window.store.list('behavior_events')
+        window.store.list('categories'), window.store.list('behavior_events'), window.store.list('behavior_comments')
       ]);
       let rows = evs.slice().reverse();
       const ids = window.cv3Students ? await window.cv3Students.accessibleIds() : null;
       if (ids) rows = rows.filter(e => ids.includes(e.student_id));
       rows = rows.slice(0, 6);
+      const cmtCounts = {};
+      allCmts.forEach(c => { cmtCounts[c.event_id] = (cmtCounts[c.event_id] || 0) + 1; });
       const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
       const catOf = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
       const list = $('#homeReportList');
       // ההערה מקוצרת לשתי שורות (`.hr-note` ב-CSS) ונפתחת בלחיצה. דיווח ארוך
       // מתח קודם את כל דף הבית ודחק את כל השאר מחוץ למסך.
-      list.innerHTML = rows.length ? rows.map(e =>
-        '<div class="tl-item hr-item" data-ev="' + e.id + '"><span class="sev-dot ' + sevc(e.severity) + '"></span>' +
+      list.innerHTML = rows.length ? rows.map(e => {
+        const cn = cmtCounts[e.id] || 0;
+        return '<div class="tl-item hr-item" data-ev="' + e.id + '"><span class="sev-dot ' + sevc(e.severity) + '"></span>' +
         '<div class="tl-main">' +
           '<div class="hr-head"><strong>' + _esc(nameOf(e.student_id)) + '</strong>' +
             (catOf(e.category_id) ? ' · ' + _esc(catOf(e.category_id)) : '') +
@@ -163,8 +166,10 @@
         '<div class="hr-act">' +
           '<button class="mini" data-card="' + e.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-vcard"></i></button>' +
           '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
+          '<button class="mini" data-cmt="' + e.id + '" title="עדכוני מעקב"' + (cn ? ' style="width:auto;padding:0 8px"' : '') + '><i class="bi bi-chat-left-text"></i>' + (cn ? ' ' + cn : '') + '</button>' +
           '<button class="mini" data-edit="' + e.id + '" title="עריכת הדיווח"><i class="bi bi-pencil"></i></button>' +
-        '</div></div>').join('')
+        '</div></div>';
+      }).join('')
         : '<div class="empty-state" style="padding:12px"><i class="bi bi-clipboard-check"></i><div>אין דיווחים עדיין — הקש "דיווח חדש"</div></div>';
 
       // הרחבה/כיווץ של ההערה. מסמנים רק הערות שבאמת נחתכות, כדי שלא יופיע
@@ -186,6 +191,11 @@
         const r = await window.cv3Behavior.toggleFollowup(e);
         if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
         renderHomeReports();
+      }));
+      list.querySelectorAll('[data-cmt]').forEach(b => b.addEventListener('click', () => {
+        const e = rows.find(x => String(x.id) === b.dataset.cmt);
+        if (!e || !window.cv3Behavior) return;
+        window.cv3Behavior.comments(e, { title: nameOf(e.student_id), onChange: () => renderHomeReports() });
       }));
       list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
         const e = rows.find(x => String(x.id) === b.dataset.edit);
