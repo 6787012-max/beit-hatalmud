@@ -230,7 +230,8 @@
           ? '<div class="' + (beh.length > 5 ? 'det-scroll' : '') + '">' + beh.slice().reverse().map(e =>
               '<div class="det-item hr-item" data-ev="' + e.id + '">' +
               '<span class="sev-dot ' + sevc(e.severity) + '"></span>' +
-              '<span class="di-main"><div class="hr-head"><strong>' + esc(catName(e.category_id) || 'דיווח') + '</strong></div>' +
+              '<span class="di-main"><div class="hr-head"><strong>' + esc(catName(e.category_id) || 'דיווח') + '</strong>' +
+              (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
               (e.note ? '<div class="tl-note hr-note" data-note>' + esc(e.note) + '</div>' : '') + '</span>' +
               '<span class="di-meta">' + esc(hebDate(e.event_date) || '') +
               ' · ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</span>' +

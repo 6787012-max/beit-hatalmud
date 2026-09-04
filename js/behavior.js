@@ -14,6 +14,11 @@
   // תזכורת — אותו עיקרון כמו tasks.js: תאריך יעד רגיל, "באיחור" מחושב כאן
   // ולא בשרת. רלוונטי רק כל עוד הדיווח עדיין פתוח למעקב.
   const isOverdue = e => !!(e.due_date && e.followup && e.due_date < today());
+  // ממוין קודם מי שבאיחור/קרוב לתזכורת; ללא תזכורת נדחק לסוף.
+  const byDueDate = (a, b) => {
+    const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
+    return ad < bd ? -1 : ad > bd ? 1 : 0;
+  };
 
   // כל הנתונים דרך המאגר המרכזי (store.js)
   async function students() { return (window.cv3Students ? await window.cv3Students.getStudents() : []); }
@@ -37,6 +42,12 @@
   // תגובות מעקב — ציר-זמן מתוארך של עדכונים על דיווח בודד (למשל: "דיברתי עם
   // ההורים", ואחר-כך "צריך להפנות לאבחון"), בלי לפתוח דיווח נפרד לכל עדכון.
   async function allComments() { return window.store.list('behavior_comments'); }
+  // מפה event_id → כמות תגובות, לתגי הספירה על כפתור "עדכוני מעקב".
+  function commentCounts(comments) {
+    const m = {};
+    (comments || []).forEach(c => { m[c.event_id] = (m[c.event_id] || 0) + 1; });
+    return m;
+  }
   async function addComment(eventId, row) { return window.store.add('behavior_comments', Object.assign({ event_id: eventId }, row)); }
   async function delComment(id) { return window.store.remove('behavior_comments', id); }
 
@@ -80,7 +91,7 @@
           '<label class="fld"><span>מעקב</span><span style="display:flex;align-items:center;gap:6px;padding-top:7px">' +
             '<input type="checkbox" id="ee_follow"' + (cur.followup ? ' checked' : '') + '> ' +
             '<span style="font-weight:400;font-size:.85rem">דיווח פתוח שדורש טיפול המשך</span></span></label>' +
-          '<label class="fld"><span>תזכורת (תאריך יעד למעקב)</span><input class="inp mb0" id="ee_due" type="date" value="' + esc(cur.due_date || '') + '"></label>' +
+          '<label class="fld"><span>תזכורת (תאריך יעד למעקב)</span><input class="inp mb0" id="ee_due" type="date" max="2099-12-31" value="' + esc(cur.due_date || '') + '"></label>' +
           '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="5">' + esc(cur.note || '') + '</textarea></label>' +
         '</div>',
       onSave: async (mel) => {
@@ -169,13 +180,13 @@
   }
   window.cv3Behavior = {
     open: openEventForm, remove: removeEvent, comments: openComments, toggleFollowup: toggleFollowup,
-    renderFollowupWidget: (container) => renderFollowupWidget(container),
+    renderFollowupWidget: (container, opts) => renderFollowupWidget(container, opts),
+    commentCounts: commentCounts,
   };
 
   async function renderBehavior(page) {
     const [studs, cs, evs, cls, allCmts] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
-    const cmtCounts = {};
-    allCmts.forEach(c => { cmtCounts[c.event_id] = (cmtCounts[c.event_id] || 0) + 1; });
+    const cmtCounts = commentCounts(allCmts);
     if (window.Author) await window.Author.load();
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
@@ -409,10 +420,7 @@
     const cmtsOf = id => allCmts.filter(c => c.event_id == id)
       .sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
     // ממוין לפי דחיפות — מי שבאיחור או קרוב לתזכורת קודם; ללא תזכורת נדחק לסוף.
-    let list = evs.filter(e => e.followup).sort((a, b) => {
-      const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
-      return ad < bd ? -1 : ad > bd ? 1 : 0;
-    });
+    let list = evs.filter(e => e.followup).sort(byDueDate);
 
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
@@ -431,7 +439,7 @@
         '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:.85rem">' +
           '<span style="color:var(--muted)"><i class="bi bi-alarm"></i> תזכורת:</span>' +
-          '<input class="inp mb0" data-duedate="' + e.id + '" type="date" value="' + esc(e.due_date || '') + '" style="width:auto;padding:4px 8px">' +
+          '<input class="inp mb0" data-duedate="' + e.id + '" type="date" max="2099-12-31" value="' + esc(e.due_date || '') + '" style="width:auto;padding:4px 8px">' +
           (isOverdue(e) ? '<span style="color:var(--danger);font-weight:700"><i class="bi bi-exclamation-triangle-fill"></i> באיחור</span>' : '') +
         '</div>' +
         '<div class="tl-item" style="margin:8px 0 10px">' +
@@ -459,18 +467,23 @@
         const r = await updEvent(ev.id, { due_date: inp.value || null });
         if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
         ev.due_date = inp.value || null;
-        list.sort((a, b) => {
-          const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
-          return ad < bd ? -1 : ad > bd ? 1 : 0;
-        });
+        list.sort(byDueDate);
         draw(); window.UI.toast('התזכורת עודכנה');
       }));
       page.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', async () => {
         const ev = list.find(x => x.id == b.dataset.resolve); if (!ev) return;
-        if (!(await window.UI.confirm('להסיר את "' + nameOf(ev.student_id) + '" מרשימת המעקב?'))) return;
+        if (!(await window.UI.confirm('להסיר את "' + esc(nameOf(ev.student_id)) + '" מרשימת המעקב?'))) return;
         const r = await updEvent(ev.id, { followup: false });
         if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
         list = list.filter(x => x.id !== ev.id); draw(); window.UI.toast('הוסר מהמעקב');
+      }));
+      page.querySelectorAll('[data-cmtdel]').forEach(b => b.addEventListener('click', async () => {
+        if (!(await window.UI.confirm('למחוק את העדכון?'))) return;
+        const r = await delComment(Number(b.dataset.cmtdel));
+        if (!r || r.ok === false) { window.UI.toast('המחיקה נכשלה', 'err'); return; }
+        const idx = allCmts.findIndex(c => c.id == b.dataset.cmtdel);
+        if (idx !== -1) allCmts.splice(idx, 1);
+        draw(); window.UI.toast('נמחק');
       }));
       page.querySelectorAll('[data-addcmt]').forEach(b => b.addEventListener('click', async () => {
         const id = b.dataset.addcmt;
@@ -490,13 +503,25 @@
   // שדורש ניווט, אלא משהו שרואים ישר בבית, לכל המשתמשים: גם דף הבית של
   // המנהל/משרד (js/app.js) וגם דף הבית הפשוט של הרב/מחנך (js/teacher.js).
   // אותה scope בדיוק כמו renderFollowup (events() כבר מסנן לפי accessibleIds).
-  async function renderFollowupWidget(container) {
+  //
+  // opts.onChange: קריאה חוזרת אחרי שינוי (טופל/תגובה) — כדי שדף שמראה גם
+  // רשימה אחרת של אותם דיווחים (renderHomeReports) יתעדכן איתה, לא רק החלונית.
+  //
+  // widgetSeq (per-container): שני renderFollowupWidget חופפים על אותו container
+  // אפשריים הלכה למעשה (ניווט מהיר הביתה שוב לפני שהקודם סיים) — בלי השמירה
+  // הזו הרינדור האיטי-יותר עלול "לנצח" ולדרוס תוצאה טרייה יותר בשקט.
+  const widgetSeq = new WeakMap();
+  async function renderFollowupWidget(container, opts) {
     if (!container) return;
+    opts = opts || {};
+    const seq = (widgetSeq.get(container) || 0) + 1;
+    widgetSeq.set(container, seq);
+    const stale = () => widgetSeq.get(container) !== seq;
     const evs = await events();
-    const list = evs.filter(e => e.followup).sort((a, b) => {
-      const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
-      return ad < bd ? -1 : ad > bd ? 1 : 0;
-    });
+    if (stale()) return;
+    const list = evs.filter(e => e.followup).sort(byDueDate);
+    if (window.Author) await window.Author.load();
+    if (stale()) return;
     if (!list.length) {
       container.innerHTML =
         '<div class="qr-card"><h3 style="margin:0 0 6px"><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h3>' +
@@ -504,6 +529,7 @@
       return;
     }
     const [studs, cs] = await Promise.all([students(), cats()]);
+    if (stale()) return;
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
     const overdueN = list.filter(isOverdue).length;
@@ -532,14 +558,18 @@
       '</div>';
     container.querySelectorAll('[data-wcmt]').forEach(b => b.addEventListener('click', () => {
       const ev = list.find(x => x.id == b.dataset.wcmt); if (!ev) return;
-      openComments(ev, { title: nameOf(ev.student_id), onChange: () => renderFollowupWidget(container) });
+      openComments(ev, {
+        title: nameOf(ev.student_id),
+        onChange: () => { renderFollowupWidget(container, opts); if (opts.onChange) opts.onChange(); },
+      });
     }));
     container.querySelectorAll('[data-wres]').forEach(b => b.addEventListener('click', async () => {
       const ev = list.find(x => x.id == b.dataset.wres); if (!ev) return;
-      if (!(await window.UI.confirm('להסיר את "' + nameOf(ev.student_id) + '" מרשימת המעקב?'))) return;
+      if (!(await window.UI.confirm('להסיר את "' + esc(nameOf(ev.student_id)) + '" מרשימת המעקב?'))) return;
       const r = await updEvent(ev.id, { followup: false });
       if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
-      renderFollowupWidget(container);
+      renderFollowupWidget(container, opts);
+      if (opts.onChange) opts.onChange();
       window.UI.toast('הוסר מהמעקב');
     }));
   }

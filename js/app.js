@@ -116,7 +116,13 @@
       if (hg) hg.style.display = '';
       if (hero) { hero.querySelector('h1').textContent = 'ברוכים הבאים'; hero.querySelector('p').textContent = 'מערכת מעקב — בחרו תחום כדי להתחיל.'; }
       renderHomeReports();
-      if (window.cv3Behavior) window.cv3Behavior.renderFollowupWidget($('#homeFollowupWidget'));
+      // מזכירה/כל מי שאין לו הרשאה למסך "מעקב דחוף" לא מקבל גם את החלונית —
+      // היא כוללת כפתורי כתיבה (טופל/תגובה), לא רק תצוגה.
+      const canFollowup = !window.Auth || !window.Auth.canAccess || window.Auth.canAccess('followup');
+      const fw = $('#homeFollowupWidget');
+      if (fw) fw.style.display = canFollowup ? '' : 'none';
+      if (hg) hg.style.gridTemplateColumns = canFollowup ? '' : '1fr';
+      if (canFollowup && window.cv3Behavior) window.cv3Behavior.renderFollowupWidget(fw, { onChange: renderHomeReports });
     }
   }
   window.updateHomeMode = updateHomeMode;
@@ -143,6 +149,7 @@
     const nb = $('#homeNewReport'); if (nb) nb.addEventListener('click', () => showPage('behavior'));
     const al = $('#homeAllReports'); if (al) al.addEventListener('click', (e) => { e.preventDefault(); showPage('behavior'); });
     try {
+      if (window.Author) await window.Author.load();
       const [studs, cats, evs, allCmts] = await Promise.all([
         (window.cv3Students ? window.cv3Students.getStudents() : Promise.resolve([])),
         window.store.list('categories'), window.store.list('behavior_events'), window.store.list('behavior_comments')
@@ -151,8 +158,7 @@
       const ids = window.cv3Students ? await window.cv3Students.accessibleIds() : null;
       if (ids) rows = rows.filter(e => ids.includes(e.student_id));
       rows = rows.slice(0, 6);
-      const cmtCounts = {};
-      allCmts.forEach(c => { cmtCounts[c.event_id] = (cmtCounts[c.event_id] || 0) + 1; });
+      const cmtCounts = window.cv3Behavior ? window.cv3Behavior.commentCounts(allCmts) : {};
       const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
       const catOf = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
@@ -191,17 +197,23 @@
       list.querySelectorAll('[data-card]').forEach(b => b.addEventListener('click', () => {
         if (window.cv3Students && window.cv3Students.openCard) window.cv3Students.openCard(b.dataset.card);
       }));
+      // "דיווחים אחרונים" והחלונית "מעקב דחוף" חיים זה ליד זה על אותו דף —
+      // שינוי באחד חייב לרענן גם את השני, אחרת אותו דיווח נראה סותר בין השניים.
+      const refreshFollowupWidget = () => {
+        const fw = $('#homeFollowupWidget');
+        if (fw && fw.style.display !== 'none' && window.cv3Behavior) window.cv3Behavior.renderFollowupWidget(fw, { onChange: renderHomeReports });
+      };
       list.querySelectorAll('[data-follow]').forEach(b => b.addEventListener('click', async () => {
         const e = rows.find(x => String(x.id) === b.dataset.follow);
         if (!e || !window.cv3Behavior) return;
         const r = await window.cv3Behavior.toggleFollowup(e);
         if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
-        renderHomeReports();
+        renderHomeReports(); refreshFollowupWidget();
       }));
       list.querySelectorAll('[data-cmt]').forEach(b => b.addEventListener('click', () => {
         const e = rows.find(x => String(x.id) === b.dataset.cmt);
         if (!e || !window.cv3Behavior) return;
-        window.cv3Behavior.comments(e, { title: nameOf(e.student_id), onChange: () => renderHomeReports() });
+        window.cv3Behavior.comments(e, { title: nameOf(e.student_id), onChange: () => { renderHomeReports(); refreshFollowupWidget(); } });
       }));
       list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
         const e = rows.find(x => String(x.id) === b.dataset.edit);

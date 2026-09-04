@@ -57,7 +57,8 @@
       const sid = pick.value();
       if (!sid) { window.UI.toast('בחר תלמיד', 'err'); return; }
       const cat = host.querySelector('#thCat').value;
-      const row = { student_id: Number(sid), category_id: cat ? Number(cat) : null, event_date: host.querySelector('#thDate').value || today(), event_time: host.querySelector('#thTime').value, note: host.querySelector('#thNote').value.trim(), followup: host.querySelector('#thFollow').checked };
+      const followup = host.querySelector('#thFollow').checked;
+      const row = { student_id: Number(sid), category_id: cat ? Number(cat) : null, event_date: host.querySelector('#thDate').value || today(), event_time: host.querySelector('#thTime').value, note: host.querySelector('#thNote').value.trim(), followup };
       const r = await window.store.add('behavior_events', row);
       if (r.ok) {
         host.querySelector('#thNote').value = ''; host.querySelector('#thTime').value = '';
@@ -65,6 +66,8 @@
         pick.reset();
         host.querySelector('#thMsg').textContent = '✓ הרישום נשמר בהצלחה';
         window.UI.toast('נשמר');
+        // דיווח חדש שסומן "מעקב" צריך להופיע בחלונית מיד, לא רק בכניסה הבאה למסך.
+        if (followup && window.cv3Behavior) window.cv3Behavior.renderFollowupWidget(host.querySelector('#thFollowupWidget'));
       } else { window.UI.toast('שגיאה', 'err'); }
     });
   };

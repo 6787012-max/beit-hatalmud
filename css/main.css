@@ -314,6 +314,8 @@ textarea.inp.ta-auto{overflow-y:auto}
 /* מצב צפייה-בלבד (מפקח) — מסתיר כפתורי פעולה/עריכה/מחיקה; רואים הכל, לא משנים */
 body.mode-readonly .btn-primary,
 body.mode-readonly [data-del], body.mode-readonly [data-tog],
+body.mode-readonly [data-follow], body.mode-readonly [data-resolve], body.mode-readonly [data-wres],
+body.mode-readonly [data-cmtdel], body.mode-readonly [data-addcmt], body.mode-readonly #cmtAdd,
 body.mode-readonly .att-btn, body.mode-readonly .row-act,
 body.mode-readonly #qCatAdd, body.mode-readonly #stuAdd, body.mode-readonly #usrAdd,
 body.mode-readonly .det-actions{ display:none !important; }
