@@ -328,7 +328,11 @@
             '<a class="btn-ghost sm" href="' + esc(driveUrl) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-left"></i> פתח בדרייב</a>' +
             '<div class="stu-link-results" id="stuDriveRes"></div>' +
           '</div>' +
-        '</div>';
+        '</div>' +
+        // דיווחי AI ממיילים — סורק אוטומטי מזהה מיילים על התלמיד וסוכם ב-2-3 שורות.
+        // הרשומות מיובאות ע"י _APPS_SCRIPT_BRIDGE.gs → scanEmailsForStudentReports (כל שעתיים).
+        '<div class="det-sec"><h4><i class="bi bi-robot"></i> דיווחי AI ממיילים</h4>' +
+          '<div id="stuEmailReports"><div class="ld"><i class="bi bi-hourglass-split"></i> טוען…</div></div></div>';
       m.el.querySelector('.modal-body').innerHTML =
         '<div class="det-head">' + (bigPhoto
           ? '<button class="det-photo-btn" id="detPhotoBtn" title="לחץ להגדלה">' +
@@ -483,6 +487,35 @@
           } catch (_) {}
           renderMail(mails); renderDrive(files);
         })();
+
+        // ── דיווחי AI ממיילים (email_reports) ──
+        // סורק Apps Script רץ כל שעתיים, מזהה תלמיד לפי שם/משפחה/כתובת הורה,
+        // ומנתח עם Gemini (רק אחרי זיהוי — פרטיות). מציג פה סיכום 2-3 שורות.
+        const erEl = m.el.querySelector('#stuEmailReports');
+        if (erEl) {
+          (async () => {
+            try {
+              const { data, error } = await window.sb.from('email_reports')
+                .select('*').eq('student_id', s.id).order('email_date', { ascending: false }).limit(30);
+              if (error) { erEl.innerHTML = '<div class="ld">' + esc(error.message || 'שגיאה') + ' (ודא migration_email_reports.sql הורץ)</div>'; return; }
+              if (!data || !data.length) { erEl.innerHTML = '<div class="ld">אין דיווחים אוטומטיים עדיין. הסורק רץ כל שעתיים.</div>'; return; }
+              const sentiClass = x => x === 'חיובי' ? 'ok' : x === 'שלילי' ? 'hi' : 'off';
+              erEl.innerHTML = data.map(er => {
+                const dt = er.email_date ? new Date(er.email_date).toLocaleDateString('he-IL') : '';
+                return '<div class="tl-item"><div class="tl-main">' +
+                  '<div class="hr-head"><strong>' + esc(er.email_subject || '(ללא נושא)') + '</strong>' +
+                    ' <span class="chip ' + sentiClass(er.sentiment) + '">' + esc(er.sentiment || '') + '</span>' +
+                    (er.category ? ' <span class="chip">' + esc(er.category) + '</span>' : '') + '</div>' +
+                  '<div class="tl-note">' + esc(er.summary || '') + '</div>' +
+                  '<div class="count-line"><i class="bi bi-person"></i> ' + esc((er.email_from || '').slice(0, 80)) + '</div>' +
+                  '</div>' +
+                  '<div class="tl-meta">' + esc(dt) + '</div>' +
+                  (er.gmail_link ? '<div class="hr-act"><a class="mini" href="' + esc(er.gmail_link) + '" target="_blank" rel="noopener" title="פתח בג׳ימייל"><i class="bi bi-envelope-open"></i></a></div>' : '') +
+                  '</div>';
+              }).join('');
+            } catch (e) { erEl.innerHTML = '<div class="ld">שגיאה: ' + esc(String(e)) + '</div>'; }
+          })();
+        }
       }
     }
 
