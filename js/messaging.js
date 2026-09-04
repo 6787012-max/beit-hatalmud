@@ -71,7 +71,10 @@
         '<div style="display:flex;gap:6px;align-items:center;margin-top:6px">' +
           '<button class="btn-ghost sm" id="msgAiSuggest" title="שיפור ההודעה עם AI"><i class="bi bi-stars"></i> שיפור בעזרת AI</button>' +
           '<button class="btn-ghost sm" id="msgPreview"><i class="bi bi-eye"></i> תצוגה מקדימה</button>' +
-        '</div></div>' +
+        '</div>' +
+        '<label style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer">' +
+          '<input type="checkbox" id="msgAttachVoice"> <i class="bi bi-paperclip"></i> צרף גם קובץ קול למייל (הקראה/הקלטה/קובץ) — עובד לכל סוגי הנמענים, בלי עלות</label>' +
+        '</div>' +
 
       // תיבה 4: תוכן הודעה קולית
       '<div class="qr-card" id="msgVoiceCard"><h3><i class="bi bi-mic-fill"></i> תוכן ההודעה הקולית</h3>' +
@@ -142,6 +145,7 @@
     page.querySelector('#msgHistoryBtn').addEventListener('click', () => openHistory());
     page.querySelector('#msgAiSuggest').addEventListener('click', () => aiSuggest(page));
     page.querySelector('#msgPreview').addEventListener('click', () => previewMail(page));
+    page.querySelector('#msgAttachVoice').addEventListener('change', () => updateChannelUi(page));
     await loadTemplates(page);
     await loadStudents(page);
     updateChannelUi(page);
@@ -192,8 +196,12 @@
     const mailOn = /mail/.test(state.channel);
     const voiceOn = /voice/.test(state.channel);
     const tzintukOn = /tzintuk|voice/.test(state.channel);
+    // כרטיס התוכן הקולי נפתח גם כשרק "צרף קובץ קול למייל" מסומן — לא רק
+    // כשהערוץ עצמו כולל צינתוק (זמין לכל סוגי הנמענים, כולל צוות/אדם פרטי).
+    const attachVoiceEl = page.querySelector('#msgAttachVoice');
+    const showVoiceCard = voiceOn || (attachVoiceEl && attachVoiceEl.checked);
     const mc = page.querySelector('#msgMailCard'); if (mc) mc.style.display = mailOn ? '' : 'none';
-    const vc = page.querySelector('#msgVoiceCard'); if (vc) vc.style.display = voiceOn ? '' : 'none';
+    const vc = page.querySelector('#msgVoiceCard'); if (vc) vc.style.display = showVoiceCard ? '' : 'none';
     const help = page.querySelector('#msgChanHelp');
     if (help) {
       const m = {
@@ -553,6 +561,16 @@
     });
   }
 
+  // ממיר Blob ל-base64 גולמי (בלי קידומת data:...;base64,) — לצירוף כקובץ במייל.
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(fr.error);
+      fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+      fr.readAsDataURL(blob);
+    });
+  }
+
   // ---------- שליחה ----------
   async function confirmAndSend(page) {
     // "אדם פרטי"/"צוות" לא עוברים דרך רשימת התלמידים — הספירה/הקיום נבדקים
@@ -565,15 +583,19 @@
     if (!audienceCount) { window.UI.toast('אין נמענים', 'err'); return; }
     const mailOn = /mail/.test(state.channel);
     const voiceOn = /voice/.test(state.channel);
+    // צירוף קובץ קול למייל עצמו — עצמאי מהערוץ/הצינתוק, זמין לכל קהל (גם צוות/אדם פרטי).
+    const attachVoiceEl = page.querySelector('#msgAttachVoice');
+    const attachVoice = !!(attachVoiceEl && attachVoiceEl.checked);
     const subj = page.querySelector('#msgSubject') ? page.querySelector('#msgSubject').value.trim() : '';
     const body = page.querySelector('#msgBody') ? page.querySelector('#msgBody').value : '';
     if (mailOn && !subj) { window.UI.toast('חסר נושא למייל', 'err'); return; }
     if (mailOn && !body) { window.UI.toast('חסר גוף המייל', 'err'); return; }
     if (voiceOn && !state.audioBlob) { window.UI.toast('חסר קובץ שמע להודעה הקולית', 'err'); return; }
+    if (attachVoice && !state.audioBlob) { window.UI.toast('סימנת "צרף קובץ קול" — צרו/הקליטו/בחרו קובץ בכרטיס התוכן הקולי קודם', 'err'); return; }
 
     const mailCount = mailRecipients.length;
     const parts = [];
-    if (mailOn) parts.push('מייל: ' + mailCount + ' כתובות');
+    if (mailOn) parts.push('מייל: ' + mailCount + ' כתובות' + (attachVoice ? ' (עם קובץ קול מצורף)' : ''));
     if (voiceOn && state.channel === 'voice') parts.push('העלאה לשלוחה + צינתוק לנרשמים');
     if (state.channel === 'mail+voice') parts.push('העלאה לשלוחה + צינתוק לנרשמים');
     if (state.channel === 'mail+tzintuk_free') parts.push('צינתוק חינמי לנרשמים בלבד');
@@ -595,7 +617,7 @@
       audience_count: audienceCount,
     };
 
-    let mailSent = 0, mailFailed = 0, voiceMsg = 'none', audioPath = null, notesArr = [];
+    let mailSent = 0, mailFailed = 0, voiceMsg = 'none', audioPath = null, audioAttached = false, notesArr = [];
 
     // ── מייל ──
     if (mailOn) {
@@ -610,6 +632,14 @@
             const jwt = sess && sess.data && sess.data.session && sess.data.session.access_token;
             if (!jwt) { notesArr.push('חסר טוקן משתמש'); }
             else {
+              const payload = { subject: subj, html_body: body, sender_name: 'מכינה בית התלמוד', recipients: recipients };
+              if (attachVoice && state.audioBlob) {
+                try {
+                  payload.audio_base64 = await blobToBase64(state.audioBlob);
+                  payload.audio_filename = state.audioName || 'voice.wav';
+                  audioAttached = true;
+                } catch (e) { notesArr.push('קידוד קובץ הקול נכשל, נשלח בלי צירוף: ' + (e && e.message || e)); }
+              }
               const r = await fetch(gasUrl, {
                 method: 'POST',
                 // text/plain כדי להימנע מ-CORS preflight (Apps Script חוסם OPTIONS)
@@ -617,7 +647,7 @@
                 body: JSON.stringify({
                   action: 'sendMail',
                   token: jwt,
-                  payload: { subject: subj, html_body: body, sender_name: 'מכינה בית התלמוד', recipients: recipients }
+                  payload: payload
                 })
               });
               const j = await r.json();
@@ -663,7 +693,7 @@
 
     // ── סיכום ──
     const parts2 = [];
-    if (mailOn) parts2.push('מייל: נשלחו ' + mailSent + (mailFailed ? ' · נכשלו ' + mailFailed : ''));
+    if (mailOn) parts2.push('מייל: נשלחו ' + mailSent + (mailFailed ? ' · נכשלו ' + mailFailed : '') + (audioAttached ? ' · עם קובץ קול' : ''));
     if (voiceOn) parts2.push('שמע: ' + (audioPath ? 'הועלה' : 'לא הועלה') + ' · צינתוק: ' + voiceMsg);
     outEl.textContent = '✓ ' + parts2.join(' · ');
     window.UI.toast('הדיוור נשלח: ' + parts2.join(' · '), 'ok');
