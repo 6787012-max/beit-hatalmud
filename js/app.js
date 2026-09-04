@@ -103,14 +103,20 @@
     if (!th || !tg) return;
     const isTeacher = u && (u.role === 'מלמד' || u.role === 'מחנך');
     const hr = $('#homeReports'); if (hr) hr.innerHTML = '';
+    // חלונית "מעקב דחוף" יושבת בתוך home-grid, יחד עם homeReports — שייכת
+    // לבית של המנהל/משרד. אצל מורה היא מוצגת בתוך teacherHome עצמו (renderTeacherHome).
+    const hg = document.querySelector('.home-grid');
     if (isTeacher && window.renderTeacherHome) {
       tg.style.display = 'none'; th.style.display = '';
+      if (hg) hg.style.display = 'none';
       if (hero) { hero.querySelector('h1').textContent = 'שלום ' + (u.name || ''); hero.querySelector('p').textContent = 'רישום מהיר לתלמידים — פשוט ומהיר.'; }
       window.renderTeacherHome(th);
     } else {
       tg.style.display = ''; th.style.display = 'none'; th.innerHTML = '';
+      if (hg) hg.style.display = '';
       if (hero) { hero.querySelector('h1').textContent = 'ברוכים הבאים'; hero.querySelector('p').textContent = 'מערכת מעקב — בחרו תחום כדי להתחיל.'; }
       renderHomeReports();
+      if (window.cv3Behavior) window.cv3Behavior.renderFollowupWidget($('#homeFollowupWidget'));
     }
   }
   window.updateHomeMode = updateHomeMode;

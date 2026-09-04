@@ -47,8 +47,10 @@
           '<label style="display:flex;align-items:center;gap:5px;font-size:.85rem;color:var(--muted);white-space:nowrap;cursor:pointer"><input type="checkbox" id="thFollow"> מעקב — דורש טיפול המשך</label>' +
           '<button class="btn-primary" id="thSave"><i class="bi bi-check-lg"></i> שמור רישום</button>' +
         '</div><div id="thMsg" class="count-line" style="margin-top:8px;min-height:1.2em"></div></div>' +
+      '<div id="thFollowupWidget"></div>' +
       '<div class="teacher-actions">' + allowed.map(goBtn).join('') + '</div>';
     if (seq !== runSeq) return;
+    if (window.cv3Behavior) window.cv3Behavior.renderFollowupWidget(host.querySelector('#thFollowupWidget'));
     const pick = window.cv3Picker.wire(host, 'th');
     host.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => window.showPage(b.dataset.go)));
     host.querySelector('#thSave').addEventListener('click', async () => {

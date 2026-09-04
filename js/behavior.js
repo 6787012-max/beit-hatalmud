@@ -167,7 +167,10 @@
       draw(); notify(); window.UI.toast('העדכון נוסף');
     });
   }
-  window.cv3Behavior = { open: openEventForm, remove: removeEvent, comments: openComments, toggleFollowup: toggleFollowup };
+  window.cv3Behavior = {
+    open: openEventForm, remove: removeEvent, comments: openComments, toggleFollowup: toggleFollowup,
+    renderFollowupWidget: (container) => renderFollowupWidget(container),
+  };
 
   async function renderBehavior(page) {
     const [studs, cs, evs, cls, allCmts] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
@@ -481,6 +484,64 @@
       }));
     }
     draw();
+  }
+
+  // חלונית קומפקטית לדף הבית (בקשת יוסף 04/09/2026 — לא רק לשונית/עמוד
+  // שדורש ניווט, אלא משהו שרואים ישר בבית, לכל המשתמשים: גם דף הבית של
+  // המנהל/משרד (js/app.js) וגם דף הבית הפשוט של הרב/מחנך (js/teacher.js).
+  // אותה scope בדיוק כמו renderFollowup (events() כבר מסנן לפי accessibleIds).
+  async function renderFollowupWidget(container) {
+    if (!container) return;
+    const evs = await events();
+    const list = evs.filter(e => e.followup).sort((a, b) => {
+      const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
+      return ad < bd ? -1 : ad > bd ? 1 : 0;
+    });
+    if (!list.length) {
+      container.innerHTML =
+        '<div class="qr-card"><h3 style="margin:0 0 6px"><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h3>' +
+        '<div class="tl-note" style="padding:4px 2px"><i class="bi bi-emoji-smile"></i> אין כרגע דיווחים במעקב</div></div>';
+      return;
+    }
+    const [studs, cs] = await Promise.all([students(), cats()]);
+    const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
+    const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
+    const overdueN = list.filter(isOverdue).length;
+    container.innerHTML =
+      '<div class="qr-card">' +
+        '<div class="card-h-row"><h3 style="margin:0"><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h3>' +
+          '<span class="chip" style="' + (overdueN
+            ? 'background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)'
+            : 'background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)') + '">' +
+            list.length + (overdueN ? ' · ' + overdueN + ' באיחור' : '') + '</span></div>' +
+        list.map(e => {
+          const over = isOverdue(e);
+          return '<div class="fu-widget-item">' +
+            '<div class="fu-w-head"><span>' + esc(nameOf(e.student_id)) + '</span>' +
+              (e.due_date ? '<span style="font-size:.74rem;' + (over ? 'color:var(--danger);font-weight:700' : 'color:var(--muted)') + '">' +
+                '<i class="bi bi-calendar' + (over ? '-x' : '-event') + '"></i> ' + esc(hebDate(e.due_date) || e.due_date) + '</span>' : '') +
+            '</div>' +
+            '<div class="fu-w-meta">' + esc(catOf(e.category_id)) + (e.note ? ' — ' + esc(e.note) : '') + '</div>' +
+            '<div style="display:flex;gap:4px;margin-top:5px">' +
+              '<button class="btn-ghost sm" data-wcmt="' + e.id + '" style="padding:2px 8px;font-size:.76rem"><i class="bi bi-chat-left-text"></i> תגובה</button>' +
+              '<button class="btn-ghost sm" data-wres="' + e.id + '" style="padding:2px 8px;font-size:.76rem"><i class="bi bi-check2-circle"></i> טופל</button>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+        '<div style="text-align:center;margin-top:8px"><a href="#followup" class="btn-ghost sm">כל הרשימה ←</a></div>' +
+      '</div>';
+    container.querySelectorAll('[data-wcmt]').forEach(b => b.addEventListener('click', () => {
+      const ev = list.find(x => x.id == b.dataset.wcmt); if (!ev) return;
+      openComments(ev, { title: nameOf(ev.student_id), onChange: () => renderFollowupWidget(container) });
+    }));
+    container.querySelectorAll('[data-wres]').forEach(b => b.addEventListener('click', async () => {
+      const ev = list.find(x => x.id == b.dataset.wres); if (!ev) return;
+      if (!(await window.UI.confirm('להסיר את "' + nameOf(ev.student_id) + '" מרשימת המעקב?'))) return;
+      const r = await updEvent(ev.id, { followup: false });
+      if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
+      renderFollowupWidget(container);
+      window.UI.toast('הוסר מהמעקב');
+    }));
   }
 
   // מחולל דף-לוג פשוט לקריאה/כתיבה (רמה + תאריך + הערה לתלמיד)
