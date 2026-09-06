@@ -112,7 +112,7 @@
     // כשהתלמיד נעול (דיווח מתוך הכרטיס שלו) מציגים את שמו ולא בורר
     const lockStu = isNew && opts.studentId;
     const stuRec = lockStu ? (studs.find(x => String(x.id) === String(opts.studentId)) || {}) : null;
-    window.UI.modal({
+    const m = window.UI.modal({
       title: isNew ? ('דיווח חדש' + (stuRec ? ' — ' + esc(nm(stuRec)) : '')) : 'עריכת דיווח',
       saveLabel: 'שמירה',
       bodyHTML:
@@ -126,7 +126,9 @@
           '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev">' + sevSel + '</select></label>' +
           '<label class="fld"><span>מעקב</span><span style="display:flex;align-items:center;gap:6px;padding-top:7px">' +
             '<input type="checkbox" id="ee_follow"' + (cur.followup ? ' checked' : '') + '> ' +
-            '<span style="font-weight:400;font-size:.85rem">דיווח פתוח שדורש טיפול המשך</span></span></label>' +
+            '<i class="bi bi-flag-fill" id="ee_flagIcon"></i>' +
+            '<span style="font-weight:400;font-size:.85rem">דיווח פתוח שדורש טיפול המשך — ' +
+              'צבע הדגל נקבע לפי ה"חומרה" למעלה</span></span></label>' +
           '<label class="fld"><span>תזכורת (תאריך יעד למעקב)</span><input class="inp mb0" id="ee_due" type="date" max="2099-12-31" value="' + esc(cur.due_date || '') + '"></label>' +
           '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="5">' + esc(cur.note || '') + '</textarea></label>' +
         '</div>',
@@ -150,6 +152,12 @@
         return true;
       },
     });
+    // תצוגה חיה של צבע הדגל לפי החומרה הנבחרת — כדי שברור מיד "מה קובע את הצבע"
+    // בלי לחפש בתפריט עזרה. אותה מוסכמת צבע בדיוק כמו flagColor() ברשימות עצמן.
+    const sevEl = m.el.querySelector('#ee_sev'), flagIcon = m.el.querySelector('#ee_flagIcon');
+    const paintFlag = () => { flagIcon.style.color = flagColor(sevEl.value); };
+    sevEl.addEventListener('change', paintFlag);
+    paintFlag();
   }
   async function removeEvent(ev, onDone) {
     if (!ev) return;
