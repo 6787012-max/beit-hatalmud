@@ -34,11 +34,12 @@
     { k: 'test_oral',    t: 'מבחן בע״פ',    sub: 'שקו״ט',      max: 120,  w: 96 },
   ];
   // קטגוריה חמישית — בדיקת מחברות קנין רש"י (בקשת הרב וינברג, מייל 06/09/2026).
-  // ציון איכותני, לא מספרי: הגיליון שממנו יובאו הנתונים ההיסטוריים מוכיח
-  // שבפועל נכתבות גם דרגות נוספות (ב, ג) והערות חופשיות ("לא כתב כלום",
-  // "לבדוק", "דחוף"...), לא רק א/א+ — ולכן טקסט חופשי ולא בורר סגור.
+  // בכוונה בורר סגור ולא טקסט חופשי: מייל המשך מפורש מהרב וינברג (06/09,
+  // 12:04) — "תכניס רק מי שיש לו א או א+, מה שכתוב סתם אל תתייחס כל מיני
+  // הערות". כלומר שאר מה שנכתב בגיליון המקורי (דרגות כמו ב/ג, הערות חופשיות)
+  // הוא סתם רישום עבודה של המלמדים ולא אמור להיכנס לתוכנה בכלל.
   // לא חלק מ-score() (ה"ניקוד" 0–100 של ארבעת השדות הרגילים) — רק מהשכר.
-  const KINYAN = { k: 'kinyan_rashi', t: 'בדיקת מחברות קנין רש״י', sub: 'א / א+ / הערה', w: 190 };
+  const KINYAN = { k: 'kinyan_rashi', t: 'בדיקת מחברות קנין רש״י', sub: 'א / א+', w: 96 };
 
   function currentWeek() {
     const days = Math.floor((Date.now() - WEEK1.getTime()) / 86400000);
@@ -152,10 +153,16 @@
       };
       const kinyanCell = s => {
         const r = byKey[s.id + '|' + wk];
-        const v = r && r.kinyan_rashi != null ? r.kinyan_rashi : '';
-        return '<td><input class="inp mb0 psp-in" type="text" ' +
-          'style="width:' + KINYAN.w + 'px;padding:5px 8px" title="' + esc(v) + '" ' +
-          'data-sid="' + s.id + '" data-f="' + KINYAN.k + '" value="' + esc(v) + '"></td>';
+        const raw = r && r.kinyan_rashi != null ? r.kinyan_rashi : '';
+        // נרמול לאחת משלוש האופציות — כדי שערך היסטורי כמו "א +" (עם רווח)
+        // עדיין ייבחר נכון ב-select ולא ייפול לריק
+        const norm = String(raw).replace(/\s+/g, '');
+        const v = norm === 'א+' ? 'א+' : norm === 'א' ? 'א' : '';
+        const opt = val => '<option value="' + val + '"' + (v === val ? ' selected' : '') + '>' + (val || '—') + '</option>';
+        return '<td><select class="inp mb0 psp-in" style="width:' + KINYAN.w + 'px;padding:5px 8px;text-align:center" ' +
+          'data-sid="' + s.id + '" data-f="' + KINYAN.k + '">' +
+          opt('') + opt('א') + opt('א+') +
+          '</select></td>';
       };
       const row = (s, n) =>
         '<tr data-row="' + s.id + '"><td class="idx">' + n + '</td>' +
@@ -203,7 +210,6 @@
             inp.value = (cur && cur[f] != null) ? cur[f] : '';
             return;
           }
-          if (isKinyan) inp.title = raw;
           inp.classList.add('psp-saving');
           try {
             if (cur) {
