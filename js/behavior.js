@@ -11,6 +11,10 @@
   const hebDate = iso => window.UI.hebDate(iso);
 
   const sevClass = s => s === 'גבוהה' ? 'hi' : s === 'נמוכה' ? 'lo' : 'mid';
+  // צבע הדגל לפי חומרה (בקשת יוסף 06/09/2026): "דגל אדום/צהוב/ירוק לפי החומרה" —
+  // לא שדה חדש. משתמשים באותה "חומרה" שכבר קיימת בטופס הדיווח, ובאותם משתני
+  // צבע כמו sev-dot (--danger/--accent/--ok), כדי שהדגל לא יהיה מקור-אמת שני.
+  const flagColor = s => s === 'גבוהה' ? 'var(--danger)' : s === 'נמוכה' ? 'var(--ok)' : 'var(--accent)';
   // תזכורת — אותו עיקרון כמו tasks.js: תאריך יעד רגיל, "באיחור" מחושב כאן
   // ולא בשרת. רלוונטי רק כל עוד הדיווח עדיין פתוח למעקב.
   const isOverdue = e => !!(e.due_date && e.followup && e.due_date < today());
@@ -19,6 +23,38 @@
     const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
     return ad < bd ? -1 : ad > bd ? 1 : 0;
   };
+
+  // "קפיצה" יזומה לרב שצריך לטפל (בקשת יוסף 06/09/2026): קודם התזכורת רק
+  // הופיעה באדום כשמישהו *כבר* נכנס למסך הזה. עכשיו קופצת מעצמה כשנכנסים
+  // הביתה, ביום שהתזכורת חלה או אחריו. פעם אחת ליום לכל משתמש (localStorage)
+  // — לא לפי מי "טופל" בשרת, כדי שלא ליצור עוד עמודת מצב על behavior_events
+  // רק בשביל "האם כבר קפץ". אם לא נגמר היום עדיין יקפוץ שוב מחר, וזה בכוונה.
+  function duePopupKey() {
+    const uid = (window.currentUser && window.currentUser.id) || 'anon';
+    return 'bht_fu_popup_' + uid + '_' + today();
+  }
+  async function maybeShowDuePopup() {
+    try { if (localStorage.getItem(duePopupKey())) return; } catch (_) { return; }
+    const evs = await events();
+    const due = evs.filter(e => e.followup && e.due_date && e.due_date <= today()).sort(byDueDate);
+    if (!due.length) return;
+    const studs = await students();
+    const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
+    try { localStorage.setItem(duePopupKey(), '1'); } catch (_) {}
+    window.UI.modal({
+      title: '⏰ תזכורות מעקב שהגיע זמנן',
+      cancelLabel: 'סגירה',
+      bodyHTML:
+        '<div class="tl-note" style="margin-bottom:8px">' + due.length + ' דיווח' + (due.length > 1 ? 'ים' : '') + ' במעקב הגיע' + (due.length > 1 ? 'ו' : '') + ' לתאריך התזכורת:</div>' +
+        due.map(e => '<div class="tl-item" style="border-right:3px solid ' + flagColor(e.severity) + '">' +
+          '<span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
+          '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong>' +
+            (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
+          '<div class="tl-meta">' + (e.due_date < today() ? 'באיחור מ' : 'תזכורת ל') + '־' + esc(hebDate(e.due_date) || e.due_date) + '</div>' +
+        '</div>').join('') +
+        '<div style="text-align:center;margin-top:10px"><a href="#followup" class="btn-primary sm">מעבר לרשימת המעקב הדחוף ←</a></div>',
+    });
+  }
 
   // כל הנתונים דרך המאגר המרכזי (store.js)
   async function students() { return (window.cv3Students ? await window.cv3Students.getStudents() : []); }
@@ -269,7 +305,7 @@
       const cn = cmtCounts[e.id] || 0;
       return '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
       '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + esc(catOf(e.category_id)) +
-      (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') +
+      (e.followup ? ' <span class="chip warn" style="color:' + flagColor(e.severity) + '"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') +
       (e.due_date ? ' <span class="chip" style="' + (isOverdue(e)
           ? 'background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)'
           : 'background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)') + '">' +
@@ -278,7 +314,7 @@
       (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
       '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
         ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
-      '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
+      '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"' + (e.followup ? ' style="color:' + flagColor(e.severity) + '"' : '') + '><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
       '<button class="mini" data-cmt="' + e.id + '" title="עדכוני מעקב"' + (cn ? ' style="width:auto;padding:0 8px"' : '') + '><i class="bi bi-chat-left-text"></i>' + (cn ? ' ' + cn : '') + '</button>' +
       // מלמד רואה את כל הדיווחים על התלמידים שלו אבל מתקן רק את שלו — ולכן
       // הכפתורים נגזרים מהרשומה, לא מהמסך.
@@ -431,7 +467,7 @@
 
     function cardHtml(e) {
       const cmts = cmtsOf(e.id);
-      return '<div class="qr-card">' +
+      return '<div class="qr-card" style="border-right:4px solid ' + flagColor(e.severity) + '">' +
         '<div class="card-h-row">' +
           '<h3 style="margin:0"><span class="sev-dot ' + sevClass(e.severity) + '"></span> ' +
             esc(nameOf(e.student_id)) + ' <span class="tl-note" style="font-weight:400">· ' + esc(clsOf(e.student_id)) + '</span></h3>' +
@@ -514,6 +550,9 @@
   async function renderFollowupWidget(container, opts) {
     if (!container) return;
     opts = opts || {};
+    // לא ממתינים (fire-and-forget) — לא צריך לעכב את ציור החלונית בשביל זה,
+    // וה-localStorage guard הפנימי דואג שזה לא יריץ פעמיים ביום בלי צורך.
+    maybeShowDuePopup();
     const seq = (widgetSeq.get(container) || 0) + 1;
     widgetSeq.set(container, seq);
     const stale = () => widgetSeq.get(container) !== seq;
@@ -542,8 +581,8 @@
             list.length + (overdueN ? ' · ' + overdueN + ' באיחור' : '') + '</span></div>' +
         list.map(e => {
           const over = isOverdue(e);
-          return '<div class="fu-widget-item">' +
-            '<div class="fu-w-head"><span>' + esc(nameOf(e.student_id)) + '</span>' +
+          return '<div class="fu-widget-item" style="border-right:3px solid ' + flagColor(e.severity) + '">' +
+            '<div class="fu-w-head"><i class="bi bi-flag-fill" style="color:' + flagColor(e.severity) + '"></i> <span>' + esc(nameOf(e.student_id)) + '</span>' +
               (e.due_date ? '<span style="font-size:.74rem;' + (over ? 'color:var(--danger);font-weight:700' : 'color:var(--muted)') + '">' +
                 '<i class="bi bi-calendar' + (over ? '-x' : '-event') + '"></i> ' + esc(hebDate(e.due_date) || e.due_date) + '</span>' : '') +
             '</div>' +

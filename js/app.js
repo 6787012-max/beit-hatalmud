@@ -162,6 +162,8 @@
       const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
       const catOf = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
+      // דגל צבוע לפי חומרה (לא שדה חדש) — אותה מוסכמה כמו js/behavior.js
+      const flagColor = x => x === 'גבוהה' ? 'var(--danger)' : x === 'נמוכה' ? 'var(--ok)' : 'var(--accent)';
       const list = $('#homeReportList');
       // ההערה מקוצרת לשתי שורות (`.hr-note` ב-CSS) ונפתחת בלחיצה. דיווח ארוך
       // מתח קודם את כל דף הבית ודחק את כל השאר מחוץ למסך.
@@ -171,13 +173,13 @@
         '<div class="tl-main">' +
           '<div class="hr-head"><strong>' + _esc(nameOf(e.student_id)) + '</strong>' +
             (catOf(e.category_id) ? ' · ' + _esc(catOf(e.category_id)) : '') +
-            (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
+            (e.followup ? ' <span class="chip warn" style="color:' + flagColor(e.severity) + '"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
           (e.note ? '<div class="tl-note hr-note" data-note>' + _esc(e.note) + '</div>' : '') +
         '</div>' +
         '<div class="tl-meta">' + _esc(hebDate(e.event_date) || e.event_date || '') + (e.event_time ? ' · ' + _esc(e.event_time) : '') + '</div>' +
         '<div class="hr-act">' +
           '<button class="mini" data-card="' + e.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-vcard"></i></button>' +
-          '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
+          '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"' + (e.followup ? ' style="color:' + flagColor(e.severity) + '"' : '') + '><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
           '<button class="mini" data-cmt="' + e.id + '" title="עדכוני מעקב"' + (cn ? ' style="width:auto;padding:0 8px"' : '') + '><i class="bi bi-chat-left-text"></i>' + (cn ? ' ' + cn : '') + '</button>' +
           '<button class="mini" data-edit="' + e.id + '" title="עריכת הדיווח"><i class="bi bi-pencil"></i></button>' +
         '</div></div>';
