@@ -33,6 +33,12 @@
     { k: 'test_written', t: 'מבחן בכתב',    sub: 'גמרא עיון',  max: 120,  w: 96 },
     { k: 'test_oral',    t: 'מבחן בע״פ',    sub: 'שקו״ט',      max: 120,  w: 96 },
   ];
+  // קטגוריה חמישית — בדיקת מחברות קנין רש"י (בקשת הרב וינברג, מייל 06/09/2026).
+  // ציון איכותני, לא מספרי: הגיליון שממנו יובאו הנתונים ההיסטוריים מוכיח
+  // שבפועל נכתבות גם דרגות נוספות (ב, ג) והערות חופשיות ("לא כתב כלום",
+  // "לבדוק", "דחוף"...), לא רק א/א+ — ולכן טקסט חופשי ולא בורר סגור.
+  // לא חלק מ-score() (ה"ניקוד" 0–100 של ארבעת השדות הרגילים) — רק מהשכר.
+  const KINYAN = { k: 'kinyan_rashi', t: 'בדיקת מחברות קנין רש״י', sub: 'א / א+ / הערה', w: 190 };
 
   function currentWeek() {
     const days = Math.floor((Date.now() - WEEK1.getTime()) / 86400000);
@@ -70,14 +76,21 @@
     return 4 + 2 * Math.floor((m - 80) / 20);
   };
   const shcTest = t => t == null || t < 80 ? 0 : t < 90 ? 1 : t < 100 ? 2 : 3;
+  // תימחור קנין רש"י לפי בקשת הרב וינברג: רק שני ערכים מדויקים משולמים —
+  // כל דבר אחר (הערה חופשית, דרגה אחרת כמו ב/ג, ריק) = 0 ₪.
+  const shcKinyan = v => {
+    const norm = String(v == null ? '' : v).replace(/\s+/g, '');
+    return norm === 'א+' ? 2.5 : norm === 'א' ? 1.5 : 0;
+  };
   function shekels(r) {
     if (!r) return 0;
-    return shcShacharit(r.shacharit) + shcStudy(r.study_min) + shcTest(r.test_written) + shcTest(r.test_oral);
+    return shcShacharit(r.shacharit) + shcStudy(r.study_min) + shcTest(r.test_written) + shcTest(r.test_oral) + shcKinyan(r.kinyan_rashi);
   }
   // חוט הפירוט למעל הצ׳יפ — כדי שיראו מאיפה הגיע הסכום
   const shcTip = r => !r ? '' :
     'שחרית ' + shcShacharit(r.shacharit) + ' · לימוד ' + shcStudy(r.study_min) +
-    ' · בכתב ' + shcTest(r.test_written) + ' · בע״פ ' + shcTest(r.test_oral);
+    ' · בכתב ' + shcTest(r.test_written) + ' · בע״פ ' + shcTest(r.test_oral) +
+    ' · קנין רש״י ' + shcKinyan(r.kinyan_rashi);
   const fmtShc = v => (Math.round(v * 10) / 10).toString().replace(/\.0$/, '');
   const shcChip = r => {
     const v = shekels(r);
@@ -137,17 +150,26 @@
           'style="width:' + f.w + 'px;padding:5px 8px;text-align:center" ' +
           'data-sid="' + s.id + '" data-f="' + f.k + '" value="' + esc(v) + '"></td>';
       };
+      const kinyanCell = s => {
+        const r = byKey[s.id + '|' + wk];
+        const v = r && r.kinyan_rashi != null ? r.kinyan_rashi : '';
+        return '<td><input class="inp mb0 psp-in" type="text" ' +
+          'style="width:' + KINYAN.w + 'px;padding:5px 8px" title="' + esc(v) + '" ' +
+          'data-sid="' + s.id + '" data-f="' + KINYAN.k + '" value="' + esc(v) + '"></td>';
+      };
       const row = (s, n) =>
         '<tr data-row="' + s.id + '"><td class="idx">' + n + '</td>' +
         '<td><span class="name-link" data-view="' + s.id + '">' + esc(nm(s)) + '</span></td>' +
         '<td>' + esc(clsOf(s)) + '</td>' +
         FIELDS.map(f => cell(s, f)).join('') +
+        kinyanCell(s) +
         '<td class="psp-score">' + chip(score(byKey[s.id + '|' + wk])) + '</td>' +
         '<td class="psp-shc">' + shcChip(byKey[s.id + '|' + wk]) + '</td></tr>';
 
       page.querySelector('#pspWrap').innerHTML =
         '<table class="tbl"><thead><tr><th style="width:44px">#</th><th>תלמיד</th><th>שיעור</th>' +
         FIELDS.map(f => '<th>' + esc(f.t) + '<div class="tl-note" style="font-size:.7rem;font-weight:400">' + esc(f.sub) + '</div></th>').join('') +
+        '<th>' + esc(KINYAN.t) + '<div class="tl-note" style="font-size:.7rem;font-weight:400">' + esc(KINYAN.sub) + '</div></th>' +
         '<th>ניקוד</th><th>ש״ח<div class="tl-note" style="font-size:.7rem;font-weight:400">לפי טבלת וינברג</div></th></tr></thead><tbody>' +
         (window.cv3Sort ? window.cv3Sort.rows(page, 'psp', list, clsOf, row, 8)
                         : list.map((s, i) => row(s, i + 1)).join('')) +
@@ -169,17 +191,19 @@
       page.querySelectorAll('.psp-in').forEach(inp => {
         inp.addEventListener('change', async () => {
           const sid = Number(inp.dataset.sid), f = inp.dataset.f;
+          const isKinyan = f === KINYAN.k;
           const raw = inp.value.trim();
-          const val = raw === '' ? null : num(raw);
+          const val = raw === '' ? null : (isKinyan ? raw : num(raw));
           const fld = FIELDS.find(x => x.k === f);
           const key = sid + '|' + wk;
           const cur = byKey[key];
-          if (val != null && (val < 0 || val > fld.max)) {
+          if (!isKinyan && val != null && (val < 0 || val > fld.max)) {
             window.UI.toast('ערך חייב להיות בין 0 ל-' + fld.max, 'err');
             // לא מוחקים — משחזרים את הערך השמור הקודם כדי שהזנה שגויה לא תמחק נתונים
             inp.value = (cur && cur[f] != null) ? cur[f] : '';
             return;
           }
+          if (isKinyan) inp.title = raw;
           inp.classList.add('psp-saving');
           try {
             if (cur) {
@@ -227,12 +251,24 @@
         const sum = k => { const a = mine.map(r => r && r[k]).filter(x => x != null); return a.length ? a.reduce((x, y) => x + y, 0) : null; };
         const av = k => { const a = mine.map(r => r && r[k]).filter(x => x != null); return avg(a); };
         const shcSum = mine.reduce((a, r) => a + shekels(r), 0);
+        // תקציר קנין רש"י: כמה פעמים בדיוק א / בדיוק א+ / כל דבר אחר שנכתב (דרגה שונה או הערה)
+        const kt = mine.reduce((t, r) => {
+          const v = r && r.kinyan_rashi;
+          if (v == null) return t;
+          const norm = String(v).replace(/\s+/g, '');
+          if (norm === 'א') t.a++; else if (norm === 'א+') t.p++; else t.o++;
+          return t;
+        }, { a: 0, p: 0, o: 0 });
+        const ktTxt = (kt.a || kt.p || kt.o)
+          ? [kt.a && ('א×' + kt.a), kt.p && ('א+×' + kt.p), kt.o && ('הערה×' + kt.o)].filter(Boolean).join(' · ')
+          : '—';
         return '<tr><td class="idx">' + n + '</td><td>' + esc(nm(s)) + '</td><td>' + esc(clsOf(s)) + '</td>' +
           '<td>' + scores.length + '/' + WEEKS.length + '</td>' +
           '<td>' + (sum('shacharit') != null ? sum('shacharit') : '—') + '</td>' +
           '<td>' + (sum('study_min') != null ? Math.round(sum('study_min') / 60) + ' ש׳' : '—') + '</td>' +
           '<td>' + (av('test_written') != null ? av('test_written') : '—') + '</td>' +
           '<td>' + (av('test_oral') != null ? av('test_oral') : '—') + '</td>' +
+          '<td>' + esc(ktTxt) + '</td>' +
           '<td>' + chip(avg(scores)) + '</td>' +
           '<td><span class="chip ' + (shcSum > 0 ? 'ok' : 'off') + '">' + fmtShc(shcSum) + ' ₪</span></td>' +
           '<td class="psp-spark">' + WEEKS.map((w, i) => {
@@ -244,6 +280,7 @@
       page.querySelector('#pspWrap').innerHTML =
         '<table class="tbl"><thead><tr><th style="width:44px">#</th><th>תלמיד</th><th>שיעור</th>' +
         '<th>שבועות</th><th>סה״כ שחרית</th><th>סה״כ לימוד</th><th>ממוצע בכתב</th><th>ממוצע בע״פ</th>' +
+        '<th>קנין רש״י</th>' +
         '<th>ניקוד כללי</th><th>סה״כ ש״ח</th><th>מגמה לאורך השנה</th></tr></thead><tbody>' +
         (window.cv3Sort ? window.cv3Sort.rows(page, 'psp', list, clsOf, row, 10)
                         : list.map((s, i) => row(s, i + 1)).join('')) +
@@ -339,6 +376,7 @@
         ' · שחרית ' + val(r.shacharit) + ' · לימוד ' + val(r.study_min) + ' דק׳' +
         (r.test_written != null ? ' · בכתב ' + r.test_written : '') +
         (r.test_oral != null ? ' · בע״פ ' + r.test_oral : '') +
+        (r.kinyan_rashi ? ' · קנין רש״י: ' + esc(r.kinyan_rashi) : '') +
         ' · <strong>' + fmtShc(shekels(r)) + ' ₪</strong>' +
         '</span><span class="di-meta">' + esc(r.heb_date || '') + '</span></div>').join(''), rows.length) +
       '</div>';
