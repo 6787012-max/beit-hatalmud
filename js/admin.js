@@ -116,9 +116,13 @@
           '<div class="form-grid">' +
           '<label class="fld"><span>שם מלא * <small style="font-weight:400;color:var(--muted)">(שם הכניסה)</small></span><input class="inp mb0" id="u_name" value="' + esc(u.name) + '"></label>' +
           '<label class="fld"><span>טלפון * <small style="font-weight:400;color:var(--muted)">(סיסמה ראשונית)</small></span><input class="inp mb0" id="u_phone" value="' + esc(u.phone || u.tz || '') + '"></label>' +
-          '<label class="fld"><span>סיסמה ' + (existing ? '(ריק = טלפון/ללא שינוי)' : '(ריק = הטלפון)') + '</span>' +
-            '<div style="display:flex;gap:6px"><input class="inp mb0" id="u_pw" type="password" placeholder="סיסמה" style="flex:1" value="' + esc(existing ? (u.password || '') : '') + '">' +
-            '<button type="button" class="btn-ghost sm" id="u_pw_show" title="הצג/הסתר"><i class="bi bi-eye"></i></button></div></label>' +
+          (existing
+            ? '<label class="fld"><span>סיסמה</span><span style="display:flex;align-items:center;gap:6px;padding-top:7px">' +
+                '<input type="checkbox" id="u_pw_reset"> ' +
+                '<span style="font-weight:400;font-size:.85rem">אפס את דרישת הסיסמה — המשתמש יתבקש להחליף סיסמה חדשה בכניסה הבאה (לא קובע סיסמה בפועל, ולא ניתן להזין כאן סיסמה למשתמש קיים)</span></span></label>'
+            : '<label class="fld"><span>סיסמה (ריק = הטלפון)</span>' +
+                '<div style="display:flex;gap:6px"><input class="inp mb0" id="u_pw" type="password" placeholder="סיסמה" style="flex:1">' +
+                '<button type="button" class="btn-ghost sm" id="u_pw_show" title="הצג/הסתר"><i class="bi bi-eye"></i></button></div></label>') +
           '<label class="fld"><span>תפקיד</span><select class="inp mb0" id="u_role">' +
             ['מנהל', 'מחנך', 'מלמד', 'מפקח', 'מזכירה'].map(r => '<option' + ((u.role === r || (!u.role && r === 'מחנך')) ? ' selected' : '') + '>' + r + '</option>').join('') +
             '</select></label>' +
@@ -137,7 +141,10 @@
             '<div style="margin-top:7px;display:flex;gap:6px"><button type="button" class="btn-ghost sm" id="permAll">סמן הכל</button><button type="button" class="btn-ghost sm" id="permNone">נקה הכל</button></div></div>' +
           '</div>',
         onSave: async (mel) => {
-          const name = mel.querySelector('#u_name').value.trim(), phone = mel.querySelector('#u_phone').value.trim(), pw = mel.querySelector('#u_pw').value, role = mel.querySelector('#u_role').value;
+          const name = mel.querySelector('#u_name').value.trim(), phone = mel.querySelector('#u_phone').value.trim(), role = mel.querySelector('#u_role').value;
+          const pwEl = mel.querySelector('#u_pw');
+          const pw = pwEl ? pwEl.value : '';                       // קיים רק ביצירת משתמש חדש
+          const resetPwReq = !!(mel.querySelector('#u_pw_reset') || {}).checked;  // קיים רק בעריכת משתמש קיים
           const access_mode = mel.querySelector('#u_mode').value || null;   // null = ברירת מחדל לפי תפקיד
           if (!name || !phone) { window.UI.toast('שם וטלפון חובה', 'err'); return false; }
           const chosenPerms = [...mel.querySelectorAll('#permGrid input:checked')].map(c => c.value);
@@ -157,9 +164,10 @@
             const ur = await window.store.update('profiles', u.id, { name, role, tz: phone, perms, access_mode });
             if (!ur || ur.ok === false) { window.UI.toast('עדכון המשתמש נכשל: ' + ((ur && ur.error) || ''), 'err'); return false; }
             Object.assign(u, { name, role, tz: phone, perms, access_mode }); uid = u.id;
-            // מנהל שאיפס סיסמה — המשתמש חוזר להיות "לא החליף" ויתבקש שוב.
-            // אחרת סיסמה שהמנהל קבע היתה נחשבת לנצח כסיסמה שהמשתמש בחר.
-            if (pw && window.sb) {
+            // תיבת "אפס דרישת סיסמה" מסומנת — המשתמש חוזר להיות "לא החליף" ויתבקש שוב.
+            // בעבר זה קרה בשקט אם הוקלד משהו בשדה סיסמה (גם באגב עריכת תפקיד/הרשאות),
+            // בלי לשנות בפועל את הסיסמה האמיתית — מלכודת שנתקל בה שמואל פרידלנדר.
+            if (resetPwReq && window.sb) {
               try { await window.sb.rpc('pw_reset_flag', { p_user: u.id }); u.pw_changed_at = null; } catch (_) {}
             }
           } else {
