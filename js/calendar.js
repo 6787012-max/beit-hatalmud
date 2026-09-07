@@ -36,29 +36,43 @@
   const kindOf = k => KIND[k] || KIND.event;
   const TASK_DONE = '#6b7280', TASK_OVERDUE = '#dc2626', TASK_OPEN = '#0d9488', MEET_C = '#db2777';
   const KIND_OPTS = Object.keys(KIND).map(k => '<option value="' + k + '">' + KIND[k].label + '</option>').join('');
+  // אותו צבע-חומרה כמו הדגל ב-behavior.js (var(--danger)/--accent/--ok) — לא שכפול מקור-אמת,
+  // רק אותה נוסחה, כי behavior.js לא חושף אותה ל-window ושני המודולים נטענים בנפרד.
+  const flagColor = s => s === 'גבוהה' ? 'var(--danger)' : s === 'נמוכה' ? 'var(--ok)' : 'var(--accent)';
 
   // ---------- שליפת נתונים (עם סינון הרשאות לפריטים משויכי-תלמיד) ----------
+  // מעקב תלמידים (behavior_events) נכלל רק אם התפקיד רשאי למסך "מעקב" —
+  // אותה הרשאה בדיוק כמו המסך הייעודי, כך שהלוח לא חושף יותר ממה שכבר גלוי
+  // (ראו roleCaps ב-auth.js: כל תפקיד שרואה 'calendar' רואה גם 'behavior').
   async function pull() {
-    const s = store(); let evs = [], tks = [], mts = [];
+    const s = store(); let evs = [], tks = [], mts = [], beh = [], cats = [], studs = [];
     if (s) {
       try { evs = await s.list('calendar_events'); } catch (_) {}
       try { tks = await s.list('tasks'); } catch (_) {}
       try { mts = await s.list('meetings'); } catch (_) {}
+      if (window.Auth && window.Auth.canAccess('behavior')) {
+        try { beh = await s.list('behavior_events'); } catch (_) {}
+        try { cats = await s.list('categories'); } catch (_) {}
+        try { studs = window.cv3Students ? await window.cv3Students.getStudents() : []; } catch (_) {}
+      }
     }
     let ids = null;
     try { ids = window.cv3Students ? await window.cv3Students.accessibleIds() : null; } catch (_) {}
     if (ids) {
       tks = (tks || []).filter(t => t.student_id == null || ids.includes(t.student_id));
       mts = (mts || []).filter(m => m.student_id == null || ids.includes(m.student_id));
+      beh = (beh || []).filter(b => ids.includes(b.student_id));
     }
-    return { evs: evs || [], tks: tks || [], mts: mts || [] };
+    return { evs: evs || [], tks: tks || [], mts: mts || [], beh: beh || [], cats: cats || [], studs: studs || [] };
   }
 
-  // בונה מפת iso→[פריטים] מכל שלושת המקורות
+  // בונה מפת iso→[פריטים] מכל המקורות (אירועי-לוח, משימות, אסיפות, מעקב תלמידים)
   function indexByDate(data) {
     const map = {};
     const push = (k, o) => { (map[k] = map[k] || []).push(o); };
     const tIso = todayIso();
+    const nameOf = id => { const st = (data.studs || []).find(x => x.id == id); return st ? st.name : '—'; };
+    const catOf = id => { const c = (data.cats || []).find(x => x.id == id); return c ? c.name : ''; };
     (data.evs || []).forEach(e => {
       if (!e.date) return;
       const k = kindOf(e.kind);
@@ -74,6 +88,12 @@
     (data.mts || []).forEach(m => {
       if (!m.date) return;
       push(m.date, { color: MEET_C, text: 'אסיפה' + (m.summary ? ': ' + m.summary : ''), time: '', type: 'meeting', typeLbl: 'אסיפת הורים', raw: m });
+    });
+    (data.beh || []).forEach(b => {
+      if (!b.event_date) return;
+      const cat = catOf(b.category_id);
+      const text = nameOf(b.student_id) + (cat ? ' · ' + cat : '') + (b.followup ? ' 🚩' : '');
+      push(b.event_date, { color: flagColor(b.severity), text, time: b.event_time || '', type: 'behavior', typeLbl: 'מעקב תלמיד', raw: b });
     });
     return map;
   }
@@ -121,9 +141,11 @@
     const gregEl = page.querySelector('#calGreg');
 
     // מקרא (צבע → משמעות)
-    page.querySelector('#calLegend').innerHTML = Object.keys(KIND).map(k => [KIND[k].c, KIND[k].label]).concat([
+    const legendItems = Object.keys(KIND).map(k => [KIND[k].c, KIND[k].label]).concat([
       ['#0d9488', 'משימה'], ['#dc2626', 'משימה באיחור'], ['#6b7280', 'משימה שהושלמה'], ['#db2777', 'אסיפת הורים'],
-    ]).map(p => '<span style="display:inline-flex;align-items:center;gap:5px">' +
+    ]);
+    if (window.Auth && window.Auth.canAccess('behavior')) legendItems.push(['var(--accent)', 'מעקב תלמיד (צבע לפי חומרה)']);
+    page.querySelector('#calLegend').innerHTML = legendItems.map(p => '<span style="display:inline-flex;align-items:center;gap:5px">' +
       '<span style="width:10px;height:10px;border-radius:3px;background:' + p[0] + ';display:inline-block"></span>' + esc(p[1]) + '</span>').join('');
 
     async function render() {
@@ -169,6 +191,7 @@
           '<div class="tl-main">' + esc(it.text) + '</div>' +
           '<div class="tl-meta">' + esc(it.time || it.typeLbl) + '</div>' +
           (it.type === 'event' ? '<button class="mini danger" data-del="' + it.raw.id + '"><i class="bi bi-trash"></i></button>' : '') +
+          (it.type === 'behavior' ? '<button class="mini" data-open-student="' + it.raw.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-badge"></i></button>' : '') +
         '</div>').join('') : '<div class="empty-state" style="padding:16px"><i class="bi bi-calendar3"></i><div>אין פריטים ביום זה</div></div>';
 
       const bodyHTML =
@@ -205,6 +228,11 @@
         const ok = await UI().confirm('למחוק את האירוע?'); if (!ok) return;
         await store().remove('calendar_events', Number(b.dataset.del));
         UI().toast('נמחק'); m.close(); render();
+      }));
+      // מעבר לכרטיס התלמיד עבור פריט מעקב (הלוח רק מציג — עריכת הדיווח נשארת במסך "מעקב")
+      m.el.querySelectorAll('[data-open-student]').forEach(b => b.addEventListener('click', () => {
+        const sid = Number(b.dataset.openStudent); m.close();
+        if (window.cv3Students) window.cv3Students.openCard(sid);
       }));
     }
 
