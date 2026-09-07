@@ -180,8 +180,23 @@
         else if (window.sb) {
           const { error } = await window.sb.auth.updateUser({ password: p1 });
           if (error) { window.UI.toast('שגיאה: ' + error.message, 'err'); return false; }
-          // מסמנים במסד שהמשתמש החליף בעצמו — זה מה שמכבה את ההתראה לתמיד
-          try { await window.sb.rpc('pw_mark_changed'); } catch (_) {}
+          // מסמנים במסד שהמשתמש החליף בעצמו — זה מה שמכבה את ההתראה לתמיד.
+          // הסיסמה כבר הוחלפה בפועל בשלב הקודם, אז לא חוזרים על השדה — אבל
+          // אם הסימון עצמו נכשל בשקט, ההתראה תחזור לו בכניסה הבאה למרות
+          // שהוא כבר עשה את מה שנדרש. לכן: עד 3 ניסיונות, ואם באמת נכשל —
+          // מתריעים על כך במפורש במקום "הצליח" מטעה.
+          let marked = false;
+          for (let i = 0; i < 3 && !marked; i++) {
+            try { const r = await window.sb.rpc('pw_mark_changed'); marked = r.data === true; }
+            catch (_) { marked = false; }
+            if (!marked && i < 2) await new Promise(res => setTimeout(res, 400));
+          }
+          if (!marked) {
+            window.UI.toast('הסיסמה הוחלפה, אבל הסימון במערכת נכשל — ההתראה עלולה לחזור. נא לפנות למנהל.', 'err');
+            A.pwOk = true;                          // לא לנעול את הסשן הנוכחי בגלל תקלת סימון
+            if (opts.onDone) { try { opts.onDone(); } catch (_) {} }
+            return true;
+          }
         }
         A.pwOk = true;
         window.UI.toast('הסיסמה עודכנה בהצלחה');
