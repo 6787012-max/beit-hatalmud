@@ -346,7 +346,16 @@
       '.psp-in.psp-saving{background:#fff7ed}' +
       '.psp-in.psp-saved{background:#dcfce7;box-shadow:0 0 0 2px #16a34a33}' +
       '.psp-spark{white-space:nowrap;direction:ltr}' +
-      '.psp-spark i{display:inline-block;width:7px;height:16px;margin:0 1px;border-radius:2px;vertical-align:middle}';
+      '.psp-spark i{display:inline-block;width:7px;height:16px;margin:0 1px;border-radius:2px;vertical-align:middle}' +
+      // בלי חצים על שדות המספר — הזנה ידנית בלבד (בקשת יוסף 07/09/2026)
+      'input.psp-in[type="number"]{-moz-appearance:textfield}' +
+      'input.psp-in[type="number"]::-webkit-outer-spin-button,' +
+      'input.psp-in[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}' +
+      // כותרת הטבלה קפואה בגלילה — נשארת מתחת לסרגל העליון (60px, נמדד חי).
+      // border-collapse:collapse (מוגדר על table.tbl הכללי) שובר sticky על th
+      // ברוב הדפדפנים — לכן כאן, בטבלה הזו בלבד, separate+spacing:0 (נראה זהה).
+      '#pspWrap table.tbl{border-collapse:separate;border-spacing:0}' +
+      '#pspWrap table.tbl thead th{position:sticky;top:60px;z-index:5;background:var(--bg)}';
     document.head.appendChild(s);
   }
 
