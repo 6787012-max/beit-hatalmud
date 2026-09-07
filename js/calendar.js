@@ -191,7 +191,10 @@
           '<div class="tl-main">' + esc(it.text) + '</div>' +
           '<div class="tl-meta">' + esc(it.time || it.typeLbl) + '</div>' +
           (it.type === 'event' ? '<button class="mini danger" data-del="' + it.raw.id + '"><i class="bi bi-trash"></i></button>' : '') +
-          (it.type === 'behavior' ? '<button class="mini" data-open-student="' + it.raw.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-badge"></i></button>' : '') +
+          (it.type === 'behavior'
+            ? '<button class="mini" data-open-report="' + it.raw.id + '" title="פתיחת הדיווח (צפייה/עריכה)"><i class="bi bi-journal-text"></i></button>' +
+              '<button class="mini" data-open-student="' + it.raw.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-badge"></i></button>'
+            : '') +
         '</div>').join('') : '<div class="empty-state" style="padding:16px"><i class="bi bi-calendar3"></i><div>אין פריטים ביום זה</div></div>';
 
       const bodyHTML =
@@ -229,7 +232,16 @@
         await store().remove('calendar_events', Number(b.dataset.del));
         UI().toast('נמחק'); m.close(); render();
       }));
-      // מעבר לכרטיס התלמיד עבור פריט מעקב (הלוח רק מציג — עריכת הדיווח נשארת במסך "מעקב")
+      // פתיחת הדיווח עצמו — אותו טופס משותף כמו במסך "מעקב"/כרטיס התלמיד
+      // (window.cv3Behavior.open, ראו behavior.js), כך שחומרה/מעקב/הערה/דגל
+      // חי-לפי-חומרה זהים לגמרי וכל שמירה כאן מסתנכרנת עם שאר המערכת.
+      m.el.querySelectorAll('[data-open-report]').forEach(b => b.addEventListener('click', () => {
+        const it = items.find(x => x.type === 'behavior' && String(x.raw.id) === b.dataset.openReport);
+        if (!it || !window.cv3Behavior) return;
+        m.close();
+        window.cv3Behavior.open(it.raw, { studentId: it.raw.student_id, onSaved: render });
+      }));
+      // מעבר לכרטיס התלמיד המלא
       m.el.querySelectorAll('[data-open-student]').forEach(b => b.addEventListener('click', () => {
         const sid = Number(b.dataset.openStudent); m.close();
         if (window.cv3Students) window.cv3Students.openCard(sid);
