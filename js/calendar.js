@@ -27,11 +27,15 @@
     holiday: { c: '#16a34a', label: 'חג/מועד' },
     meeting: { c: '#ea580c', label: 'אסיפה' },
     reminder: { c: '#7c3aed', label: 'תזכורת' },
+    activity: { c: '#ca8a04', label: 'פעילות' },
+    outing: { c: '#0891b2', label: 'יציאה' },
+    trip: { c: '#4f46e5', label: 'טיול' },
+    sermon: { c: '#78350f', label: 'דרשה' },
+    other: { c: '#64748b', label: 'אחר' },
   };
   const kindOf = k => KIND[k] || KIND.event;
   const TASK_DONE = '#6b7280', TASK_OVERDUE = '#dc2626', TASK_OPEN = '#0d9488', MEET_C = '#db2777';
-  const KIND_OPTS = [['event', 'אירוע'], ['holiday', 'חג/מועד'], ['meeting', 'אסיפה'], ['reminder', 'תזכורת']]
-    .map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('');
+  const KIND_OPTS = Object.keys(KIND).map(k => '<option value="' + k + '">' + KIND[k].label + '</option>').join('');
 
   // ---------- שליפת נתונים (עם סינון הרשאות לפריטים משויכי-תלמיד) ----------
   async function pull() {
@@ -85,6 +89,7 @@
       '<h2>לוח שנה</h2>' +
       '<div class="head-actions">' +
         '<button class="btn-primary sm" id="calAdd"><i class="bi bi-plus-lg"></i> אירוע חדש</button>' +
+        '<button class="btn-ghost sm" id="calYearly"><i class="bi bi-bar-chart"></i> תקציר שנתי</button>' +
         '<button class="btn-ghost sm" id="calCsv"><i class="bi bi-download"></i> ייצוא CSV</button>' +
       '</div></div>' +
       // סרגל ניווט חודש
@@ -116,10 +121,9 @@
     const gregEl = page.querySelector('#calGreg');
 
     // מקרא (צבע → משמעות)
-    page.querySelector('#calLegend').innerHTML = [
-      ['#2563eb', 'אירוע'], ['#16a34a', 'חג/מועד'], ['#ea580c', 'אסיפה'], ['#7c3aed', 'תזכורת'],
+    page.querySelector('#calLegend').innerHTML = Object.keys(KIND).map(k => [KIND[k].c, KIND[k].label]).concat([
       ['#0d9488', 'משימה'], ['#dc2626', 'משימה באיחור'], ['#6b7280', 'משימה שהושלמה'], ['#db2777', 'אסיפת הורים'],
-    ].map(p => '<span style="display:inline-flex;align-items:center;gap:5px">' +
+    ]).map(p => '<span style="display:inline-flex;align-items:center;gap:5px">' +
       '<span style="width:10px;height:10px;border-radius:3px;background:' + p[0] + ';display:inline-block"></span>' + esc(p[1]) + '</span>').join('');
 
     async function render() {
@@ -222,11 +226,71 @@
       });
     }
 
+    // ייצוא CSV של רשימת אירועים נתונה (משמש את תקציר שנתי)
+    function exportEvsCsv(evs, filename) {
+      const head = ['כותרת', 'תאריך', 'שעה', 'סוג', 'הערה'];
+      const lines = [head.join(',')].concat(evs.map(e =>
+        [e.title, e.date, e.time || '', kindOf(e.kind).label, e.note || '']
+          .map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')));
+      const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    }
+
+    // תקציר שנתי — מעקב על כל האירועים/פעילויות שנרשמו בשנה נתונה, מפולח לפי סוג
+    async function openYearSummary() {
+      const data = await pull();
+      const evs = (data.evs || []).filter(e => e.date).sort((a, b) =>
+        String(a.date) < String(b.date) ? -1 : String(a.date) > String(b.date) ? 1 : 0);
+      const curYear = String(new Date().getFullYear());
+      const years = Array.from(new Set(evs.map(e => e.date.slice(0, 4)).concat([curYear]))).sort();
+
+      const bodyHTML =
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">' +
+          '<label class="fld mb0" style="flex:0 0 auto"><span>שנה</span><select class="inp mb0" id="ys_year">' +
+            years.map(y => '<option value="' + y + '"' + (y === curYear ? ' selected' : '') + '>' + y + '</option>').join('') +
+          '</select></label>' +
+          '<button class="btn-ghost sm" id="ys_csv" style="margin-inline-start:auto"><i class="bi bi-download"></i> ייצוא CSV לשנה</button>' +
+        '</div>' +
+        '<div id="ys_stats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>' +
+        '<div id="ys_list"></div>';
+
+      const m = UI().modal({ title: 'תקציר שנתי — אירועים ופעילויות', cancelLabel: 'סגור', bodyHTML });
+      let shown = [];
+
+      function renderYear(y) {
+        shown = evs.filter(e => e.date.slice(0, 4) === y);
+        const counts = {};
+        shown.forEach(e => { const k = KIND[e.kind] ? e.kind : 'event'; counts[k] = (counts[k] || 0) + 1; });
+        m.el.querySelector('#ys_stats').innerHTML = Object.keys(KIND).map(k => {
+          const n = counts[k] || 0;
+          return '<div class="qr-card" style="padding:8px 10px;text-align:center;min-width:70px' + (n ? '' : ';opacity:.45') + '">' +
+            '<div style="width:9px;height:9px;border-radius:3px;background:' + KIND[k].c + ';margin:0 auto 4px"></div>' +
+            '<div style="font-size:1.1rem;font-weight:800">' + n + '</div>' +
+            '<div style="font-size:.68rem;color:var(--muted)">' + esc(KIND[k].label) + '</div>' +
+          '</div>';
+        }).join('');
+        m.el.querySelector('#ys_list').innerHTML = shown.length ? shown.map(e => {
+          const d = new Date(e.date + 'T00:00:00'); const k = kindOf(e.kind);
+          return '<div class="tl-item" style="margin-bottom:6px">' +
+            '<span class="sev-dot" style="background:' + k.c + '"></span>' +
+            '<div class="tl-main">' + esc(e.title || '') + (e.note ? ' — <span style="color:var(--muted)">' + esc(e.note) + '</span>' : '') + '</div>' +
+            '<div class="tl-meta">' + esc(fmt(d, { day: 'numeric', month: 'numeric', year: 'numeric' }, 'he-IL')) + ' · ' + esc(k.label) + '</div>' +
+          '</div>';
+        }).join('') : '<div class="empty-state" style="padding:16px"><i class="bi bi-calendar3"></i><div>אין אירועים בשנה זו</div></div>';
+      }
+
+      m.el.querySelector('#ys_year').addEventListener('change', e => renderYear(e.target.value));
+      m.el.querySelector('#ys_csv').addEventListener('click', () => exportEvsCsv(shown, 'events_' + m.el.querySelector('#ys_year').value + '.csv'));
+      renderYear(curYear);
+    }
+
     // חיווט כפתורים
     page.querySelector('#calPrev').addEventListener('click', () => { state.m--; if (state.m < 0) { state.m = 11; state.y--; } render(); });
     page.querySelector('#calNext').addEventListener('click', () => { state.m++; if (state.m > 11) { state.m = 0; state.y++; } render(); });
     page.querySelector('#calToday').addEventListener('click', () => { const n = new Date(); state.y = n.getFullYear(); state.m = n.getMonth(); render(); });
     page.querySelector('#calAdd').addEventListener('click', () => openDay(todayIso()));
+    page.querySelector('#calYearly').addEventListener('click', openYearSummary);
     page.querySelector('#calCsv').addEventListener('click', exportCsv);
 
     render();
