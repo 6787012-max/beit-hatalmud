@@ -708,8 +708,15 @@
 
     // ── שמע: קמפיין אמיתי (RunCampaign, לפי הנמענים שנבחרו) או צינתוק חינמי לנרשמים ──
     if (voiceOn && state.audioBlob) {
-      if (!window.Yemot || !window.Yemot.token()) {
-        notesArr.push('לא מחובר לקו — היכנס למסך "קו ימות המשיח" והתחבר, ואז שלח שוב');
+      // בדיקה אמיתית מול השרת — לא רק "יש מחרוזת טוקן שמורה". הטוקן נשמר
+      // בין כניסות (localStorage) אבל פג אצל ימות אחרי כ-45 דק' חוסר פעילות;
+      // בלי הבדיקה הזו זה נכשל בשקט בתוך runVoiceCampaign וקל לפספס את
+      // ההערה (דווח ע"י יוסף 08/09/2026 — "מייל נשלח, קול לא").
+      const yemotConnected = window.Yemot && window.Yemot.token() &&
+        (await window.Yemot.call('GetSession').catch(() => ({}))).responseStatus === 'OK';
+      if (!yemotConnected) {
+        voiceMsg = 'failed';
+        notesArr.push('לא מחובר לקו ימות (או שההתחברות פגה) — היכנס למסך "קו ימות המשיח", התחבר מחדש, ואז שלח שוב');
       } else if (isRealCampaign) {
         try {
           const r = await window.Yemot.runVoiceCampaign(state.audioBlob, voicePhones,
@@ -747,12 +754,17 @@
     if (mailOn) parts2.push('מייל: נשלחו ' + mailSent + (mailFailed ? ' · נכשלו ' + mailFailed : '') + (audioAttached ? ' · עם קובץ קול' : ''));
     if (isRealCampaign) {
       const m = /^campaign:(\d+)(?::([\d.]+)u)?$/.exec(voiceMsg);
-      parts2.push(m ? ('שיחה קולית: הופעלה ל-' + m[1] + ' מספרים' + (m[2] ? (' · ' + m[2] + ' יחידות') : '')) : ('שיחה קולית: ' + voiceMsg));
+      parts2.push(m ? ('שיחה קולית: הופעלה ל-' + m[1] + ' מספרים' + (m[2] ? (' · ' + m[2] + ' יחידות') : '')) : 'שיחה קולית: נכשלה');
     } else if (voiceOn) {
-      parts2.push('שמע: ' + (audioPath ? 'הועלה' : 'לא הועלה') + ' · צינתוק: ' + voiceMsg);
+      parts2.push('שמע: ' + (audioPath ? 'הועלה' : 'לא הועלה') + ' · צינתוק: ' + (voiceMsg === 'failed' ? 'נכשל' : voiceMsg));
     }
-    outEl.textContent = '✓ ' + parts2.join(' · ');
-    window.UI.toast('הדיוור נשלח: ' + parts2.join(' · '), 'ok');
+    // הערות (בעיקר כשלים) מוצגות תמיד על המסך עצמו — לא רק בטוסט חולף שקל
+    // לפספס לצד הטוסט החיובי (דווח ע"י יוסף 08/09/2026: "מייל נשלח, קול לא",
+    // וההסבר על הכישלון היה רק בטוסט שני).
+    outEl.textContent = (notesArr.length ? '⚠️ ' : '✓ ') + parts2.join(' · ') + (notesArr.length ? '\n' + notesArr.join(' · ') : '');
+    outEl.style.color = notesArr.length ? 'var(--danger)' : '';
+    outEl.style.whiteSpace = 'pre-line';
+    window.UI.toast('הדיוור נשלח: ' + parts2.join(' · '), notesArr.length ? 'warn' : 'ok');
     if (notesArr.length) window.UI.toast('הערות: ' + notesArr.join('; '), 'warn');
   }
 

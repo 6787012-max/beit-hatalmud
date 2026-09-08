@@ -79,7 +79,12 @@
     const qs = new URLSearchParams(Object.assign({ token: token() }, params || {}));
     const res = await fetch(`${API}/${method}?${qs}`, { method: 'GET' });
     let data; try { data = await res.json(); } catch (_) { data = { responseStatus: 'EXCEPTION', message: 'תשובה לא תקינה' }; }
-    if (data && /token/i.test(data.message || '') && data.responseStatus !== 'OK') setToken('');
+    // ניקוי הטוקן על כל שגיאת הרשאה — לא רק כשה-message מזכיר "token" מילולית.
+    // "session is expired" (FORBIDDEN) לא הכיל את המילה הזו, אז המסך המשיך
+    // להראות "מחובר" בירוק גם אחרי שהטוקן כבר לא תקף (דווח ע"י יוסף 08/09/2026).
+    if (data && data.responseStatus !== 'OK' &&
+        (data.responseStatus === 'FORBIDDEN' || /token|session|expired|not.?login/i.test(data.message || '')))
+      setToken('');
     return data;
   }
 
