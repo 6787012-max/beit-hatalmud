@@ -653,6 +653,13 @@
     const ok = await window.UI.confirm('לשלוח דיוור?\n\n' + parts.join('\n') + '\n\nלא ניתן לבטל.');
     if (!ok) return;
 
+    // נעילת הכפתור בזמן השליחה — לחיצה כפולה מתוך חוסר-סבלנות (השליחה יכולה
+    // לקחת זמן: לולאת מיילים + לולאת UpdateTemplateEntry) גרמה בעבר לכפילות
+    // אמיתית (מייל+שיחה) בכפתורים אחרים, ראה תיקון מקביל ב-#ymTtsGen.
+    const sendBtn = page.querySelector('#msgSend');
+    if (sendBtn) sendBtn.disabled = true;
+    try {
+
     const outEl = page.querySelector('#msgSendMsg');
     outEl.textContent = 'שולח…';
 
@@ -776,6 +783,7 @@
     outEl.style.whiteSpace = 'pre-line';
     window.UI.toast('הדיוור נשלח: ' + parts2.join(' · '), notesArr.length ? 'warn' : 'ok');
     if (notesArr.length) window.UI.toast('הערות: ' + notesArr.join('; '), 'warn');
+    } finally { if (sendBtn) sendBtn.disabled = false; }
   }
 
   // ---------- היסטוריה ----------

@@ -324,7 +324,7 @@
       const activeTab = page.querySelector('.ym-tab.on').dataset.tab;
       if (!ext) { msg.textContent = 'הזינו שלוחת יעד.'; return; }
       let blob, name;
-      if (activeTab === 'text') { blob = state.ttsBlob; name = 'tts.wav'; if (!blob) { msg.textContent = 'צרו קול קודם (כפתור "צור קול").'; return; } }
+      if (activeTab === 'text') { blob = state.ttsBlob; name = 'tts.mp3'; if (!blob) { msg.textContent = 'צרו קול קודם (כפתור "צור קול").'; return; } }
       else if (activeTab === 'rec') { blob = state.recBlob; name = 'rec.webm'; if (!blob) { msg.textContent = 'הקליטו קודם.'; return; } }
       else { const f = page.querySelector('#ymFile').files[0]; if (!f) { msg.textContent = 'בחרו קובץ.'; return; } blob = f; name = f.name; }
 

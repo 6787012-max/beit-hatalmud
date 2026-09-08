@@ -361,9 +361,11 @@
     const btn = p.querySelector('#ylCampSend'); btn.disabled = true; out.textContent = 'שולח…';
     try {
       const r = await Y().runVoiceCampaign(blob, phones, { description: 'בית התלמוד — ' + label });
-      out.textContent = '✓ הקמפיין הופעל: ' + r.phoneCount + ' מספרים' +
+      const allFailed = r.entryFails && r.entryFails >= phones.length;
+      out.textContent = (allFailed ? '⚠️ הקמפיין נכשל: 0' : '✓ הקמפיין הופעל: ' + r.phoneCount) + ' מספרים' +
         (r.estimatedPrice != null ? ', עלות ' + r.estimatedPrice + ' יחידות' : '') +
         (r.entryFails ? (' (' + r.entryFails + ' מספרים נכשלו בהוספה)') : '');
+      if (allFailed) out.style.color = 'var(--danger)';
       showBalance();
     } catch (e) { out.textContent = 'השליחה נכשלה: ' + (e.message || e); }
     finally { btn.disabled = false; }
