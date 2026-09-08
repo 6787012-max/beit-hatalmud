@@ -122,6 +122,7 @@
         (window.cv3Sort ? window.cv3Sort.bar('stu') : '') +
       '</div>' +
       '<div class="count-line" id="stuCount"></div>' +
+      '<div id="classRepBox"></div>' +
       '<div class="table-wrap"><table class="tbl"><thead><tr>' +
         '<th style="width:44px">#</th><th>שם</th><th>כיתה</th><th>הורה</th><th>טלפון</th><th>סטטוס</th><th></th>' +
       '</tr></thead><tbody id="stuBody"></tbody></table></div>' +
@@ -163,6 +164,20 @@
         : rows.map((s, i) => tr(s, i + 1)).join('');
       page.querySelector('#stuCount').textContent = rows.length + ' מתוך ' + students.length + ' תלמידים';
       page.querySelector('#stuEmpty').hidden = rows.length > 0;
+      const repBox = page.querySelector('#classRepBox');
+      if (repBox) {
+        if (cf && window.cv3AI) {
+          const cls = classes.find(c => String(c.id) === cf);
+          repBox.innerHTML = '<button class="btn-ghost sm" id="classRepBtn"><i class="bi bi-stars"></i> חוות דעת AI לכיתה' + (cls ? ' — ' + esc(cls.name) : '') + '</button><div id="classRepSlot" class="tl-note" style="font-size:.84rem;margin-top:6px"></div>';
+          const crb = repBox.querySelector('#classRepBtn');
+          crb.addEventListener('click', () => {
+            crb.disabled = true;
+            window.cv3AI.renderClass(repBox.querySelector('#classRepSlot'), cf, cls ? cls.name : '').finally(() => { crb.disabled = false; });
+          });
+        } else {
+          repBox.innerHTML = '';
+        }
+      }
       body.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => openDetail(students.find(s => s.id == b.dataset.view))));
       body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openForm(students.find(s => s.id == b.dataset.edit))));
       body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => del(students.find(s => s.id == b.dataset.del))));

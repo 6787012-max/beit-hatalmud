@@ -19,6 +19,47 @@
   // מסמכי החובה בכל תיק (אפיון + החלטת ועדה שנעמי הוסיפה) — זהה ל-student-docs.js
   const NEED = ['ויתור סודיות', 'שאלון הפניה', 'אבחונים ורקע קודם', 'מסמך קביל', 'החלטת ועדה'];
 
+  // עקרונות משיטת "לא ניתן החינוך למלאכי השרת" (הרב אריה אינדורסקי, מכון
+  // הורני) — נוספו 2026-09-08 לבקשת יוסף, אותו METHOD_PROMPT שכבר בשימוש
+  // ב-cheder-maale-amos/js/ai-report.js. "בשביל מה" ולא "למה", אבחון בין
+  // תשומת לב עודפת למאבק כוח, עין טובה, אחריות בצעד קטן מתוך אמון.
+  const METHOD_PROMPT = [
+    'אתה יועץ חינוכי המלווה מלמדים ומחנכים בישיבה/מכינה, על פי דרך החינוך התורנית',
+    '(מבוססת על "לא ניתן החינוך למלאכי השרת", הרב אריה אינדורסקי, מכון הורני).',
+    'עקרונות שעליך ליישם בניתוח:',
+    '',
+    '1. שאל "בשביל מה" ולא "למה" — אל תחפש רק סיבות/גורמים חיצוניים להתנהגות',
+    '   חוזרת (עייפות, "קושי", "אופי"). התלמיד בטבעו רוצה להשתייך ולשתף',
+    '   פעולה; דפוס חוזר הוא לרוב ניסיון לא-מודע להשיג שייכות בדרך מוטעית.',
+    '2. שני סוגי שייכות מוטעית, והרמז לאבחנה הוא התגובה הרגשית של הצוות:',
+    '   (א) תשומת לב עודפת — התלמיד "מרוויח" מלהיתפס כחלש/מתקשה, ומקבל',
+    '   התעסקות ורחמים מוגברים. (ב) מאבק כוח — התלמיד "מרוויח" מניצחון על',
+    '   הסמכות, וגורם לתסכול וחוסר אונים. שער בזהירות לפי הנתונים, בלי לקבוע.',
+    '3. אל תניח מגבלה קבועה — קושי נוכחי אינו זהות. התלמיד יכול ורוצה,',
+    '   גם אם כרגע נראה אחרת.',
+    '4. המלצה מעשית: להעביר אחריות בצעד קטן אחד, מתוך אמון וסמכות רגועה —',
+    '   לא כפייה ולא ויתור. תוצאה טבעית/הגיונית עדיפה על עונש מתוך כעס.',
+    '5. עין טובה — פתח בנקודת חוזק אמיתית מתוך הנתונים, לפני הקושי.',
+    '',
+    'אל תפתח בברכה, פנייה אישית או הקדמה — התחל ישר מהכותרת הראשונה,',
+    'ואל תסיים במשפט סיכום — עצור אחרי הצעד המעשי.\n\n',
+  ].join('\n');
+
+  // מקורות חינוך שמנהל הוסיף (edu-sources.js, 08/09) — מוזרקים לכל פרומפט אחרי
+  // ה-METHOD_PROMPT הקבוע, לפני "נתונים:". אם המודול לא נטען/אין מקורות — no-op.
+  async function eduSourcesText() {
+    try { return window.cv3EduSources ? await window.cv3EduSources.sourcesText() : { text: '', sig: 'es0' }; }
+    catch (_) { return { text: '', sig: 'es0' }; }
+  }
+  function withEduSources(basePrompt, esText) {
+    if (!esText) return basePrompt;
+    const marker = 'נתונים:\n';
+    const idx = basePrompt.lastIndexOf(marker);
+    const block = 'מקורות חינוך נוספים שהמנהל הוסיף למערכת — שלב את הרוח וההנחיות שלהם ' +
+      'בניתוח, לצד השיטה הקבועה למעלה:\n' + esText + '\n\n';
+    return idx === -1 ? (basePrompt + '\n\n' + block) : (basePrompt.slice(0, idx) + block + basePrompt.slice(idx));
+  }
+
   // כל קריאות ה-AI עוברות דרך window.cv3call (ai-proxy.js): המפתח בשרת בלבד.
   async function gemini(prompt, maxTokens) {
     const body = {
@@ -47,7 +88,9 @@
   // מספיקה כדי לדעת אם משהו זז מאז הפעם הקודמת.
   // גרסת מטמון: סיכומים שנוצרו לפני תיקון טוקני החשיבה נשמרו קטועים.
   // העלאת המספר מבטלת אותם בלי לגעת ב-localStorage של המשתמש.
-  const CV = 'v2:';
+  // v3: prompt מבוסס-שיטה (METHOD_PROMPT, 08/09) — מבטל סיכומים ישנים בלי
+  // הכותרות/העקרונות החדשים, בלי לגעת ב-localStorage של המשתמש.
+  const CV = 'v3:';
   function cacheGet(k, sig) {
     try {
       const raw = localStorage.getItem('cv3ai_' + CV + k);
@@ -171,23 +214,65 @@
              text: lines.join('\n'), students: students, classes: classes };
   }
 
+  // ───────────────────────── איסוף נתוני כיתה בודדת (חדש 2026-09-08) ─────────────────────────
+  // כמו orgData, אבל מסונן לכיתה אחת — כדי לתת המלצה ממוקדת למחנך הכיתה,
+  // לא רק תמונה מוסדית כללית. אין מסך "כיתה" עצמאי במערכת (זה תמיד היה
+  // שדה סינון בטבלת תלמידים) — אותה תבנית כמו cheder-maale-amos.
+  async function classData(classId, className) {
+    const S = window.store;
+    const [studentsAll, att, beh, tests] = await Promise.all([
+      window.cv3Students ? window.cv3Students.getStudents() : S.list('students'),
+      S.list('attendance'), S.list('behavior_events'), S.list('tests'),
+    ]);
+    const students = studentsAll.filter(s => String(s.class_id) === String(classId));
+    const ids = students.map(s => s.id);
+    const inClass = arr => arr.filter(x => ids.indexOf(x.student_id) > -1);
+    const a = inClass(att);
+    const c = ks => a.filter(x => ks.indexOf(x.status) > -1).length;
+    const present = c(['present', 'נוכח']), late = c(['late', 'איחור']),
+          absent = c(['absent', 'חיסור', 'נעדר']);
+    const tot = present + late + absent + c(['left', 'יצא']);
+    const behC = inClass(beh);
+    const highSev = behC.filter(e => e.severity === 'גבוהה').length;
+    const grades = inClass(tests).map(t => Number(t.grade)).filter(x => !isNaN(x));
+    const byStudent = {};
+    behC.forEach(e => { byStudent[e.student_id] = (byStudent[e.student_id] || 0) + 1; });
+    const topReported = Object.keys(byStudent).sort((x, y) => byStudent[y] - byStudent[x]).slice(0, 3)
+      .map(sid => { const s = students.find(x => String(x.id) === String(sid)); return s ? nm(s) + ' (' + byStudent[sid] + ')' : null; })
+      .filter(Boolean);
+    return {
+      sig: [students.length, a.length, behC.length, inClass(tests).length].join('-'),
+      text: [
+        'כיתה: ' + (className || ''),
+        'מספר תלמידים: ' + students.length,
+        'נוכחות כיתתית: ' + (tot ? (Math.round(((present + late) / tot) * 100) + '% הגעה, ' + absent + ' חיסורים סה"כ') : 'אין רישומים'),
+        'דיווחי מעקב: ' + behC.length + ' סה"כ, מתוכם ' + highSev + ' בחומרה גבוהה',
+        'התלמידים עם הכי הרבה דיווחי מעקב: ' + (topReported.length ? topReported.join(', ') : 'אין ריכוז בולט'),
+        'מבחנים: ' + (grades.length ? (grades.length + ' ציונים, ממוצע ' + Math.round(grades.reduce((x, y) => x + y, 0) / grades.length)) : 'אין'),
+      ].join('\n'),
+    };
+  }
+
   // ───────────────────────── סיכום תלמיד ─────────────────────────
-  const STU_PROMPT = 'אתה עוזר פדגוגי בישיבה/מכינה. לפניך נתוני תלמיד מתוך מערכת המעקב. ' +
-    'כתוב בעברית סיכום קצר (עד 6 שורות) בשלושה חלקים קצרים: **תמונת מצב**, **נקודות לחיזוק**, **המלצה לצוות**. ' +
-    'הסתמך אך ורק על הנתונים שמופיעים כאן, בלי להמציא. אם אין מספיק נתונים — אמור זאת במשפט אחד. ' +
-    'אל תאבחן ואל תיתן חוות דעת רפואית. כתוב ענייני ומכבד.\n\nנתונים:\n';
+  const STU_PROMPT = METHOD_PROMPT +
+    'לפניך נתוני תלמיד יחיד מתוך מערכת המעקב. כתוב בעברית, קצר וממוקד (עד 8 שורות), ' +
+    'בשלושה חלקים עם כותרות מודגשות: **מה קורה כאן** (מה כנראה משיג התלמיד — או שאין מספיק ' +
+    'נתונים לדעת), **נקודת חוזק**, **צעד אחד מעשי לצוות**. הסתמך אך ורק על הנתונים שמופיעים ' +
+    'כאן, בלי להמציא. אל תאבחן ואל תיתן חוות דעת רפואית/פסיכולוגית — זו הכוונה חינוכית בלבד.\n\nנתונים:\n';
 
   async function renderStudent(host, student) {
     if (!host) return;
     host.innerHTML = '<div class="ld"><i class="bi bi-stars"></i> מנתח…</div>';
     try {
       const d = await studentData(student);
+      const es = await eduSourcesText();
+      const sig = d.sig + '|' + es.sig;
       const ck = 'stu' + student.id;
-      let hit = cacheGet(ck, d.sig);
+      let hit = cacheGet(ck, sig);
       if (!hit) {
-        const txt = await gemini(STU_PROMPT + d.text, 600);
-        cacheSet(ck, d.sig, txt);
-        hit = cacheGet(ck, d.sig) || { text: txt, at: Date.now() };
+        const txt = await gemini(withEduSources(STU_PROMPT, es.text) + d.text, 1000);
+        cacheSet(ck, sig, txt);
+        hit = cacheGet(ck, sig) || { text: txt, at: Date.now() };
       }
       host.innerHTML = md(hit.text) +
         '<div class="tl-note" style="font-size:.72rem;margin-top:6px">נוצר ע"י AI · ' + ago(hit.at) +
@@ -204,20 +289,30 @@
   }
 
   // ───────────────────────── סיכום מוסד ─────────────────────────
-  const ORG_PROMPT = 'אתה עוזר ניהולי במכינה. לפניך תמונת מצב מצטברת מהמערכת. ' +
-    'כתוב בעברית סיכום קצר למנהל (עד 7 שורות): **מה תקין**, **מה דורש תשומת לב**, **צעד מומלץ אחד**. ' +
-    'הסתמך רק על הנתונים. אם חסרים נתונים — ציין זאת קצר.\n\nנתונים:\n';
+  const ORG_PROMPT = METHOD_PROMPT +
+    'לפניך תמונת מצב מצטברת על כל המוסד (לא תלמיד ותלמיד). התייחס לאקלים הכללי — ' +
+    'האם יש ריכוז דיווחים אצל מעטים, מגמת נוכחות, כיתות שבולטות — ולא לתלמיד ספציפי. ' +
+    'כתוב בעברית, קצר וממוקד (עד 8 שורות), בשלושה חלקים עם כותרות מודגשות: **מה קורה כאן**, ' +
+    '**מה תקין** (נקודת חוזק מוסדית), **צעד אחד מעשי למנהל**. הסתמך רק על הנתונים.\n\nנתונים:\n';
+
+  const CLS_PROMPT = METHOD_PROMPT +
+    'לפניך נתונים מצטברים על כיתה אחת בלבד (לא תלמיד יחיד ולא כל המוסד). התייחס לאקלים ' +
+    'הכיתתי — האם יש ריכוז דיווחים אצל מעטים, מגמת נוכחות, וכו׳. ' +
+    'כתוב בעברית, קצר וממוקד (עד 8 שורות), בשלושה חלקים עם כותרות מודגשות: **מה קורה כאן**, ' +
+    '**נקודת חוזק**, **צעד אחד מעשי לצוות**. הסתמך רק על הנתונים.\n\nנתונים:\n';
 
   async function renderOrg(host) {
     if (!host) return;
     host.innerHTML = '<div class="ld"><i class="bi bi-stars"></i> מנתח את נתוני המוסד…</div>';
     try {
       const d = await orgData();
-      let hit = cacheGet('org', d.sig);
+      const es = await eduSourcesText();
+      const sig = d.sig + '|' + es.sig;
+      let hit = cacheGet('org', sig);
       if (!hit) {
-        const txt = await gemini(ORG_PROMPT + d.text, 700);
-        cacheSet('org', d.sig, txt);
-        hit = cacheGet('org', d.sig) || { text: txt, at: Date.now() };
+        const txt = await gemini(withEduSources(ORG_PROMPT, es.text) + d.text, 1000);
+        cacheSet('org', sig, txt);
+        hit = cacheGet('org', sig) || { text: txt, at: Date.now() };
       }
       host.innerHTML = md(hit.text) +
         '<div class="tl-note" style="font-size:.72rem;margin-top:6px">נוצר ע"י AI לפי ההרשאות שלך · ' + ago(hit.at) +
@@ -227,6 +322,35 @@
         e.preventDefault();
         try { localStorage.removeItem('cv3ai_' + CV + 'org'); } catch (_) {}
         renderOrg(host);
+      });
+    } catch (e) {
+      host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(e.message || e) + ')</div>';
+    }
+  }
+
+  // ───────────────────────── סיכום כיתה (חדש 2026-09-08) ─────────────────────────
+  async function renderClass(host, classId, className) {
+    if (!host) return;
+    host.innerHTML = '<div class="ld"><i class="bi bi-stars"></i> מנתח את נתוני הכיתה…</div>';
+    const ck = 'cls' + classId;
+    try {
+      const d = await classData(classId, className);
+      const es = await eduSourcesText();
+      const sig = d.sig + '|' + es.sig;
+      let hit = cacheGet(ck, sig);
+      if (!hit) {
+        const txt = await gemini(withEduSources(CLS_PROMPT, es.text) + d.text, 1000);
+        cacheSet(ck, sig, txt);
+        hit = cacheGet(ck, sig) || { text: txt, at: Date.now() };
+      }
+      host.innerHTML = md(hit.text) +
+        '<div class="tl-note" style="font-size:.72rem;margin-top:6px">נוצר ע"י AI · ' + ago(hit.at) +
+        ' · <a href="#" data-airefresh>רענון</a></div>';
+      const r = host.querySelector('[data-airefresh]');
+      if (r) r.addEventListener('click', e => {
+        e.preventDefault();
+        try { localStorage.removeItem('cv3ai_' + CV + ck); } catch (_) {}
+        renderClass(host, classId, className);
       });
     } catch (e) {
       host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(e.message || e) + ')</div>';
@@ -285,5 +409,5 @@
     return _ctx;
   }
 
-  window.cv3AI = { renderStudent, renderOrg, dataContext, gemini, md, orgData };
+  window.cv3AI = { renderStudent, renderOrg, renderClass, dataContext, gemini, md, orgData, classData };
 })();

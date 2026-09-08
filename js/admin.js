@@ -40,6 +40,7 @@
         '<div class="qr-grid" style="grid-template-columns:1fr auto;margin-top:10px"><input class="inp mb0" id="newCls" placeholder="שם כיתה חדשה"><button class="btn-primary sm" id="addCls"><i class="bi bi-plus-lg"></i> הוסף</button></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-tags"></i> קטגוריות התנהגות</h3><p class="login-hint" style="margin:0 0 8px">הקטגוריות מופיעות בבחירה בעת דיווח התנהגות. ניתן להוסיף, לערוך ולמחוק.</p><div id="catList"></div>' +
         '<div class="qr-grid" style="grid-template-columns:1fr auto;margin-top:10px"><input class="inp mb0" id="newCat" placeholder="שם קטגוריה חדשה"><button class="btn-primary sm" id="addCat"><i class="bi bi-plus-lg"></i> הוסף</button></div></div>' +
+      '<div class="qr-card"><h3><i class="bi bi-stars"></i> מקורות חינוך ל-AI</h3><div id="eduSrcPanel"></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-clock-history"></i> יומן פעולות</h3><div id="audList"></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-bug"></i> בקשות תיקון</h3><div class="qr-grid" style="grid-template-columns:auto 2fr auto"><select class="inp mb0" id="fbKind"><option value="bug">באג</option><option value="idea">רעיון</option></select><textarea class="inp mb0 ta-auto" id="fbBody" rows="2" placeholder="תיאור…"></textarea><button class="btn-primary sm" id="fbSave"><i class="bi bi-send"></i> שלח</button></div><div id="fbList" style="margin-top:10px"></div></div>' +
       '<div class="qr-card"><h3><i class="bi bi-info-circle"></i> אודות</h3><ul class="about-list"><li>מערכת מעקב — מכינה בית התלמוד · גרסה 0.2</li><li>ארכיטקטורה: GitHub Pages + Supabase (RLS)</li><li>מוסד: <b id="aboutInst"></b></li></ul></div>';
@@ -265,6 +266,7 @@
       findUser: id => users.find(u => String(u.id) === String(id)),
     };
     drawCls(); drawCats(); drawUsers(); drawFb();
+    if (window.cv3EduSources) window.cv3EduSources.renderPanel(page.querySelector('#eduSrcPanel'));
     if (window.cv3Team) window.cv3Team.render(page.querySelector('#teamOverview'));
   }
 
