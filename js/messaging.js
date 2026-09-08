@@ -324,17 +324,21 @@
       page.querySelectorAll('#msgVoiceCard .ym-pane').forEach(p => p.hidden = p.dataset.vp !== t.dataset.vt);
     }));
     // TTS דרך geminiSpeak (חשוף ע"י yemot.js)
-    page.querySelector('#msgTtsGen').addEventListener('click', async () => {
+    page.querySelector('#msgTtsGen').addEventListener('click', async ev => {
+      const btn = ev.currentTarget;
       const txt = page.querySelector('#msgVoiceText').value.trim();
       const msg = page.querySelector('#msgTtsMsg'), prev = page.querySelector('#msgTtsPrev');
       if (!txt) { msg.textContent = 'כתבו טקסט קודם'; return; }
       if (!window.geminiSpeak) { msg.textContent = 'רכיב TTS לא זמין (רענן/נקה cache)'; return; }
-      msg.textContent = 'יוצר קול…';
+      // חסימת קליק כפול — הקריאה יכולה לקחת עד כ-20 שניות (תור ריצות ב-Apps
+      // Script), וקליק נוסף באמצע יצר שתי קריאות מקבילות שהתחרו זו בזו.
+      btn.disabled = true; msg.textContent = 'יוצר קול… (עד כ-20 שניות)';
       try {
-        state.audioBlob = await window.geminiSpeak(txt); state.audioName = 'tts.wav';
+        state.audioBlob = await window.geminiSpeak(txt); state.audioName = 'tts.mp3';
         prev.src = URL.createObjectURL(state.audioBlob); prev.style.display = '';
         msg.textContent = '✓ הקול מוכן';
       } catch (e) { msg.textContent = 'יצירת קול נכשלה: ' + String(e && e.message || e); }
+      finally { btn.disabled = false; }
     });
     // הקלטה
     let rec = null, chunks = [], timer = null, t0 = 0;
@@ -711,9 +715,15 @@
       // בדיקה אמיתית מול השרת — לא רק "יש מחרוזת טוקן שמורה". הטוקן נשמר
       // בין כניסות (localStorage) אבל פג אצל ימות אחרי כ-45 דק' חוסר פעילות;
       // בלי הבדיקה הזו זה נכשל בשקט בתוך runVoiceCampaign וקל לפספס את
-      // ההערה (דווח ע"י יוסף 08/09/2026 — "מייל נשלח, קול לא").
-      const yemotConnected = window.Yemot && window.Yemot.token() &&
-        (await window.Yemot.call('GetSession').catch(() => ({}))).responseStatus === 'OK';
+      // ההערה (דווח ע"י יוסף 08/09/2026 — "מייל נשלח, קול לא"). אם המנהל
+      // סימן "התחבר אוטומטית תמיד" במסך הקו — tryAutoLogin מתחבר מחדש בשקט
+      // כאן, בלי לגרום למשתמש לעבור למסך הקו בעצמו.
+      const checkYemot = async () => {
+        if (!window.Yemot) return false;
+        if (window.Yemot.token() && (await window.Yemot.call('GetSession').catch(() => ({}))).responseStatus === 'OK') return true;
+        return window.Yemot.tryAutoLogin ? await window.Yemot.tryAutoLogin() : false;
+      };
+      const yemotConnected = await checkYemot();
       if (!yemotConnected) {
         voiceMsg = 'failed';
         notesArr.push('לא מחובר לקו ימות (או שההתחברות פגה) — היכנס למסך "קו ימות המשיח", התחבר מחדש, ואז שלח שוב');

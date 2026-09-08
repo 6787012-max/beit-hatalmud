@@ -8,65 +8,39 @@
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const API = 'https://www.call2all.co.il/ym/api';
-  // טקסט→שמע: דרך window.cv3call (ai-proxy.js). המפתח שמור כסוד בשרת (Supabase
-  // secret GEMINI_KEY) ואינו נמצא עוד בקוד הלקוח / ב-repo הציבורי.
-  const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
-  const GKEY_LS = 'cv3_gemini_key';
-  // מפתח אופציונלי שמנהל יכול להזין ידנית (localStorage) לעקיפת השרת — לרוב אין.
-  // נחשב רק אם הוא בפורמט תקין (AIza…); אחרת מתעלמים ומשתמשים בשרת.
-  const gKey = () => { try { const k = localStorage.getItem(GKEY_LS) || ''; return /^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(k) ? k : ''; } catch (_) { return ''; } };
-  const setGKey = k => { try { k ? localStorage.setItem(GKEY_LS, k) : localStorage.removeItem(GKEY_LS); } catch (_) {} };
   const SS_KEY = 'cv3_yemot_token';
   const DEFAULT_LINE = '0733518751';   // קו המכינה "תשע תלמוד". 033060570 הוא קו החיידר — לא כאן.
 
-  // PCM16 (base64) → WAV Blob
-  function pcmB64ToWav(b64, rate) {
-    const bin = atob(b64), dataLen = bin.length;
-    const buf = new ArrayBuffer(44 + dataLen), dv = new DataView(buf);
-    const wr = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
-    wr(0, 'RIFF'); dv.setUint32(4, 36 + dataLen, true); wr(8, 'WAVE'); wr(12, 'fmt ');
-    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-    dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true);
-    dv.setUint16(34, 16, true); wr(36, 'data'); dv.setUint32(40, dataLen, true);
-    for (let i = 0; i < dataLen; i++) dv.setUint8(44 + i, bin.charCodeAt(i));
-    return new Blob([buf], { type: 'audio/wav' });
-  }
-  // Gemini TTS מחזיר לפעמים 200 OK עם candidates[0] ריק (finishReason שאינו
-  // STOP, בד"כ OTHER) — בעיקר על טקסט בעברית. תקלה מתועדת אצל גוגל עצמם
-  // (google-gemini/cookbook#1231, ספטמבר 2026), אין תיקון צד-שרת, אין הודעת
-  // שגיאה מפורשת שמסבירה למה. אומת ידנית: אנגלית מצליחה בעקביות, עברית נכשלת
-  // בעקביות (לא "לפעמים") מול המפתח של הפרויקט הזה. retry לא עוזר לרוב, אבל
-  // האפשרות שזו תנודתיות אמיתית (כמו שגוגל עצמם מתארים אצל משתמשים אחרים)
-  // מצדיקה כמה ניסיונות בשקט לפני שמציגים למשתמש שגיאה + חלופה.
-  async function geminiSpeak(text, opts) {
-    opts = opts || {};
-    const attempts = opts.attempts || 3;
-    const body = {
-      contents: [{ parts: [{ text: 'קרא בקול רגוע, ברור ומקצועי המתאים להודעה טלפונית: ' + text }] }],
-      generationConfig: { responseModalities: ['AUDIO'],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } } }
-    };
-    let lastErr = null;
-    for (let i = 0; i < attempts; i++) {
-      try {
-        const r = await window.cv3call(TTS_MODEL, body);
-        const j = await r.json().catch(() => null);
-        if (!r.ok || !j) { lastErr = new Error((j && j.error && j.error.message) || 'שגיאת Gemini'); }
-        else {
-          const cand = j.candidates && j.candidates[0];
-          const inline = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].inlineData;
-          if (inline && inline.data) {
-            let rate = 24000; const m = (inline.mimeType || '').match(/rate=(\d+)/); if (m) rate = parseInt(m[1], 10);
-            return pcmB64ToWav(inline.data, rate);
-          }
-          lastErr = new Error('empty:' + (cand && cand.finishReason || '?'));
-        }
-      } catch (e) { lastErr = e; }
-      if (i < attempts - 1) await new Promise(res => setTimeout(res, 700));
-    }
-    const em = String(lastErr && lastErr.message || '');
-    if (/API key|invalid|expired/i.test(em)) throw lastErr;
-    throw new Error('שירות יצירת הקול של גוגל לא הצליח להפיק אודיו (בעיה ידועה שלהם, בעיקר בעברית — לא תקלה במערכת שלנו). נסו שוב בעוד רגע, או השתמשו ב"הקלטה ישירה" / "קובץ מוכן" במקום.');
+  // טקסט→שמע: Gemini native TTS הוחלף (08/09/2026) — נכשל עקבי על עברית
+  // (200 OK עם candidates[0] ריק, finishReason:"OTHER"; מתועד אצל גוגל עצמם,
+  // google-gemini/cookbook#1231) ולא היה חינמי (יוסף כבר חויב מאות שקלים על
+  // הפרוקסי שלו). התחליף: Google Translate TTS (לא רשמי, בלי מפתח, בלי
+  // מכסה) — אבל דרך ה-Apps Script bridge (GAS_URL) ולא Supabase Edge
+  // Function: נוסה קודם דרך Deno/Supabase והוחזר עקבי קובץ קבוע-וקטוע
+  // (rate-limit על טווח ה-IP המשותף של הפלטפורמה); UrlFetchApp מתשתית גוגל
+  // עצמה לא נתקל בזה בכלל. הפיצול לקטעים ≤180 תווים ושרשור ה-MP3 קורים
+  // בצד-שרת (_APPS_SCRIPT_BRIDGE.gs action=tts) — הלקוח רק שולח טקסט וגוזר Blob.
+  async function geminiSpeak(text) {
+    const gasUrl = window.CV3 && window.CV3.GAS_URL;
+    if (!gasUrl) throw new Error('שירות יצירת הקול לא מוגדר (חסר GAS_URL)');
+    let jwt = '';
+    try {
+      const s = window.sb && window.sb.auth && (await window.sb.auth.getSession());
+      jwt = (s && s.data && s.data.session && s.data.session.access_token) || '';
+    } catch (_) {}
+    if (!jwt) throw new Error('צריך להתחבר מחדש כדי ליצור קול');
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      // text/plain כדי להימנע מ-CORS preflight (Apps Script חוסם OPTIONS) — אותה תבנית כמו sendMail.
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'tts', token: jwt, text }),
+    });
+    const j = await res.json().catch(() => null);
+    if (!j || j.error) throw new Error((j && j.error) || 'יצירת הקול נכשלה — שגיאת רשת או שרת');
+    const bin = atob(j.audio_base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: j.mime || 'audio/mpeg' });
   }
 
   // localStorage ולא sessionStorage — יוסף ביקש שההתחברות תישאר בין פתיחות של
@@ -74,6 +48,21 @@
   // פעילות (call() מנקה אותו אז לבד כשזה קורה) — זה לא הופך אותו לתמידי.
   const token = () => { try { return localStorage.getItem(SS_KEY) || ''; } catch (_) { return ''; } };
   const setToken = t => { try { t ? localStorage.setItem(SS_KEY, t) : localStorage.removeItem(SS_KEY); } catch (_) {} };
+
+  // "התחבר אוטומטית תמיד" (בקשת יוסף 08/09/2026) — הטוקן פג אחרי ~45 דק',
+  // אז לבד הוא לא מספיק כדי "להישאר מחובר תמיד". נשמר רק ב-localStorage של
+  // המכשיר הזה, לעולם לא בקוד המקור (שהוא ריפו ציבורי — ראה incident מפתח
+  // Gemini שדלף בעבר מאותה סיבה). המשתמש בוחר את זה מפורשות (checkbox
+  // מסומן-כבוי כברירת מחדל), לא ברירת מחדל אוטומטית.
+  const CREDS_LS = 'cv3_yemot_creds';
+  const getCreds = () => { try { return JSON.parse(localStorage.getItem(CREDS_LS) || 'null'); } catch (_) { return null; } };
+  const setCreds = c => { try { c ? localStorage.setItem(CREDS_LS, JSON.stringify(c)) : localStorage.removeItem(CREDS_LS); } catch (_) {} };
+  async function tryAutoLogin() {
+    const c = getCreds();
+    if (!c || !c.line || !c.pass) return false;
+    const r = await login(c.line, c.pass);
+    return r.ok;
+  }
 
   async function call(method, params) {
     const qs = new URLSearchParams(Object.assign({ token: token() }, params || {}));
@@ -176,25 +165,36 @@
 
   const state = { path: 'ivr2:/', rec: null, chunks: [], recBlob: null, ttsBlob: null };
 
-  async function render(page) { return token() ? renderPanel(page) : renderLogin(page); }
+  async function render(page) {
+    if (token()) return renderPanel(page);
+    if (await tryAutoLogin()) return renderPanel(page);   // "זכור אותי" — התחברות שקטה לפני שמציגים טופס
+    return renderLogin(page);
+  }
 
   function renderLogin(page) {
+    const remembered = !!getCreds();
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>קו ימות המשיח</h2></div>' +
       '<div class="qr-card" style="max-width:460px;margin:0 auto">' +
         '<h3><i class="bi bi-telephone-inbound"></i> התחברות לקו המוסד</h3>' +
-        '<p class="login-hint" style="margin:6px 0 14px">ההתחברות מול שרת ימות. הסיסמה אינה נשמרת — רק אסימון גישה, שנשאר שמור במכשיר הזה עד ניתוק ידני (פג אצל ימות אחרי כ-45 דק׳ חוסר פעילות).</p>' +
+        '<p class="login-hint" style="margin:6px 0 14px">ההתחברות מול שרת ימות. אסימון הגישה נשאר שמור במכשיר הזה עד ניתוק ידני (פג אצל ימות אחרי כ-45 דק׳ חוסר פעילות).</p>' +
         '<label class="lbl">מספר הקו</label><input class="inp" id="ymLine" value="' + DEFAULT_LINE + '" inputmode="numeric">' +
         '<label class="lbl">סיסמת הקו</label><input class="inp" id="ymPass" type="password" autocomplete="off" placeholder="סיסמת ניהול הקו">' +
-        '<button class="btn-primary" id="ymLoginBtn" style="margin-top:6px"><i class="bi bi-box-arrow-in-left"></i> התחברות</button>' +
+        '<label class="ym-check" style="margin-top:8px"><input type="checkbox" id="ymRemember"' + (remembered ? ' checked' : '') + '> התחבר אוטומטית תמיד במכשיר הזה (גם אחרי שהאסימון פג)</label>' +
+        '<p class="login-hint" style="margin:4px 0 0"><i class="bi bi-shield-lock"></i> הסיסמה תישמר רק בדפדפן הזה — לא בקוד האתר ולא בשרת.</p>' +
+        '<button class="btn-primary" id="ymLoginBtn" style="margin-top:10px"><i class="bi bi-box-arrow-in-left"></i> התחברות</button>' +
         '<div id="ymMsg" class="login-msg"></div></div>';
     const btn = page.querySelector('#ymLoginBtn');
     const go = async () => {
       const line = page.querySelector('#ymLine').value.trim(), pass = page.querySelector('#ymPass').value, msg = page.querySelector('#ymMsg');
+      const remember = page.querySelector('#ymRemember').checked;
       if (!line || !pass) { msg.textContent = 'נא להזין מספר קו וסיסמה.'; return; }
       msg.textContent = 'מתחבר…'; btn.disabled = true;
-      try { const r = await login(line, pass); if (r.ok) { state.path = 'ivr2:/'; render(page); } else { msg.textContent = r.msg; btn.disabled = false; } }
-      catch (e) { msg.textContent = 'שגיאת רשת — בדוק חיבור.'; btn.disabled = false; }
+      try {
+        const r = await login(line, pass);
+        if (r.ok) { setCreds(remember ? { line, pass } : null); state.path = 'ivr2:/'; render(page); }
+        else { msg.textContent = r.msg; btn.disabled = false; }
+      } catch (e) { msg.textContent = 'שגיאת רשת — בדוק חיבור.'; btn.disabled = false; }
     };
     btn.addEventListener('click', go);
     page.querySelector('#ymPass').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
@@ -218,16 +218,9 @@
 
         '<div class="ym-pane" data-pane="text">' +
           '<textarea class="inp" id="ymText" rows="3" placeholder="כתבו את ההודעה שתוקרא בקול… (למשל: שלום, הגעתם למכינה בית התלמוד)"></textarea>' +
-          '<div id="ymKeyRow" hidden style="margin-top:8px">' +
-            '<label class="lbl" style="margin-bottom:4px">מפתח Gemini (נשמר במכשיר זה בלבד, פעם אחת)</label>' +
-            '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-              '<input class="inp mb0" id="ymGKey" type="text" dir="ltr" autocomplete="off" spellcheck="false" placeholder="AIza…" style="flex:1;min-width:180px;direction:ltr;text-align:left">' +
-              '<button class="btn-ghost sm" id="ymGKeySave"><i class="bi bi-key"></i> שמור מפתח</button></div>' +
-            '<p class="login-hint" style="margin-top:4px">המפתח נשמר מקומית בדפדפן שלך בלבד ואינו נשלח לאף שרת חוץ מ-Google.</p></div>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">' +
             '<button class="btn-ghost sm" id="ymTtsGen"><i class="bi bi-soundwave"></i> צור קול</button>' +
             '<audio id="ymTtsPrev" controls style="display:none;height:36px"></audio>' +
-            '<button class="btn-ghost sm" id="ymKeyChange" style="opacity:.7"><i class="bi bi-key"></i> החלף מפתח</button>' +
             '<span id="ymTtsMsg" class="count-line"></span></div></div>' +
 
         '<div class="ym-pane" data-pane="rec" hidden>' +
@@ -258,7 +251,9 @@
       // עורך הגדרות שלוחה (מוסתר עד לחיצה)
       '<div class="qr-card" id="ymEditCard" hidden></div>';
 
-    page.querySelector('#ymLogout').addEventListener('click', () => { setToken(''); render(page); });
+    // ניתוק מפורש מבטל גם "התחבר אוטומטית" — אחרת render() היה מתחבר
+    // מחדש באותה שנייה מ-tryAutoLogin() והכפתור היה נראה כאילו לא עושה כלום.
+    page.querySelector('#ymLogout').addEventListener('click', () => { setToken(''); setCreds(null); render(page); });
     page.querySelector('#ymRefresh').addEventListener('click', () => loadDir(page, state.path));
     page.querySelector('#ymNewExt').addEventListener('click', () => openCreate(page));
     wireTabs(page); wireTts(page); wireRec(page); wireSend(page);
@@ -273,38 +268,24 @@
     }));
   }
 
-  // ----- טקסט → שמע (Gemini ישירות מהדפדפן) -----
+  // ----- טקסט → שמע (Google Translate TTS, חינמי, דרך Apps Script) -----
   function wireTts(page) {
-    const keyRow = page.querySelector('#ymKeyRow');
-    keyRow.hidden = true;  // המפתח בשרת — אין צורך להזין. הכפתור למטה לעקיפה ידנית בלבד.
-    page.querySelector('#ymKeyChange').addEventListener('click', () => {
-      keyRow.hidden = false;
-      const inp = page.querySelector('#ymGKey'); inp.value = ''; inp.focus();
-    });
-    // ניקוי מפתח שגוי שנשמר בטעות בעבר (למשל קוד OAuth) — כדי לא לדרוס את המוטמע
-    try { const st = localStorage.getItem(GKEY_LS); if (st && !/^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(st)) setGKey(''); } catch (_) {}
-    page.querySelector('#ymGKeySave').addEventListener('click', () => {
-      // ניקוי רעשי-הדבקה: רווחים, מרכאות, תווים נסתרים
-      const k = page.querySelector('#ymGKey').value.replace(/[\s"'`​-‏]/g, '');
-      const msg = page.querySelector('#ymTtsMsg');
-      if (!/^(AIza[\w-]{20,}|AQ\.[\w-]{20,})$/.test(k)) { msg.textContent = 'זה לא מפתח Gemini תקין. מפתח מתחיל ב-AIza או ב-AQ.'; return; }
-      setGKey(k); keyRow.hidden = true;
-      msg.textContent = '✓ המפתח נשמר. לחצו "צור קול" כדי לבדוק.';
-    });
-    page.querySelector('#ymTtsGen').addEventListener('click', async () => {
+    page.querySelector('#ymTtsGen').addEventListener('click', async ev => {
+      const btn = ev.currentTarget;
       const text = page.querySelector('#ymText').value.trim();
       const msg = page.querySelector('#ymTtsMsg'), prev = page.querySelector('#ymTtsPrev');
       if (!text) { msg.textContent = 'כתבו טקסט קודם.'; return; }
-      msg.textContent = 'יוצר קול…';
+      // חסימת קליק כפול — הקריאה יכולה לקחת עד כ-20 שניות (טקסט ארוך = כמה
+      // קטעים בתור אצל Apps Script), ולחיצה נוספת באמצע יצרה שתי קריאות
+      // מקבילות שהתחרו על אותה מכסת-הרצה ושתיהן נכשלו/התארכו עוד יותר
+      // (נצפה בבדיקה 08/09/2026).
+      btn.disabled = true; msg.textContent = 'יוצר קול… (עד כ-20 שניות)';
       try {
         state.ttsBlob = await geminiSpeak(text);
         prev.src = URL.createObjectURL(state.ttsBlob); prev.style.display = '';
         msg.textContent = '✓ הקול מוכן — האזינו והעלו לשלוחה.';
-      } catch (e) {
-        const em = String(e && e.message || e);
-        if (/API key|invalid|expired/i.test(em)) { keyRow.hidden = false; msg.textContent = 'מפתח ה-AI נדחה — פנו למנהל המערכת.'; }
-        else msg.textContent = 'יצירת הקול נכשלה: ' + em;
-      }
+      } catch (e) { msg.textContent = 'יצירת הקול נכשלה: ' + String(e && e.message || e); }
+      finally { btn.disabled = false; }
     });
   }
 
@@ -638,11 +619,10 @@
               estimatedPrice: run.estimatedPrice, entryFails, phoneCount: uniquePhones.length };
   }
 
-  // חשיפה למודולים אחרים (דיווחים קוליים): המפתח הפעיל + עזרי ימות
-  window.geminiKey = gKey;
-  window.geminiSpeak = geminiSpeak;   // לשימוש עמוד הבדיקה/מודולים
+  // חשיפה למודולים אחרים (דיווחים קוליים): עזרי ימות
+  window.geminiSpeak = geminiSpeak;   // השם נשמר לתאימות — הרבה מודולים כבר קוראים לו; המימוש הפנימי הוחלף ל-TTS חינמי (ראה למעלה)
   window.Yemot = {
-    API, token, call, getText, putText, uploadBlob, parseIni, serializeIni, runVoiceCampaign,
+    API, token, call, getText, putText, uploadBlob, parseIni, serializeIni, runVoiceCampaign, tryAutoLogin,
     downloadUrl: path => `${API}/DownloadFile?token=${encodeURIComponent(token())}&path=${encodeURIComponent(path)}`
   };
 

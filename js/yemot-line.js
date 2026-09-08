@@ -183,7 +183,7 @@
   async function genVoice() {
     const p = pane('msg'), txt = p.querySelector('#ylText').value.trim(), out = p.querySelector('#ylMsgOut');
     if (!txt) { out.textContent = 'כתבו קודם את ההודעה.'; return; }
-    const btn = p.querySelector('#ylGen'); btn.disabled = true; out.textContent = 'יוצר קול…';
+    const btn = p.querySelector('#ylGen'); btn.disabled = true; out.textContent = 'יוצר קול… (עד כ-20 שניות)';
     try {
       blob = await window.geminiSpeak(txt);
       showPrev(URL.createObjectURL(blob));
