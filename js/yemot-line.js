@@ -465,6 +465,8 @@
             (who[ph] = who[ph] || new Set()).add(s.name || '');
           });
       });
+      // הורה שהוא גם איש צוות — עדיפות לניתוב ההורה (זה השימוש העיקרי של
+      // הרשימה); הוא עדיין יכול להגיע לתפריט הצוות ידנית דרך /0.
       const excluded = Object.keys(map).filter(ph => staff.has(ph));
       excluded.forEach(ph => delete map[ph]);
       const single = {}, multi = {};
@@ -472,9 +474,14 @@
         const a = [...map[ph]];
         if (a.length === 1) single[ph] = a[0]; else multi[ph] = a.sort();
       });
+      // אנשי צוות (שאינם הורה חופף) → תפריט צוות ייעודי ("staff": מזכיר
+      // בקול שלוחות 8/9, שהתפריט הראשי הרגיל לא מזכיר בכלל — בלעדי זה כל
+      // איש צוות ששומע את תפריט ההורים לא יודע להיכן להקיש. בקשת יוסף 08/09/2026).
+      let staffRouted = 0;
+      staff.forEach(ph => { if (!(ph in single) && !(ph in multi)) { single[ph] = 'staff'; staffRouted++; } });
 
       builtIni = ['; נוצר מהמערכת — אל תערוך ידנית.',
-                  '; מיפוי טלפון הורה -> שלוחת השיעור. מי שלא כאן שומע את התפריט הראשי.']
+                  '; מיפוי טלפון -> שלוחה: הורה=שלוחת הכיתה, איש צוות=staff (תפריט צוות). מי שלא כאן שומע את התפריט הראשי.']
         .concat(Object.keys(single).sort().map(ph => ph + '=' + single[ph])).join('\n') + '\n';
 
       const per = {}; Object.values(single).forEach(e => { per[e] = (per[e] || 0) + 1; });
@@ -482,10 +489,11 @@
         '<div class="ym-stats">' + TARGETS.slice(0, 4).map(t =>
           '<div class="ym-stat"><i class="bi bi-people"></i><div><span class="ym-k">' + esc(t.label) +
           '</span><b>' + (per[t.key] || 0) + '</b></div></div>').join('') +
+        '<div class="ym-stat"><i class="bi bi-person-badge"></i><div><span class="ym-k">צוות → תפריט צוות</span><b>' + staffRouted + '</b></div></div>' +
         '<div class="ym-stat"><i class="bi bi-telephone"></i><div><span class="ym-k">סה"כ מספרים</span><b>' +
           Object.keys(single).length + '</b></div></div></div>' +
-        (excluded.length ? '<p class="login-hint"><i class="bi bi-shield-check"></i> הוחרגו ' + excluded.length +
-          ' מספרי צוות — הם ימשיכו לשמוע את התפריט הראשי ולהגיע לשלוחה 9.</p>' : '') +
+        (excluded.length ? '<p class="login-hint"><i class="bi bi-shield-check"></i> ' + excluded.length +
+          ' מספרי צוות הם גם הורים רשומים — קיבלו ניתוב הורה (עדיפות), לא ניתוב צוות. הם עדיין יכולים להגיע לתפריט הצוות דרך התפריט הראשי.</p>' : '') +
         (Object.keys(multi).length ? '<p class="login-hint"><i class="bi bi-exclamation-triangle"></i> ' +
           Object.keys(multi).length + ' מספרים עם אחים בשני שיעורים — לא מנותבים, יקבלו את התפריט הראשי ויבחרו:<br>' +
           Object.keys(multi).map(ph => esc(ph) + ' (' + esc([...(who[ph] || [])].join(', ')) + ')').join('<br>') + '</p>' : '');
