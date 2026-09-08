@@ -66,6 +66,7 @@
   }
 
   const UNIT_PER_CALL = 0.1;   // אומת חי מול RunTzintuk (bilingPerCall)
+  const CAMPAIGN_UNIT_PER_CALL = 1.0;   // אומת חי מול RunCampaign (unitsPerMessage) — פי 10 מצינתוק
   async function units() {
     try { const s = await Y().call('GetSession'); return typeof s.units === 'number' ? s.units : null; }
     catch (_) { return null; }
@@ -137,7 +138,25 @@
       '<div id="ylMsgOut" class="count-line" style="margin-top:8px;min-height:1.2em"></div>' +
       '<p class="login-hint" style="margin-top:6px"><i class="bi bi-info-circle"></i> ' +
         'הצינתוק רק מצלצל — הנמען מתקשר בחזרה ושומע. הוא לא משמיע את ההודעה בשיחה עצמה. ' +
-        'שידור לרשימת המערכת עולה ' + UNIT_PER_CALL + ' יחידה לשיחה; לנרשמים — חינם.</p>';
+        'שידור לרשימת המערכת עולה ' + UNIT_PER_CALL + ' יחידה לשיחה; לנרשמים — חינם.</p>' +
+
+      '<hr style="border:none;border-top:1px solid var(--line);margin:18px 0">' +
+      '<h4 style="margin:0 0 6px"><i class="bi bi-telephone-outbound"></i> שיחה יזומה עם הקראת ההודעה (קמפיין אמיתי)</h4>' +
+      '<p class="login-hint" style="margin:0 0 10px">' +
+        'בשונה מצינתוק — כאן המערכת מתקשרת ומשמיעה את ההודעה למעלה <b>בתוך השיחה עצמה</b>, ' +
+        'בלי שהנמען צריך לחזור ולהתקשר. עולה משמעותית יותר: כ-' + CAMPAIGN_UNIT_PER_CALL + ' יחידה לכל שיחה ' +
+        '(נגבית גם על ניסיון שלא נענה).</p>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">' +
+        '<label class="ym-check"><input type="radio" name="ylCampTo" value="class" checked> ' +
+          'לכל הורי השיעור שנבחר למעלה <span class="count-line" id="ylCampClassCost">…</span></label>' +
+        '<label class="ym-check"><input type="radio" name="ylCampTo" value="one"> תלמיד/הורה בודד</label>' +
+        '<label class="ym-check"><input type="radio" name="ylCampTo" value="phone"> מספר טלפון חופשי (גם למי שאינו הורה תלמיד)</label></div>' +
+      '<div id="ylCampOne" hidden style="margin-bottom:10px"><select class="inp mb0" id="ylCampStudent"><option value="">טוען…</option></select></div>' +
+      '<div id="ylCampPhone" hidden style="margin-bottom:10px">' +
+        '<input class="inp mb0" id="ylCampPhoneInput" placeholder="05XXXXXXXX" inputmode="tel" dir="ltr" style="text-align:left;max-width:220px"></div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
+        '<button class="btn-primary sm" id="ylCampSend" disabled><i class="bi bi-telephone-outbound"></i> שלח שיחה אמיתית</button>' +
+        '<span class="count-line" id="ylCampOut"></span></div>';
 
     p.querySelector('#ylTarget').addEventListener('change', loadMsgs);
     p.querySelector('#ylMsgRefresh').addEventListener('click', loadMsgs);
@@ -146,10 +165,12 @@
       const f = e.target.files && e.target.files[0];
       if (!f) return;
       blob = f; showPrev(URL.createObjectURL(f)); p.querySelector('#ylUpload').disabled = false;
+      p.querySelector('#ylCampSend').disabled = false;
     });
     p.querySelector('#ylUpload').addEventListener('click', upload);
-    p.querySelector('#ylTarget').addEventListener('change', showCost);
-    loadMsgs(); showCost(); showBalance();
+    p.querySelector('#ylTarget').addEventListener('change', () => { showCost(); showCampaignClassCost(); });
+    wireCampaign(p);
+    loadMsgs(); showCost(); showBalance(); showCampaignClassCost(); fillCampaignStudentSelect();
   }
 
   const curTarget = () => TARGETS.find(t => t.key === pane('msg').querySelector('#ylTarget').value) || TARGETS[0];
@@ -167,6 +188,7 @@
       blob = await window.geminiSpeak(txt);
       showPrev(URL.createObjectURL(blob));
       p.querySelector('#ylUpload').disabled = false;
+      p.querySelector('#ylCampSend').disabled = false;
       out.textContent = 'הקול מוכן — האזינו ואז העלו.';
     } catch (e) { out.textContent = 'שגיאה ביצירת הקול: ' + (e.message || e); }
     finally { btn.disabled = false; }
@@ -260,6 +282,91 @@
     el.innerHTML = b === null ? '' :
       (b > 0 ? 'יתרה: ' + b + ' יחידות'
              : '<span style="color:var(--danger,#b42318)">יתרה 0 — שידור בתשלום לא ירוץ</span>');
+  }
+
+  // ---------- 1ב. שיחה יזומה עם הקראה (RunCampaign) — נמען: שיעור/יחיד/טלפון ----------
+  function wireCampaign(p) {
+    p.querySelectorAll('input[name="ylCampTo"]').forEach(r => r.addEventListener('change', () => {
+      p.querySelector('#ylCampOne').hidden = r.value !== 'one';
+      p.querySelector('#ylCampPhone').hidden = r.value !== 'phone';
+    }));
+    p.querySelector('#ylCampSend').addEventListener('click', sendCampaign);
+  }
+
+  async function showCampaignClassCost() {
+    const el = pane('msg').querySelector('#ylCampClassCost'); if (!el) return;
+    el.textContent = '(טוען…)';
+    try {
+      const n = ((await roster())[curTarget().key] || []).length;
+      el.textContent = '(' + n + ' מספרים · כ-' + (n * CAMPAIGN_UNIT_PER_CALL).toFixed(1) + ' יחידות)';
+    } catch (_) { el.textContent = '(לא ניתן לקרוא את המערכת)'; }
+  }
+
+  // רשימת הורים לבחירת "תלמיד/הורה בודד" — מכל 4 השיעורים (לא רק הנבחר למעלה,
+  // כי בחירת נמען יחיד היא עצמאית מבורר "שיעור היעד" של הבלוק הראשון).
+  async function fillCampaignStudentSelect() {
+    const sel = pane('msg').querySelector('#ylCampStudent');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">טוען…</option>';
+    try {
+      const [st, cl] = await Promise.all([window.db.list('students', {}), window.db.list('classes', {})]);
+      if (!st.ok || !cl.ok) { sel.innerHTML = '<option value="">שגיאה בטעינה</option>'; return; }
+      const clsName = {}; cl.data.forEach(c => { clsName[c.id] = c.name; });
+      const extOf = {}; SHIURIM.forEach(x => { extOf[x.cls] = x.ext; });
+      const rows = [];
+      st.data.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')).forEach(s => {
+        if (!extOf[clsName[s.class_id]]) return;
+        const reg = s.reg || {};
+        [['אבא', s.parent_phone || reg['נייד אב']], ['אמא', s.mother_phone || reg['נייד אם']]].forEach(([who, ph]) => {
+          const n = normPhone0(ph);
+          if (n) rows.push({ label: (s.name || '') + ' — ' + who + ' (' + n + ')', phone: n });
+        });
+      });
+      sel.innerHTML = '<option value="">בחרו…</option>' + rows.map(r =>
+        '<option value="' + esc(r.phone) + '">' + esc(r.label) + '</option>').join('');
+    } catch (_) { sel.innerHTML = '<option value="">שגיאה בטעינה</option>'; }
+  }
+
+  async function sendCampaign() {
+    const p = pane('msg'), out = p.querySelector('#ylCampOut');
+    if (!blob) { out.textContent = 'אין קול מוכן — צרו קול / הקליטו / בחרו קובץ למעלה קודם.'; return; }
+    const to = (p.querySelector('input[name="ylCampTo"]:checked') || {}).value || 'class';
+    let phones = [], label = '';
+    if (to === 'class') {
+      try { phones = (await roster())[curTarget().key] || []; }
+      catch (e) { out.textContent = 'לא ניתן לקרוא את רשימת ההורים: ' + (e.message || e); return; }
+      label = 'כל הורי ' + curTarget().label + ' (' + phones.length + ' מספרים)';
+    } else if (to === 'one') {
+      const selEl = p.querySelector('#ylCampStudent'), v = selEl.value;
+      if (!v) { out.textContent = 'בחרו תלמיד/הורה מהרשימה.'; return; }
+      phones = [v]; label = selEl.selectedOptions[0].textContent;
+    } else {
+      const n = normPhone0(p.querySelector('#ylCampPhoneInput').value.trim());
+      if (!n) { out.textContent = 'מספר טלפון לא תקין.'; return; }
+      phones = [n]; label = n;
+    }
+    if (!phones.length) { out.textContent = 'אין מספרים לשליחה.'; return; }
+    const cost = (phones.length * CAMPAIGN_UNIT_PER_CALL).toFixed(1);
+    const bal = await units();
+    if (bal !== null && bal < phones.length * CAMPAIGN_UNIT_PER_CALL) {
+      out.textContent = 'היתרה בקו היא ' + bal + ' יחידות — צריך כ-' + cost + '. טענו יחידות קודם.';
+      return;
+    }
+    const ok = await window.UI.confirm(
+      'לשלוח שיחה אמיתית שמקריאה את ההודעה?' + String.fromCharCode(10) +
+      'נמענים: ' + label + String.fromCharCode(10) +
+      'עלות משוערת: כ-' + cost + ' יחידות' + String.fromCharCode(10) +
+      'אי אפשר לעצור אחרי הלחיצה.');
+    if (!ok) return;
+    const btn = p.querySelector('#ylCampSend'); btn.disabled = true; out.textContent = 'שולח…';
+    try {
+      const r = await Y().runVoiceCampaign(blob, phones, { description: 'בית התלמוד — ' + label });
+      out.textContent = '✓ הקמפיין הופעל: ' + r.phoneCount + ' מספרים' +
+        (r.estimatedPrice != null ? ', עלות ' + r.estimatedPrice + ' יחידות' : '') +
+        (r.entryFails ? (' (' + r.entryFails + ' מספרים נכשלו בהוספה)') : '');
+      showBalance();
+    } catch (e) { out.textContent = 'השליחה נכשלה: ' + (e.message || e); }
+    finally { btn.disabled = false; }
   }
 
   // ---------- 2. רשימות תפוצה ----------

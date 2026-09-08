@@ -11,6 +11,14 @@
 (function () {
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const normPhone = v => {
+    if (!v) return null;
+    let d = String(v).replace(/\D/g, '');
+    if (d.startsWith('972')) d = '0' + d.slice(3);
+    if (!d.startsWith('0')) d = '0' + d;
+    return (d.length >= 9 && d.length <= 10) ? d : null;
+  };
+  const CAMPAIGN_UNIT_PER_CALL = 1.0;   // ראה js/yemot-line.js — RunCampaign (unitsPerMessage), פי 10 מצינתוק
   const CATEGORIES = [
     { k: 'general',   lbl: 'כללי' },
     { k: 'meeting',   lbl: 'אסיפת הורים' },
@@ -22,14 +30,14 @@
   ];
   const CHANNELS = [
     { k: 'mail',              lbl: 'מייל בלבד', ic: 'bi-envelope' },
-    { k: 'voice',             lbl: 'הודעה קולית בלבד', ic: 'bi-mic' },
-    { k: 'mail+voice',        lbl: 'מייל + הודעה קולית', ic: 'bi-broadcast' },
+    { k: 'voice',             lbl: 'שיחה עם הקראה בלבד', ic: 'bi-mic' },
+    { k: 'mail+voice',        lbl: 'מייל + שיחה עם הקראה', ic: 'bi-broadcast' },
     { k: 'mail+tzintuk_free', lbl: 'מייל + צינתוק לנרשמים בלבד', ic: 'bi-bell' },
   ];
 
   // מצב הפאנל — נשמר בזיכרון בזמן ניווט בין הטאבים
   const state = { audience: 'all', classId: '', selectedIds: new Set(),
-                  individual: { name: '', email: '' }, staffIds: new Set(),
+                  individual: { name: '', email: '', phone: '' }, staffIds: new Set(),
                   channel: 'mail', tpl: null, audioBlob: null, audioName: '' };
 
   async function render(page) {
@@ -72,6 +80,12 @@
           '<button class="btn-ghost sm" id="msgAiSuggest" title="שיפור ההודעה עם AI"><i class="bi bi-stars"></i> שיפור בעזרת AI</button>' +
           '<button class="btn-ghost sm" id="msgPreview"><i class="bi bi-eye"></i> תצוגה מקדימה</button>' +
         '</div>' +
+        '<label class="lbl" style="margin-top:10px">חתימת השולח (מופיעה בתחתית המייל, עם לוגו המכינה בכותרת)</label>' +
+        '<select class="inp mb0" id="msgSignature" style="width:auto">' +
+          '<option value="yosef" selected>יוסף שלום שניידר — מנהל המערכת</option>' +
+          '<option value="weinberg">הרב צבי וינברג — ראש המכינה</option>' +
+          '<option value="">בלי חתימה אישית</option>' +
+        '</select>' +
         '<label style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer">' +
           '<input type="checkbox" id="msgAttachVoice"> <i class="bi bi-paperclip"></i> צרף גם קובץ קול למייל (הקראה/הקלטה/קובץ) — עובד לכל סוגי הנמענים, בלי עלות</label>' +
         '</div>' +
@@ -95,10 +109,11 @@
           '<audio id="msgRecPrev" controls style="display:none;width:100%;margin-top:8px"></audio></div>' +
         '<div class="ym-pane" data-vp="file" hidden>' +
           '<input class="inp mb0" id="msgFile" type="file" accept="audio/*"></div>' +
-        '<label class="lbl" style="margin-top:10px">שלוחה בקו שההודעה תועלה אליה (ברירת מחדל: 20 — לא בשימוש בתפריט)</label>' +
+        '<label class="lbl" style="margin-top:10px">שלוחה בקו להעלאת ההודעה (רק לערוץ "מייל + צינתוק לנרשמים"; ברירת מחדל: 20 — לא בשימוש בתפריט)</label>' +
         '<input class="inp mb0" id="msgExt" value="20" style="width:120px" inputmode="numeric">' +
         '<p class="login-hint" style="margin-top:6px">' +
-          'הצינתוק (חינם/בתשלום) מפנה את הנמענים לשלוחה זו — הם ישמעו את ההודעה בהתקשרות חזרה.</p></div>' +
+          '<b>"שיחה עם הקראה"</b> — המערכת מתקשרת ומשמיעה את ההודעה בשיחה עצמה (עולה יחידות). ' +
+          '<b>"צינתוק לנרשמים"</b> — רק מצלצל; הנמען מתקשר בחזרה לשלוחה שלמעלה ושומע שם (חינם, ורק למי שנרשם בעצמו בקו).</p></div>' +
 
       // תיבה 5: נמענים
       '<div class="qr-card"><h3><i class="bi bi-people-fill"></i> נמענים</h3>' +
@@ -124,8 +139,9 @@
           '<div id="msgStaffList" class="msg-stu-list"><div class="empty-state" style="padding:14px">טוען…</div></div></div>' +
         '<div id="msgAudIndividual" hidden style="margin-top:8px">' +
           '<label class="lbl">שם הנמען</label><input class="inp mb0" id="msgIndName" placeholder="שם (רשות)" style="margin-bottom:8px">' +
-          '<label class="lbl">כתובת מייל</label><input class="inp mb0" id="msgIndEmail" type="email" dir="ltr" placeholder="name@example.com" style="text-align:left">' +
-          '<p class="login-hint" style="margin-top:6px"><i class="bi bi-info-circle"></i> לאדם פרטי אפשר לשלוח רק מייל — ערוץ קולי/צינתוק זמין רק להורי תלמידים הרשומים בקו.</p></div>' +
+          '<label class="lbl">כתובת מייל</label><input class="inp mb0" id="msgIndEmail" type="email" dir="ltr" placeholder="name@example.com" style="text-align:left;margin-bottom:8px">' +
+          '<label class="lbl">מספר טלפון (לשיחה קולית — רשות)</label><input class="inp mb0" id="msgIndPhone" dir="ltr" inputmode="tel" placeholder="05XXXXXXXX" style="text-align:left;max-width:200px">' +
+          '<p class="login-hint" style="margin-top:6px"><i class="bi bi-info-circle"></i> צינתוק חינמי (שלוחה 7) זמין רק להורי תלמידים הרשומים בקו — אבל שיחה קולית אמיתית (הערוצים "שיחה עם הקראה") עובדת לכל מספר טלפון, כולל כאן.</p></div>' +
         '<div id="msgAudSum" class="msg-aud-sum">…</div></div>' +
 
       // תיבה 6: שליחה
@@ -206,9 +222,9 @@
     if (help) {
       const m = {
         'mail': 'שליחת מייל מחשבון המכינה לכל ההורים שנבחרו (אבא + אמא). אם אין מייל להורה — הוא לא נכלל.',
-        'voice': 'ההודעה הקולית תועלה לשלוחה בקו + צינתוק חינמי לנרשמים בקו (שלוחה 7). מי שלא נרשם — לא יקבל.',
-        'mail+voice': 'משלב את שני הערוצים: מייל לכולם + הודעה קולית לנרשמים בקו.',
-        'mail+tzintuk_free': 'מייל לכולם + צינתוק חינמי לנרשמים בלבד (בלי חיוב יחידות).'
+        'voice': 'שיחה אמיתית שמקריאה את ההודעה בתוך השיחה עצמה (לא צינתוק) — לכל הנמענים שנבחרו למטה, כולל טלפון בודד. עולה כ-' + CAMPAIGN_UNIT_PER_CALL + ' יחידה לכל שיחה.',
+        'mail+voice': 'משלב את שני הערוצים: מייל + שיחה אמיתית שמקריאה את ההודעה, לכל הנמענים שנבחרו למטה.',
+        'mail+tzintuk_free': 'מייל לכולם + צינתוק חינמי לנרשמים בלבד בקו (שלוחה 7) — מי שלא נרשם בעצמו לא יקבל, בלי חיוב יחידות.'
       };
       help.innerHTML = '<i class="bi bi-info-circle"></i> ' + esc(m[state.channel] || '');
     }
@@ -385,16 +401,17 @@
     updateAudSum(page);
   }
   function wireAudience(page) {
-    // ערוץ קולי/צינתוק תלוי בהורים הרשומים בקו — לא קיים ל"צוות"/"אדם פרטי".
-    // עוברים אוטומטית ל"מייל בלבד" כדי לא להציע פעולה שלא באמת עובדת.
+    // ערוץ קולי זמין לכל קהל שיש בו מספרי טלפון — כולל "אדם פרטי" (RunCampaign
+    // מחייג כל מספר, לא רק הורים רשומים בקו). "צוות" נשאר מייל-בלבד: אין להם
+    // שדה טלפון בפאנל הזה (staffWithEmail מחזיר רק בעלי אימייל).
     const syncChannelForAudience = () => {
-      if ((state.audience === 'staff' || state.audience === 'individual') && state.channel !== 'mail') {
+      if (state.audience === 'staff' && state.channel !== 'mail') {
         state.channel = 'mail';
         page.querySelectorAll('.msg-chan').forEach(x => x.classList.toggle('on', x.dataset.c === 'mail'));
         updateChannelUi(page);
       }
       page.querySelectorAll('.msg-chan').forEach(x => {
-        const disable = x.dataset.c !== 'mail' && (state.audience === 'staff' || state.audience === 'individual');
+        const disable = x.dataset.c !== 'mail' && state.audience === 'staff';
         x.classList.toggle('disabled', disable);
         x.querySelector('input').disabled = disable;
       });
@@ -426,6 +443,7 @@
     });
     page.querySelector('#msgIndName').addEventListener('input', e => { state.individual.name = e.target.value; });
     page.querySelector('#msgIndEmail').addEventListener('input', e => { state.individual.email = e.target.value; updateAudSum(page); });
+    page.querySelector('#msgIndPhone').addEventListener('input', e => { state.individual.phone = e.target.value; updateAudSum(page); });
   }
   function filteredStudents(q) {
     const qq = (q || '').trim();
@@ -495,11 +513,33 @@
     });
     return out;
   }
+  // רשימת מספרי הטלפון בפועל לשיחה קולית (RunCampaign) — לפי אותו קהל שנבחר
+  // למעלה (individual/all/class/custom), מנורמל וללא כפילויות. "צוות" לא נכלל —
+  // staffWithEmail לא אוספת טלפון בפאנל הזה.
+  function phonesForSend() {
+    if (state.audience === 'individual') {
+      const n = normPhone((state.individual.phone || '').trim());
+      return n ? [n] : [];
+    }
+    if (state.audience === 'staff') return [];
+    const out = new Set();
+    recipientsForSend().forEach(s => {
+      const reg = s.reg || {};
+      [s.parent_phone, s.mother_phone, reg['נייד אב'], reg['נייד אם'], reg['טלפון בבית']]
+        .map(normPhone).filter(Boolean).forEach(p => out.add(p));
+    });
+    return [...out];
+  }
   function updateAudSum(page) {
     const box = page.querySelector('#msgAudSum');
     if (state.audience === 'individual') {
       const email = (state.individual.email || '').trim();
-      box.innerHTML = '<i class="bi bi-person"></i> ' + (email ? '<b>' + esc(state.individual.name.trim() || email) + '</b> · ' + esc(email) : 'הזינו כתובת מייל');
+      const phone = normPhone((state.individual.phone || '').trim());
+      const parts = [];
+      if (email) parts.push('<i class="bi bi-envelope"></i> ' + esc(email));
+      parts.push('<i class="bi bi-telephone"></i> ' + (phone ? esc(phone) : 'אין טלפון'));
+      box.innerHTML = '<i class="bi bi-person"></i> <b>' + esc(state.individual.name.trim() || 'ללא שם') + '</b>' +
+        (parts.length ? ' · ' + parts.join(' · ') : '');
       return;
     }
     if (state.audience === 'staff') {
@@ -515,7 +555,8 @@
       if ((reg['אימייל אם'] || '').trim()) mails++;
     });
     box.innerHTML = '<i class="bi bi-people"></i> תלמידים נבחרו: <b>' + list.length + '</b>' +
-      ' · <i class="bi bi-envelope"></i> כתובות מייל: <b>' + mails + '</b>';
+      ' · <i class="bi bi-envelope"></i> כתובות מייל: <b>' + mails + '</b>' +
+      ' · <i class="bi bi-telephone"></i> מספרי טלפון: <b>' + phonesForSend().length + '</b>';
   }
 
   // ---------- שיפור AI ----------
@@ -578,11 +619,15 @@
     const isStudentAud = state.audience === 'all' || state.audience === 'class' || state.audience === 'custom';
     const audienceCount = isStudentAud ? recipientsForSend().length
       : state.audience === 'staff' ? staffWithEmail().filter(p => state.staffIds.has(p.id)).length
-      : (state.individual.email || '').trim() ? 1 : 0;
+      : ((state.individual.email || '').trim() || normPhone((state.individual.phone || '').trim())) ? 1 : 0;
     const mailRecipients = mailRecipientsForSend();
     if (!audienceCount) { window.UI.toast('אין נמענים', 'err'); return; }
     const mailOn = /mail/.test(state.channel);
     const voiceOn = /voice/.test(state.channel);
+    // ערוץ קולי אמיתי (לא צינתוק) → RunCampaign לרשימת הטלפונים שבפועל נגזרת
+    // מהנמענים שנבחרו למעלה (individual/all/class/custom) — לא לכל הנרשמים בקו.
+    const isRealCampaign = voiceOn && state.channel !== 'mail+tzintuk_free';
+    const voicePhones = isRealCampaign ? phonesForSend() : [];
     // צירוף קובץ קול למייל עצמו — עצמאי מהערוץ/הצינתוק, זמין לכל קהל (גם צוות/אדם פרטי).
     const attachVoiceEl = page.querySelector('#msgAttachVoice');
     const attachVoice = !!(attachVoiceEl && attachVoiceEl.checked);
@@ -592,13 +637,14 @@
     if (mailOn && !body) { window.UI.toast('חסר גוף המייל', 'err'); return; }
     if (voiceOn && !state.audioBlob) { window.UI.toast('חסר קובץ שמע להודעה הקולית', 'err'); return; }
     if (attachVoice && !state.audioBlob) { window.UI.toast('סימנת "צרף קובץ קול" — צרו/הקליטו/בחרו קובץ בכרטיס התוכן הקולי קודם', 'err'); return; }
+    if (isRealCampaign && !voicePhones.length) { window.UI.toast('אין מספרי טלפון בקרב הנמענים שנבחרו — לא ניתן לשלוח שיחה קולית', 'err'); return; }
 
     const mailCount = mailRecipients.length;
+    const campaignCost = (voicePhones.length * CAMPAIGN_UNIT_PER_CALL).toFixed(1);
     const parts = [];
     if (mailOn) parts.push('מייל: ' + mailCount + ' כתובות' + (attachVoice ? ' (עם קובץ קול מצורף)' : ''));
-    if (voiceOn && state.channel === 'voice') parts.push('העלאה לשלוחה + צינתוק לנרשמים');
-    if (state.channel === 'mail+voice') parts.push('העלאה לשלוחה + צינתוק לנרשמים');
-    if (state.channel === 'mail+tzintuk_free') parts.push('צינתוק חינמי לנרשמים בלבד');
+    if (isRealCampaign) parts.push('שיחה אמיתית עם הקראת ההודעה: ' + voicePhones.length + ' מספרים · עלות משוערת כ-' + campaignCost + ' יחידות (לא ניתן לעצור אחרי ההרצה)');
+    if (state.channel === 'mail+tzintuk_free') parts.push('צינתוק חינמי לנרשמים בלבד בקו (בלי חיוב יחידות)');
 
     const ok = await window.UI.confirm('לשלוח דיוור?\n\n' + parts.join('\n') + '\n\nלא ניתן לבטל.');
     if (!ok) return;
@@ -632,7 +678,8 @@
             const jwt = sess && sess.data && sess.data.session && sess.data.session.access_token;
             if (!jwt) { notesArr.push('חסר טוקן משתמש'); }
             else {
-              const payload = { subject: subj, html_body: body, sender_name: 'מכינה בית התלמוד', recipients: recipients };
+              const sigEl = page.querySelector('#msgSignature');
+              const payload = { subject: subj, html_body: body, sender_name: 'מכינה בית התלמוד', recipients: recipients, signature: sigEl ? sigEl.value : '' };
               if (attachVoice && state.audioBlob) {
                 try {
                   payload.audio_base64 = await blobToBase64(state.audioBlob);
@@ -659,33 +706,37 @@
       } catch (e) { notesArr.push('חריגה בשליחת מייל: ' + (e && e.message || e)); }
     }
 
-    // ── שמע / צינתוק ──
+    // ── שמע: קמפיין אמיתי (RunCampaign, לפי הנמענים שנבחרו) או צינתוק חינמי לנרשמים ──
     if (voiceOn && state.audioBlob) {
-      const ext = (page.querySelector('#msgExt') && page.querySelector('#msgExt').value.trim()) || '20';
-      try {
-        if (!window.Yemot || !window.Yemot.token()) {
-          notesArr.push('לא מחובר לקו — היכנס למסך "קו ימות המשיח" והתחבר, ואז שלח שוב');
-        } else {
+      if (!window.Yemot || !window.Yemot.token()) {
+        notesArr.push('לא מחובר לקו — היכנס למסך "קו ימות המשיח" והתחבר, ואז שלח שוב');
+      } else if (isRealCampaign) {
+        try {
+          const r = await window.Yemot.runVoiceCampaign(state.audioBlob, voicePhones,
+            { description: 'דיוור — ' + (subj || state.audience), filename: state.audioName || 'message.wav' });
+          voiceMsg = 'campaign:' + r.phoneCount + (r.estimatedPrice != null ? (':' + r.estimatedPrice + 'u') : '');
+          if (r.entryFails) notesArr.push(r.entryFails + ' מספרים נכשלו בהוספה לקמפיין');
+        } catch (e) { voiceMsg = 'failed'; notesArr.push('שליחת השיחה הקולית נכשלה: ' + (e && e.message || e)); }
+      } else {
+        // mail+tzintuk_free — כמו קודם: מעלים לשלוחה, ואז צינתוק חינמי לנרשמים בה.
+        const ext = (page.querySelector('#msgExt') && page.querySelector('#msgExt').value.trim()) || '20';
+        try {
           const up = await window.Yemot.uploadBlob(ext, state.audioBlob, state.audioName || 'msg.wav');
           if (up.responseStatus !== 'OK') { notesArr.push('העלאה לקו נכשלה: ' + (up.message || '')); }
           else {
             audioPath = 'ivr2:/' + ext;
-            // צינתוק לפי סוג הערוץ
-            if (state.channel === 'voice' || state.channel === 'mail+voice' || state.channel === 'mail+tzintuk_free') {
-              // צינתוק לנרשמים בקו (חינם) — מפנה לשלוחה
-              const tz = await window.Yemot.call('SendFreeTzintuk', { path: audioPath });
-              if (tz.responseStatus === 'OK') voiceMsg = 'free_only';
-              else { voiceMsg = 'failed'; notesArr.push('צינתוק חינמי נכשל: ' + (tz.message || '')); }
-            }
+            const tz = await window.Yemot.call('SendFreeTzintuk', { path: audioPath });
+            if (tz.responseStatus === 'OK') voiceMsg = 'free_only';
+            else { voiceMsg = 'failed'; notesArr.push('צינתוק חינמי נכשל: ' + (tz.message || '')); }
           }
-        }
-      } catch (e) { notesArr.push('חריגה בשליחה קולית: ' + (e && e.message || e)); }
+        } catch (e) { notesArr.push('חריגה בצינתוק חינמי: ' + (e && e.message || e)); }
+      }
     }
 
     // ── שמירה ליומן ──
     logRow.mail_sent = mailSent;
     logRow.mail_failed = mailFailed;
-    logRow.voice_ext = voiceOn ? ((page.querySelector('#msgExt') && page.querySelector('#msgExt').value.trim()) || '20') : null;
+    logRow.voice_ext = (voiceOn && !isRealCampaign) ? ((page.querySelector('#msgExt') && page.querySelector('#msgExt').value.trim()) || '20') : null;
     logRow.voice_tzintuk = voiceMsg;
     logRow.audio_path = audioPath;
     logRow.notes = notesArr.join('\n') || null;
@@ -694,7 +745,12 @@
     // ── סיכום ──
     const parts2 = [];
     if (mailOn) parts2.push('מייל: נשלחו ' + mailSent + (mailFailed ? ' · נכשלו ' + mailFailed : '') + (audioAttached ? ' · עם קובץ קול' : ''));
-    if (voiceOn) parts2.push('שמע: ' + (audioPath ? 'הועלה' : 'לא הועלה') + ' · צינתוק: ' + voiceMsg);
+    if (isRealCampaign) {
+      const m = /^campaign:(\d+)(?::([\d.]+)u)?$/.exec(voiceMsg);
+      parts2.push(m ? ('שיחה קולית: הופעלה ל-' + m[1] + ' מספרים' + (m[2] ? (' · ' + m[2] + ' יחידות') : '')) : ('שיחה קולית: ' + voiceMsg));
+    } else if (voiceOn) {
+      parts2.push('שמע: ' + (audioPath ? 'הועלה' : 'לא הועלה') + ' · צינתוק: ' + voiceMsg);
+    }
     outEl.textContent = '✓ ' + parts2.join(' · ');
     window.UI.toast('הדיוור נשלח: ' + parts2.join(' · '), 'ok');
     if (notesArr.length) window.UI.toast('הערות: ' + notesArr.join('; '), 'warn');

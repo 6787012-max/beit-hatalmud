@@ -36,6 +36,7 @@ body{
 .brand-txt{display:flex; flex-direction:column; line-height:1.15}
 .brand-txt strong{font-weight:800; font-size:1.05rem}
 .brand-txt small{font-size:.76rem; opacity:.85}
+.brand-txt .live-clock{color:var(--accent); opacity:1; font-variant-numeric:tabular-nums; margin-top:1px}
 .appbar-actions{display:flex; align-items:center; gap:10px}
 .status{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; background:rgba(255,255,255,.12); padding:5px 11px; border-radius:999px}
 .status .dot{width:9px; height:9px; border-radius:50%; background:#f1c40f; box-shadow:0 0 0 3px rgba(241,196,15,.2)}

@@ -133,6 +133,9 @@
     if (!iso) return '';
     try { return window.UI.hebDate(iso, { year: false }); } catch (_) { return ''; }
   }
+  function relDay(iso) {
+    try { return window.UI.relativeDay(iso); } catch (_) { return ''; }
+  }
   async function renderHomeReports() {
     const box = $('#homeReports'); if (!box || !window.store) return;
     box.innerHTML =
@@ -176,7 +179,8 @@
             (e.followup ? ' <span class="chip warn" style="color:' + flagColor(e.severity) + '"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
           (e.note ? '<div class="tl-note hr-note" data-note>' + _esc(e.note) + '</div>' : '') +
         '</div>' +
-        '<div class="tl-meta">' + _esc(hebDate(e.event_date) || e.event_date || '') + (e.event_time ? ' · ' + _esc(e.event_time) : '') + '</div>' +
+        '<div class="tl-meta">' + _esc(hebDate(e.event_date) || e.event_date || '') + (e.event_time ? ' · ' + _esc(e.event_time) : '') +
+          (relDay(e.event_date) ? ' · ' + _esc(relDay(e.event_date)) : '') + '</div>' +
         '<div class="hr-act">' +
           '<button class="mini" data-card="' + e.student_id + '" title="כרטיס התלמיד"><i class="bi bi-person-vcard"></i></button>' +
           '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"' + (e.followup ? ' style="color:' + flagColor(e.severity) + '"' : '') + '><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
@@ -285,6 +289,23 @@
     }
   }
 
+  // שעון חי בכותרת — יום בשבוע + תאריך עברי + שעה עם שניות, מתעדכן כל שנייה
+  // (בקשת יוסף 08/09/2026). ה-Intl העברי כבר יש ב-window.UI.hebDate — לא
+  // לשכפל אותו; ראה ההערה ב-js/ui.js למה לא לקרוא ל-Intl(he-u-ca-hebrew) ישירות.
+  const CLOCK_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+  function startClock() {
+    const el = $('#liveClock'); if (!el) return;
+    const pad = n => String(n).padStart(2, '0');
+    const tick = () => {
+      const now = new Date();
+      const heb = (window.UI && window.UI.hebDate) ? window.UI.hebDate(now) : '';
+      const time = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+      el.textContent = 'יום ' + CLOCK_DAYS[now.getDay()] + ' · ' + heb + ' · ' + time;
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+
   // מסך עצירה כשמוסד חי לא הצליח לטעון את שכבת הנתונים. חוסם כניסה בכוונה:
   // בלי זה המערכת מציגה תלמידי דוגמה ושומרת לזיכרון בלבד, והמשתמש מגלה
   // שהנתונים נעלמו רק אחרי שרענן — כלומר אחרי שכבר איבד אותם.
@@ -314,6 +335,7 @@
     buildPages();
     wireDark();
     setStatus();
+    startClock();
     if (window.Auth) window.Auth.init();   // מציג כניסה או בית לפי מצב האימות
     if ('serviceWorker' in navigator) {
       // רישום + ריפוי-עצמי: בודק עדכון בכל טעינה, ומרענן פעם אחת כשה-SW החדש תופס שליטה

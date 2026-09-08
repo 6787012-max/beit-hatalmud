@@ -113,6 +113,23 @@
     } catch (_) { return ''; }
   }
 
+  /** iso → "היום"/"אתמול"/"שלשום"/"לפני N ימים", עד חודש אחורה. מעבר לזה
+   *  (או תאריך עתידי) מחזיר '' — התאריך העברי המלא כבר מזהה מספיק. */
+  function relativeDay(iso) {
+    if (!iso) return '';
+    try {
+      const d = new Date(String(iso).slice(0, 10) + 'T00:00:00');
+      if (isNaN(d.getTime())) return '';
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const diff = Math.round((today - d) / 86400000);
+      if (diff === 0) return 'היום';
+      if (diff === 1) return 'אתמול';
+      if (diff === 2) return 'שלשום';
+      if (diff > 2 && diff <= 30) return 'לפני ' + diff + ' ימים';
+      return '';
+    } catch (_) { return ''; }
+  }
+
   // גדילה אוטומטית ל-textarea של הדיווחים. `field-sizing:content` עושה את זה
   // ב-CSS, אבל הוא עוד לא נתמך בכל דפדפן — ובלעדיו שדה עם 8 שורות טקסט מציג
   // 3 ומסתיר את השאר. מאזין אחד ברמת המסמך מכסה גם תוכן שנוצר אחרי הטעינה.
@@ -127,5 +144,5 @@
   document.addEventListener('focusin', e => autoGrow(e.target), true);
 
   window.UI = { modal, toast, confirm, el: elc, fullName: fullName, autoGrow: autoGrow,
-    hebDate: hebDate, hebYear: hebYear, gematria: gematria };
+    hebDate: hebDate, hebYear: hebYear, gematria: gematria, relativeDay: relativeDay };
 })();

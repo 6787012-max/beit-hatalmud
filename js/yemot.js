@@ -31,24 +31,49 @@
     for (let i = 0; i < dataLen; i++) dv.setUint8(44 + i, bin.charCodeAt(i));
     return new Blob([buf], { type: 'audio/wav' });
   }
-  async function geminiSpeak(text) {
+  // Gemini TTS מחזיר לפעמים 200 OK עם candidates[0] ריק (finishReason שאינו
+  // STOP, בד"כ OTHER) — בעיקר על טקסט בעברית. תקלה מתועדת אצל גוגל עצמם
+  // (google-gemini/cookbook#1231, ספטמבר 2026), אין תיקון צד-שרת, אין הודעת
+  // שגיאה מפורשת שמסבירה למה. אומת ידנית: אנגלית מצליחה בעקביות, עברית נכשלת
+  // בעקביות (לא "לפעמים") מול המפתח של הפרויקט הזה. retry לא עוזר לרוב, אבל
+  // האפשרות שזו תנודתיות אמיתית (כמו שגוגל עצמם מתארים אצל משתמשים אחרים)
+  // מצדיקה כמה ניסיונות בשקט לפני שמציגים למשתמש שגיאה + חלופה.
+  async function geminiSpeak(text, opts) {
+    opts = opts || {};
+    const attempts = opts.attempts || 3;
     const body = {
       contents: [{ parts: [{ text: 'קרא בקול רגוע, ברור ומקצועי המתאים להודעה טלפונית: ' + text }] }],
       generationConfig: { responseModalities: ['AUDIO'],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } } }
     };
-    const r = await window.cv3call(TTS_MODEL, body);
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j) throw new Error((j && j.error && j.error.message) || 'שגיאת Gemini');
-    const inline = j.candidates && j.candidates[0] && j.candidates[0].content
-      && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].inlineData;
-    if (!inline || !inline.data) throw new Error('לא התקבל אודיו');
-    let rate = 24000; const m = (inline.mimeType || '').match(/rate=(\d+)/); if (m) rate = parseInt(m[1], 10);
-    return pcmB64ToWav(inline.data, rate);
+    let lastErr = null;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const r = await window.cv3call(TTS_MODEL, body);
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j) { lastErr = new Error((j && j.error && j.error.message) || 'שגיאת Gemini'); }
+        else {
+          const cand = j.candidates && j.candidates[0];
+          const inline = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].inlineData;
+          if (inline && inline.data) {
+            let rate = 24000; const m = (inline.mimeType || '').match(/rate=(\d+)/); if (m) rate = parseInt(m[1], 10);
+            return pcmB64ToWav(inline.data, rate);
+          }
+          lastErr = new Error('empty:' + (cand && cand.finishReason || '?'));
+        }
+      } catch (e) { lastErr = e; }
+      if (i < attempts - 1) await new Promise(res => setTimeout(res, 700));
+    }
+    const em = String(lastErr && lastErr.message || '');
+    if (/API key|invalid|expired/i.test(em)) throw lastErr;
+    throw new Error('שירות יצירת הקול של גוגל לא הצליח להפיק אודיו (בעיה ידועה שלהם, בעיקר בעברית — לא תקלה במערכת שלנו). נסו שוב בעוד רגע, או השתמשו ב"הקלטה ישירה" / "קובץ מוכן" במקום.');
   }
 
-  const token = () => { try { return sessionStorage.getItem(SS_KEY) || ''; } catch (_) { return ''; } };
-  const setToken = t => { try { t ? sessionStorage.setItem(SS_KEY, t) : sessionStorage.removeItem(SS_KEY); } catch (_) {} };
+  // localStorage ולא sessionStorage — יוסף ביקש שההתחברות תישאר בין פתיחות של
+  // הדפדפן/טאב (08/09/2026). הטוקן עצמו עדיין פג אצל ימות אחרי ~45 דק' חוסר
+  // פעילות (call() מנקה אותו אז לבד כשזה קורה) — זה לא הופך אותו לתמידי.
+  const token = () => { try { return localStorage.getItem(SS_KEY) || ''; } catch (_) { return ''; } };
+  const setToken = t => { try { t ? localStorage.setItem(SS_KEY, t) : localStorage.removeItem(SS_KEY); } catch (_) {} };
 
   async function call(method, params) {
     const qs = new URLSearchParams(Object.assign({ token: token() }, params || {}));
@@ -153,7 +178,7 @@
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>קו ימות המשיח</h2></div>' +
       '<div class="qr-card" style="max-width:460px;margin:0 auto">' +
         '<h3><i class="bi bi-telephone-inbound"></i> התחברות לקו המוסד</h3>' +
-        '<p class="login-hint" style="margin:6px 0 14px">ההתחברות מול שרת ימות. הסיסמה אינה נשמרת — רק אסימון זמני לסשן.</p>' +
+        '<p class="login-hint" style="margin:6px 0 14px">ההתחברות מול שרת ימות. הסיסמה אינה נשמרת — רק אסימון גישה, שנשאר שמור במכשיר הזה עד ניתוק ידני (פג אצל ימות אחרי כ-45 דק׳ חוסר פעילות).</p>' +
         '<label class="lbl">מספר הקו</label><input class="inp" id="ymLine" value="' + DEFAULT_LINE + '" inputmode="numeric">' +
         '<label class="lbl">סיסמת הקו</label><input class="inp" id="ymPass" type="password" autocomplete="off" placeholder="סיסמת ניהול הקו">' +
         '<button class="btn-primary" id="ymLoginBtn" style="margin-top:6px"><i class="bi bi-box-arrow-in-left"></i> התחברות</button>' +
@@ -344,7 +369,7 @@
         const items = [
           ['bi-telephone', 'מספר הקו', s.username || s.ownerId || '—'],
           (s.creditRemains != null ? ['bi-coin', 'יתרת יחידות', s.creditRemains] : null),
-          ['bi-shield-check', 'אבטחה', 'אסימון לסשן זה בלבד'],
+          ['bi-shield-check', 'אבטחה', 'אסימון גישה שמור במכשיר זה'],
         ].filter(Boolean);
         box.innerHTML = items.map(([ic, k, v]) => '<div class="ym-stat"><i class="bi ' + ic + '"></i><div><span class="ym-k">' + esc(k) + '</span><b>' + esc(v) + '</b></div></div>').join('');
       } else if (!token()) render(page);
@@ -565,11 +590,54 @@
     } catch (e) { window.UI.toast('לא ניתן להשמיע', 'err'); }
   }
 
+  // ----- קמפיין אמיתי (RunCampaign) — שיחה שמשמיעה את ההודעה בפועל בשיחה
+  // עצמה, לא צינתוק (שרק מצלצל ומחכה שהנמען יחזור ויתקשר). אומת חי 08/09/2026
+  // מול call2all: CreateTemplate→UpdateTemplateEntry(×מספרים)→UploadFile בנתיב
+  // "{templateId}.wav" (שונה מ-uploadBlob הרגיל שמעלה לשלוחה!)→RunCampaign.
+  // ⚠️ RunCampaign בלי templateId מפורש נופל על תבנית ברירת-המחדל של החשבון
+  // ומריץ אותה בפועל — templateId חובה תמיד, אין קיצור-דרך "לבדוק בלי פרמטרים".
+  async function uploadCampaignMessage(templateId, blob, filename) {
+    const fd = new FormData();
+    fd.append('token', token());
+    fd.append('path', templateId + '.wav');
+    fd.append('convertAudio', '1');
+    fd.append('file', blob, filename || 'message.wav');
+    const res = await fetch(`${API}/UploadFile`, { method: 'POST', body: fd });
+    return res.json();
+  }
+  // עלות: כ-1 יחידה לכל מספר (unitsPerMessage בברירת המחדל) — פי ~10 מצינתוק
+  // (0.1 יחידה), ונגבה גם על ניסיון שנכשל. יוצר תבנית חד-פעמית לכל שליחה —
+  // לא נוגעים בתבנית הקיימת של החשבון. לא מוחקים אותה בסוף בכוונה, כדי
+  // ש-campaignId/getCampaignStatus יישארו תקפים לבדיקה אחרי ההרצה.
+  async function runVoiceCampaign(blob, phones, opts) {
+    opts = opts || {};
+    const uniquePhones = [...new Set((phones || []).filter(Boolean))];
+    if (!uniquePhones.length) throw new Error('אין מספרי טלפון לשליחה');
+    const ct = await call('CreateTemplate', { description: opts.description || ('שידור ' + new Date().toLocaleString('he-IL')) });
+    if (ct.responseStatus !== 'OK') throw new Error('יצירת הקמפיין נכשלה: ' + (ct.message || ''));
+    const templateId = ct.templateId;
+    const up = await uploadCampaignMessage(templateId, blob, opts.filename || 'message.wav');
+    if (up.responseStatus !== 'OK') {
+      try { await call('DeleteTemplate', { templateId }); } catch (_) {}
+      throw new Error('העלאת ההודעה לקמפיין נכשלה: ' + (up.message || ''));
+    }
+    if (opts.callerId) await call('UpdateTemplate', { templateId, callerId: opts.callerId });
+    let entryFails = 0;
+    for (const phone of uniquePhones) {
+      const r = await call('UpdateTemplateEntry', { templateId, phone });
+      if (r.responseStatus !== 'OK') entryFails++;
+    }
+    const run = await call('RunCampaign', { templateId });
+    if (run.responseStatus !== 'OK') throw new Error('הפעלת הקמפיין נכשלה: ' + (run.message || ''));
+    return { templateId, campaignId: run.campaignId, entriesCount: run.entriesCount,
+              estimatedPrice: run.estimatedPrice, entryFails, phoneCount: uniquePhones.length };
+  }
+
   // חשיפה למודולים אחרים (דיווחים קוליים): המפתח הפעיל + עזרי ימות
   window.geminiKey = gKey;
   window.geminiSpeak = geminiSpeak;   // לשימוש עמוד הבדיקה/מודולים
   window.Yemot = {
-    API, token, call, getText, putText, uploadBlob, parseIni, serializeIni,
+    API, token, call, getText, putText, uploadBlob, parseIni, serializeIni, runVoiceCampaign,
     downloadUrl: path => `${API}/DownloadFile?token=${encodeURIComponent(token())}&path=${encodeURIComponent(path)}`
   };
 

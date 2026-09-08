@@ -9,6 +9,7 @@
   // פילוח פעילות הצוות הוא מידע ניהולי — מנהל ומפקח בלבד
   const canSeeStats = () => !!(window.currentUser && ['מנהל', 'מפקח'].includes(window.currentUser.role));
   const hebDate = iso => window.UI.hebDate(iso);
+  const relDay = iso => { try { return window.UI.relativeDay(iso); } catch (_) { return ''; } };
 
   const sevClass = s => s === 'גבוהה' ? 'hi' : s === 'נמוכה' ? 'lo' : 'mid';
   // צבע הדגל לפי חומרה (בקשת יוסף 06/09/2026): "דגל אדום/צהוב/ירוק לפי החומרה" —
@@ -595,6 +596,8 @@
                 '<i class="bi bi-calendar' + (over ? '-x' : '-event') + '"></i> ' + esc(hebDate(e.due_date) || e.due_date) + '</span>' : '') +
             '</div>' +
             '<div class="fu-w-meta">' + esc(catOf(e.category_id)) + (e.note ? ' — ' + esc(e.note) : '') + '</div>' +
+            (e.event_date ? '<div class="fu-w-meta" style="opacity:.7"><i class="bi bi-clock-history"></i> דווח ' +
+              esc(hebDate(e.event_date) || e.event_date) + (relDay(e.event_date) ? ' · ' + esc(relDay(e.event_date)) : '') + '</div>' : '') +
             '<div style="display:flex;gap:4px;margin-top:5px">' +
               '<button class="btn-ghost sm" data-wcmt="' + e.id + '" style="padding:2px 8px;font-size:.76rem"><i class="bi bi-chat-left-text"></i> תגובה</button>' +
               '<button class="btn-ghost sm" data-wres="' + e.id + '" style="padding:2px 8px;font-size:.76rem"><i class="bi bi-check2-circle"></i> טופל</button>' +
