@@ -192,9 +192,13 @@
       // קטגוריות הקריאה הוצגו כ"משימות" ותיק המסמכים נעלם. אין להוסיף או
       // להסיר כאן שורה בלי לעדכן את שני הצדדים יחד.
       if (window.Author) await window.Author.load();
-      const [cats, beh, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs, psp, photoRows] = await Promise.all([
+      const [cats, beh, behCmts, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs, psp, photoRows] = await Promise.all([
         window.store.list('categories'),
-        window.store.byStudent('behavior_events', s.id), window.store.byStudent('attendance', s.id),
+        window.store.byStudent('behavior_events', s.id),
+        // אין student_id בטבלת behavior_comments (רק event_id) — נשלף הכל
+        // ומסננים בצד הלקוח, אותו דפוס בדיוק כמו allComments() ב-behavior.js.
+        window.store.list('behavior_comments'),
+        window.store.byStudent('attendance', s.id),
         window.store.byStudent('tests', s.id), window.store.byStudent('functioning', s.id),
         window.store.byStudent('medications', s.id), window.store.byStudent('conversations', s.id),
         window.store.byStudent('meetings', s.id), window.store.byStudent('reading', s.id), window.store.byStudent('writing', s.id),
@@ -237,23 +241,39 @@
       // קודם זה היה סקשן לקריאה בלבד, ומי שרצה לתקן דיווח נאלץ לצאת למסך
       // המעקב ולחפש אותו שם. ההערה מקוצרת לשתי שורות ונפתחת בלחיצה, כמו בבית.
       const canEditBeh = !window.Auth || !window.Auth.isReadonly();
+      // תגובות/עדכוני-מעקב לכל דיווח — מוצגות כתת-דיווח מקונן ממש מתחת אליו,
+      // לא רק מאחורי מודל נסתר (בקשת יוסף 09/09/2026: "לא מצליח לראות איפה
+      // ניתן לראות את זה" — התגובה הייתה קיימת רק במסך "מעקב תלמידים",
+      // ובכרטיס התלמיד לא הופיעה בכלל).
+      const cmtSub = e => {
+        const cs = behCmts.filter(c => c.event_id == e.id).sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
+        if (!cs.length) return '';
+        return '<div class="hr-subwrap">' + cs.map(c =>
+          '<div class="det-item hr-subitem"><span class="di-main"><div class="tl-note hr-note">' + esc(c.note) + '</div></span>' +
+          '<span class="di-meta">' + esc(hebDate(c.comment_date) || c.comment_date || '') +
+          ' · ' + (window.Author ? window.Author.cell(c.created_by) : '') + '</span></div>').join('') + '</div>';
+      };
       const behSec = '<div class="det-sec"><h4><i class="bi bi-clipboard-check"></i> התנהגות ומעקב ' +
         '<span class="det-badge">' + beh.length + '</span>' +
         (canEditBeh ? '<button class="btn-ghost sm" id="behAdd" style="margin-inline-start:auto"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' : '') +
         '</h4>' +
         (beh.length
-          ? '<div class="' + (beh.length > 5 ? 'det-scroll' : '') + '">' + beh.slice().reverse().map(e =>
-              '<div class="det-item hr-item" data-ev="' + e.id + '">' +
+          ? '<div class="' + (beh.length > 5 ? 'det-scroll' : '') + '">' + beh.slice().reverse().map(e => {
+              const cn = behCmts.filter(c => c.event_id == e.id).length;
+              return '<div class="det-item hr-item" data-ev="' + e.id + '">' +
               '<span class="sev-dot ' + sevc(e.severity) + '"></span>' +
               '<span class="di-main"><div class="hr-head"><strong>' + esc(catName(e.category_id) || 'דיווח') + '</strong>' +
               (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
               (e.note ? '<div class="tl-note hr-note" data-note>' + esc(e.note) + '</div>' : '') + '</span>' +
               '<span class="di-meta">' + esc(hebDate(e.event_date) || '') +
               ' · ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</span>' +
-              (canEditBeh ? '<span class="hr-act">' +
-                '<button class="mini" data-behedit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
-                '<button class="mini danger" data-behdel="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></span>' : '') +
-              '</div>').join('') + '</div>'
+              '<span class="hr-act">' +
+                '<button class="mini" data-behcmt="' + e.id + '" title="עדכוני מעקב"' + (cn ? ' style="width:auto;padding:0 8px"' : '') + '><i class="bi bi-chat-left-text"></i>' + (cn ? ' ' + cn : '') + '</button>' +
+                (canEditBeh ? '<button class="mini" data-behedit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+                '<button class="mini danger" data-behdel="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>' : '') +
+              '</span>' +
+              '</div>' + cmtSub(e);
+            }).join('') + '</div>'
           : '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">אין דיווחים</div>') +
         '</div>';
 
@@ -445,6 +465,10 @@
       m.el.querySelectorAll('[data-behedit]').forEach(b => b.addEventListener('click', () => {
         const e = beh.find(x => String(x.id) === b.dataset.behedit);
         if (e && window.cv3Behavior) window.cv3Behavior.open(e, { onSaved: reopen });
+      }));
+      m.el.querySelectorAll('[data-behcmt]').forEach(b => b.addEventListener('click', () => {
+        const e = beh.find(x => String(x.id) === b.dataset.behcmt);
+        if (e && window.cv3Behavior) window.cv3Behavior.comments(e, { title: window.UI.fullName ? window.UI.fullName(s) : s.name, onChange: reopen });
       }));
       m.el.querySelectorAll('[data-behdel]').forEach(b => b.addEventListener('click', () => {
         const e = beh.find(x => String(x.id) === b.dataset.behdel);

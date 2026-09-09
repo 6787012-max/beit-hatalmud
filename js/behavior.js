@@ -230,8 +230,11 @@
   };
 
   async function renderBehavior(page) {
-    const [studs, cs, evs, cls, allCmts] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
-    const cmtCounts = commentCounts(allCmts);
+    const [studs, cs, evs, cls, allCmtsInit] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
+    // let, לא const: אחרי הוספת/מחיקת תגובה מרעננים את שתיהן מהשרת (ראה
+    // data-cmt למטה) כדי שתת-הדיווח המקונן יציג את התוכן העדכני, לא רק מונה.
+    let allCmts = allCmtsInit;
+    let cmtCounts = commentCounts(allCmts);
     if (window.Author) await window.Author.load();
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
@@ -310,6 +313,16 @@
         (!fc || String(e.category_id) === fc) &&
         (!fb || authorKey(e) === fb));
     };
+    // תגובות מוצגות כתת-דיווח מקונן ממש מתחת לדיווח, לא רק מאחורי הכפתור —
+    // בקשת יוסף 09/09/2026, אותה תבנית כמו בכרטיס התלמיד (students.js).
+    const cmtSub = e => {
+      const cs = allCmts.filter(c => c.event_id == e.id).sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
+      if (!cs.length) return '';
+      return '<div class="hr-subwrap">' + cs.map(c =>
+        '<div class="det-item hr-subitem"><span class="di-main"><div class="tl-note hr-note">' + esc(c.note) + '</div></span>' +
+        '<span class="di-meta">' + esc(hebDate(c.comment_date) || c.comment_date || '') +
+        ' · ' + (window.Author ? window.Author.cell(c.created_by) : '') + '</span></div>').join('') + '</div>';
+    };
     const itemHtml = e => {
       const cn = cmtCounts[e.id] || 0;
       return '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
@@ -330,7 +343,7 @@
       ((!window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(e))
         ? '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
           '<button class="mini danger" data-del="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>'
-        : '') + '</div>';
+        : '') + '</div>' + cmtSub(e);
     };
     const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id)
       : g === 'by' ? (window.Author ? window.Author.name(e.created_by) : 'לא ידוע')
@@ -416,7 +429,9 @@
         const ev = list.find(x => x.id == b.dataset.cmt); if (!ev) return;
         window.cv3Behavior.comments(ev, {
           title: nameOf(ev.student_id),
-          onChange: n => { cmtCounts[ev.id] = n; draw(); },
+          // מרעננים את הרשימה המלאה, לא רק את המונה — אחרת תת-הדיווח החדש
+          // שנוסף לא יופיע עד רענון מלא של הדף.
+          onChange: async () => { allCmts = await allComments(); cmtCounts = commentCounts(allCmts); draw(); },
         });
       }));
     }

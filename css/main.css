@@ -445,6 +445,9 @@ button.chip{border:none; cursor:pointer; font-family:inherit}
 .hr-note.hr-clamped::after{content:' הצג עוד ▾'; color:var(--primary); font-weight:700; font-size:.78rem}
 .hr-note.hr-clamped.open::after{content:' הצג פחות ▴'}
 .hr-act{display:flex; gap:4px; align-items:center; flex:none}
+.hr-subwrap{margin:0 0 5px; padding-inline-start:12px; margin-inline-start:16px; border-inline-start:2px solid var(--line,#e2e2e2)}
+.hr-subitem{background:transparent; opacity:.9; padding:4px 11px; margin-bottom:2px}
+.hr-subitem .hr-note{font-size:.82rem; -webkit-line-clamp:unset; overflow:visible}
 
 /* דף בית: תוכן ראשי + חלונית "מעקב דחוף" צדדית (נדבקת בגלילה במסך רחב) */
 .home-grid{display:grid; grid-template-columns:1fr 300px; gap:16px; align-items:start}
