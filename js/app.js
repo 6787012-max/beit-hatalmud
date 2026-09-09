@@ -39,6 +39,8 @@
     { id: 'voicereports',  label: 'דיווחים קוליים',    icon: 'bi-mic-fill',        group: G3, color: '#8e44ad', adminOnly: true },
     // דיוור להורים: מזכירה/מנהל בלבד (adminOnly). מייל + קול + צינתוק בערוץ אחד.
     { id: 'messaging',     label: 'שליחת דיוור',       icon: 'bi-envelope-paper',  group: G3, color: '#059669', adminOnly: true },
+    // הטענת כרטיס נטען "טייצר" — היה גיליון Sheets נפרד, עבר לגמרי לכאן (09/09/2026).
+    { id: 'taitzer',       label: 'כרטיסי טייצר',      icon: 'bi-credit-card-fill', group: G3, color: '#0891b2', adminOnly: true },
     { id: 'exporter',      label: 'יצוא והדפסה',      icon: 'bi-printer',         group: G3, color: '#475569' },
     { id: 'lobby',         label: 'מסך הלובי',        icon: 'bi-tv',              group: G3, color: '#b45309', adminOnly: true },
     { id: 'settings',      label: 'הגדרות והרשאות',   icon: 'bi-gear',            group: G3, color: '#7f8c8d', adminOnly: true },
