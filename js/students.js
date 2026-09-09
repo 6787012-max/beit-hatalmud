@@ -192,7 +192,7 @@
       // קטגוריות הקריאה הוצגו כ"משימות" ותיק המסמכים נעלם. אין להוסיף או
       // להסיר כאן שורה בלי לעדכן את שני הצדדים יחד.
       if (window.Author) await window.Author.load();
-      const [cats, beh, behCmts, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs, psp, photoRows] = await Promise.all([
+      const [cats, beh, behCmts, att, tst, fnc, med, cnv, mtg, rdg, wrt, tsk, raCats, raAssess, tlaData, frmRes, frmAll, voice, sdocs, psp, photoRows, txData] = await Promise.all([
         window.store.list('categories'),
         window.store.byStudent('behavior_events', s.id),
         // אין student_id בטבלת behavior_comments (רק event_id) — נשלף הכל
@@ -211,6 +211,7 @@
         (window.cv3StudentDocs ? window.cv3StudentDocs.forStudent(s.id) : Promise.resolve([])),
         window.store.byStudent('passport', s.id),
         window.store.list('student_photos', { select: 'student_id,mime,photo', eq: { student_id: s.id } }),
+        (window.cv3Taitzer ? window.cv3Taitzer.forStudent(s.tz) : Promise.resolve(null)),
       ]);
       const ph = (photoRows || [])[0];
       const bigPhoto = ph && ph.photo ? 'data:' + (ph.mime || 'image/jpeg') + ';base64,' + ph.photo : '';
@@ -407,6 +408,7 @@
         // תל"א מוצג רק למי שיש לו גישה למסך תל"א (מלמד — לא).
         ((window.cv3Tla && canTla) ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
         (window.cv3StudentDocs ? window.cv3StudentDocs.cardSection(sdocs) : '') +
+        (window.cv3Taitzer ? window.cv3Taitzer.cardSection(txData) : '') +
         // ── כל השאר מאחורי "הרחב": פרטי הרישום המלאים וההיסטוריה ──
         '<button class="btn-ghost sm det-more-btn" id="stuMoreBtn" type="button">' +
           '<i class="bi bi-chevron-down"></i> <span>הצג את כל הנתונים</span></button>' +

@@ -196,6 +196,8 @@ body.dark .demo-note{color:var(--accent)}
 
 /* ===== buttons (shared) ===== */
 .btn-primary.sm,.btn-ghost.sm{width:auto; padding:8px 14px; font-size:.88rem}
+.btn-ghost.xs{width:auto; padding:3px 7px; font-size:.78rem; border-radius:8px}
+.tx-weeknav{display:flex; align-items:center; gap:10px; margin:4px 2px 12px; font-size:.92rem}
 .btn-ghost{border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:11px; cursor:pointer; font-family:inherit; font-weight:700; padding:10px 14px; display:inline-flex; align-items:center; gap:7px; transition:background .15s}
 .btn-ghost:hover{background:var(--bg)}
 .inp.mb0{margin-bottom:0}
@@ -297,6 +299,9 @@ textarea.inp.ta-auto{overflow-y:auto}
 .det-stats .ds b{display:block; font-size:1.25rem; font-weight:800; color:var(--primary-dark); font-variant-numeric:tabular-nums}
 .det-stats .ds span{font-size:.72rem; color:var(--muted)}
 .det-sec{margin-bottom:12px}
+/* קטע "טייצר" בכרטיס תלמיד — רקע עדין ייחודי כדי שיהיה נוח לעין להבחין
+   אותו משאר הכרטיס (בקשת יוסף 09/09), גוון תואם למיתוג (primary-light). */
+.det-sec.tx-sec{background:color-mix(in srgb,var(--primary-light) 8%,var(--card)); border:1px solid color-mix(in srgb,var(--primary-light) 22%,var(--line)); border-radius:12px; padding:10px 12px 4px}
 .det-sec h4{font-size:.82rem; font-weight:800; color:var(--muted); margin-bottom:6px; display:flex; align-items:center; gap:7px}
 .det-sec h4 .bi{color:var(--primary)}
 .det-badge{font-size:.68rem; font-weight:800; background:color-mix(in srgb,var(--primary) 13%,transparent); color:var(--primary); padding:1px 8px; border-radius:999px}
