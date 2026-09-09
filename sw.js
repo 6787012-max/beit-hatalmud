@@ -4,7 +4,7 @@
 // שמשתמש שטען את האתר פעם אחת המשיך לקבל את הגרסה הישנה לנצח.)
 const CACHE = 'cv3-v93';
 const ASSETS = ['./', 'index.html', 'css/main.css', 'manifest.webmanifest', 'favicon.svg', 'icon-192.png',
-  'js/config.js', 'js/supabase.js', 'js/api.js', 'js/store.js', 'js/ui.js', 'js/sortui.js', 'js/auth.js',
+  'js/config.js', 'js/phone-utils.js', 'js/supabase.js', 'js/api.js', 'js/store.js', 'js/ui.js', 'js/sortui.js', 'js/auth.js',
   'js/author.js', 'js/students.js', 'js/picker.js', 'js/behavior.js', 'js/tla.js', 'js/tla-autofill.js', 'js/form-templates.js', 'js/passport.js', 'js/medical.js', 'js/books.js', 'js/reading-assess.js', 'js/certificate.js', 'js/tracking.js', 'js/dashboard.js',
   'js/admin.js', 'js/pettycash.js', 'js/lobby.js', 'js/forms.js', 'js/teacher.js', 'js/tasks.js',
   'js/calendar.js', 'js/trips.js', 'js/staffcard.js', 'js/guide-data.js', 'js/help.js', 'js/yemot.js', 'js/yemot-line.js', 'js/voicereports.js', 'js/messaging.js', 'js/app.js',

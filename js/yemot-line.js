@@ -35,13 +35,7 @@
 
   const Y = () => window.Yemot;
 
-  const normPhone0 = v => {
-    if (!v) return null;
-    let d = String(v).replace(/\D/g, '');
-    if (d.startsWith('972')) d = '0' + d.slice(3);
-    if (!d.startsWith('0')) d = '0' + d;
-    return (d.length >= 9 && d.length <= 10) ? d : null;
-  };
+  const normPhone0 = window.cv3NormPhone;
 
   // מספרי ההורים לפי שיעור, ישירות מ-Supabase. זהו מקור האמת לשידור בתשלום —
   // הרשימה החינמית (tzl:) סגורה להזרקה ומכילה רק את מי שנרשם בעצמו.
@@ -429,13 +423,7 @@
     p.querySelector('#ylRtShow').addEventListener('click', showRouting);
   }
 
-  const normPhone = v => {
-    if (!v) return null;
-    let d = String(v).replace(/\D/g, '');
-    if (d.startsWith('972')) d = '0' + d.slice(3);
-    if (!d.startsWith('0')) d = '0' + d;
-    return (d.length >= 9 && d.length <= 10) ? d : null;
-  };
+  const normPhone = window.cv3NormPhone;
 
   let builtIni = '';
   async function buildRouting() {

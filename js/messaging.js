@@ -11,13 +11,7 @@
 (function () {
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const normPhone = v => {
-    if (!v) return null;
-    let d = String(v).replace(/\D/g, '');
-    if (d.startsWith('972')) d = '0' + d.slice(3);
-    if (!d.startsWith('0')) d = '0' + d;
-    return (d.length >= 9 && d.length <= 10) ? d : null;
-  };
+  const normPhone = window.cv3NormPhone;
   const CAMPAIGN_UNIT_PER_CALL = 1.0;   // ראה js/yemot-line.js — RunCampaign (unitsPerMessage), פי 10 מצינתוק
   const CATEGORIES = [
     { k: 'general',   lbl: 'כללי' },
