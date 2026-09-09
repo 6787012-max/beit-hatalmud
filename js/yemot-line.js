@@ -50,12 +50,14 @@
     if (rosterCache) return rosterCache;
     const [st, cl] = await Promise.all([window.db.list('students', {}), window.db.list('classes', {})]);
     if (!st.ok || !cl.ok) throw new Error('לא ניתן לקרוא את נתוני המערכת');
-    const clsName = {}; cl.data.forEach(c => { clsName[c.id] = c.name; });
-    const extOf = {}; SHIURIM.forEach(x => { extOf[x.cls] = x.ext; });
+    // yemot_ext (עמודה יציבה, ראה migration_yemot_class_ext.sql) עדיפה על התאמת
+    // שם-כיתה כטקסט חופשי — נופל להתאמת-שם רק אם העמודה עוד לא מולאה לכיתה הזו.
+    const nameExtOf = {}; SHIURIM.forEach(x => { nameExtOf[x.cls] = x.ext; });
+    const extOfClassId = {}; cl.data.forEach(c => { extOfClassId[c.id] = c.yemot_ext || nameExtOf[c.name] || null; });
     const out = { '1': new Set(), '2': new Set(), '3': new Set(), '4': new Set() };
     st.data.forEach(s => {
-      const ext = extOf[clsName[s.class_id]];
-      if (!ext) return;
+      const ext = extOfClassId[s.class_id];
+      if (!ext || !out[ext]) return;
       const reg = s.reg || {};
       [s.parent_phone, s.mother_phone, reg['נייד אב'], reg['נייד אם'], reg['טלפון בבית']]
         .map(normPhone0).filter(Boolean).forEach(ph => out[ext].add(ph));
@@ -311,11 +313,11 @@
     try {
       const [st, cl] = await Promise.all([window.db.list('students', {}), window.db.list('classes', {})]);
       if (!st.ok || !cl.ok) { sel.innerHTML = '<option value="">שגיאה בטעינה</option>'; return; }
-      const clsName = {}; cl.data.forEach(c => { clsName[c.id] = c.name; });
-      const extOf = {}; SHIURIM.forEach(x => { extOf[x.cls] = x.ext; });
+      const nameExtOf = {}; SHIURIM.forEach(x => { nameExtOf[x.cls] = x.ext; });
+      const extOfClassId = {}; cl.data.forEach(c => { extOfClassId[c.id] = c.yemot_ext || nameExtOf[c.name] || null; });
       const rows = [];
       st.data.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he')).forEach(s => {
-        if (!extOf[clsName[s.class_id]]) return;
+        if (!extOfClassId[s.class_id]) return;
         const reg = s.reg || {};
         [['אבא', s.parent_phone || reg['נייד אב']], ['אמא', s.mother_phone || reg['נייד אם']]].forEach(([who, ph]) => {
           const n = normPhone0(ph);
@@ -444,8 +446,8 @@
         window.db.list('students', {}), window.db.list('classes', {})
       ]);
       if (!st.ok || !cl.ok) { note(box, 'לא ניתן לקרוא את נתוני המערכת.'); return; }
-      const byId = {}; cl.data.forEach(c => { byId[c.id] = c.name; });
-      const extOf = {}; SHIURIM.forEach(s => { extOf[s.cls] = s.ext; });
+      const nameExtOf = {}; SHIURIM.forEach(s => { nameExtOf[s.cls] = s.ext; });
+      const extOfClassId = {}; cl.data.forEach(c => { extOfClassId[c.id] = c.yemot_ext || nameExtOf[c.name] || null; });
 
       // אנשי צוות מוחרגים — אחרת הם ננעלים בשלוחת השיעור ומאבדים את שלוחה 9
       let staff = new Set();
@@ -458,7 +460,7 @@
 
       const map = {}, who = {};
       st.data.forEach(s => {
-        const ext = extOf[byId[s.class_id]];
+        const ext = extOfClassId[s.class_id];
         if (!ext) return;
         const reg = s.reg || {};
         [s.parent_phone, s.mother_phone, reg['נייד אב'], reg['נייד אם'], reg['טלפון בבית']]
