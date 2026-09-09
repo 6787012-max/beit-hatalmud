@@ -283,6 +283,23 @@
     'נתונים לדעת), **נקודת חוזק**, **צעד אחד מעשי לצוות**. הסתמך אך ורק על הנתונים שמופיעים ' +
     'כאן, בלי להמציא. אל תאבחן ואל תיתן חוות דעת רפואית/פסיכולוגית — זו הכוונה חינוכית בלבד.\n\nנתונים:\n';
 
+  // מכסת Gemini החינמית (20 בקשות/דקה) משותפת לכל פיצ'רי ה-AI במערכת (סיכומים,
+  // עוזר אישי, תמלול דיווחים קוליים) — עומס אמיתי של כמה אנשי צוות במקביל
+  // מספיק כדי לחרוג ממנה. **לא הוגדל בכוונה ל-billing מלא** — ראה ההערה ב-
+  // supabase/functions/ai/index.ts (יוסף כבר חויב מאות ש"ח על שימוש לא-מוגבל
+  // בעבר). כאן רק הופכים שגיאת-חסימה-מוחלטת לכפתור "נסה שוב" + הודעה קריאה.
+  function friendlyErr(msg) {
+    const m = String(msg || '');
+    if (/quota|RESOURCE_EXHAUSTED|429/i.test(m)) return 'עומס זמני על מערכת ה-AI (כמה אנשי צוות במקביל) — נסו שוב בעוד דקה.';
+    return m;
+  }
+  function showError(host, msg, retry) {
+    host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(friendlyErr(msg)) + ')</div>' +
+      '<a href="#" class="btn-ghost sm" data-airefresh style="margin-top:6px;display:inline-block"><i class="bi bi-arrow-clockwise"></i> נסה שוב</a>';
+    const r = host.querySelector('[data-airefresh]');
+    if (r) r.addEventListener('click', e => { e.preventDefault(); retry(); });
+  }
+
   // מציג את הניתוח האחרון שנשמר (אם יש) + קישור רענון, או — אם עוד אין —
   // כפתור "הפק ניתוח" מפורש. ה-fetchFn רץ (וקורא ל-Gemini) רק בלחיצה,
   // לא בפתיחת המסך. onRefresh הוא הקריאה החוזרת ל-render עם force=true.
@@ -318,7 +335,7 @@
       }
       showCachedOrPrompt(host, ck, 'נוצר ע"י AI', () => renderStudent(host, student, true));
     } catch (e) {
-      host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(e.message || e) + ')</div>';
+      showError(host, e.message || e, () => renderStudent(host, student, true));
     }
   }
 
@@ -361,7 +378,7 @@
       }
       showCachedOrPrompt(host, 'org', 'נוצר ע"י AI לפי ההרשאות שלך', () => renderOrg(host, true));
     } catch (e) {
-      host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(e.message || e) + ')</div>';
+      showError(host, e.message || e, () => renderOrg(host, true));
     }
   }
 
@@ -390,7 +407,7 @@
         renderClass(host, classId, className);
       });
     } catch (e) {
-      host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(e.message || e) + ')</div>';
+      showError(host, e.message || e, () => renderClass(host, classId, className));
     }
   }
 
