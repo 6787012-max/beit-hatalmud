@@ -211,11 +211,21 @@
             ab = cnt(a, 'absent') + cnt(a, 'חיסור') + cnt(a, 'נעדר');
       const t = p + l + ab;
       const g = tests.filter(x => ids.includes(x.student_id)).map(x => Number(x.grade)).filter(x => !isNaN(x));
-      lines.push('- ' + k + ': ' + ids.length + ' תלמידים' +
-        (t ? (', ' + Math.round(((p + l) / t) * 100) + '% הגעה (' + ab + ' חיסורים)') : ', אין נוכחות') +
-        (g.length ? (', ממוצע מבחנים ' + Math.round(g.reduce((x, y) => x + y, 0) / g.length)) : '') +
-        ', ' + beh.filter(x => ids.includes(x.student_id)).length + ' דיווחי מעקב' +
-        ', ' + tla.filter(x => ids.includes(x.student_id)).length + ' תוכניות תל"א');
+      const behN = beh.filter(x => ids.includes(x.student_id)).length;
+      const tlaN = tla.filter(x => ids.includes(x.student_id)).length;
+      // ⚠️ כיתה בלי שום תיעוד (לא נוכחות, לא מעקב, לא תל"א) כנראה משמעה
+      // שהמורה לא מעדכן את המערכת — לא שהכיתה רגועה. בלי הדגל הזה ה-AI
+      // רואה "0 דיווחי מעקב" בדיוק כמו כיתה עם דיווחים מעטים אמיתיים,
+      // ועלול "לשבח" חוסר-עדכון כאקלים טוב (בקשת יוסף 09/09/2026).
+      if (t === 0 && behN === 0 && tlaN === 0) {
+        lines.push('- ' + k + ': ' + ids.length + ' תלמידים · ⚠️ אין שום תיעוד (לא נוכחות, לא מעקב, לא תל"א) — כנראה המורה/מחנך לא מעדכן את המערכת, לא ראיה לכיתה רגועה');
+      } else {
+        lines.push('- ' + k + ': ' + ids.length + ' תלמידים' +
+          (t ? (', ' + Math.round(((p + l) / t) * 100) + '% הגעה (' + ab + ' חיסורים)') : ', אין רישומי נוכחות') +
+          (g.length ? (', ממוצע מבחנים ' + Math.round(g.reduce((x, y) => x + y, 0) / g.length)) : '') +
+          ', ' + behN + ' דיווחי מעקב' +
+          ', ' + tlaN + ' תוכניות תל"א');
+      }
     });
     const noDocs = students.filter(s => !docs.some(d => d.student_id === s.id)).length;
     lines.push('תלמידים בלי תיק מסמכים: ' + noDocs);
@@ -249,15 +259,19 @@
     const topReported = Object.keys(byStudent).sort((x, y) => byStudent[y] - byStudent[x]).slice(0, 3)
       .map(sid => { const s = students.find(x => String(x.id) === String(sid)); return s ? nm(s) + ' (' + byStudent[sid] + ')' : null; })
       .filter(Boolean);
+    // ⚠️ אין שום תיעוד = כנראה המחנך לא מעדכן, לא כיתה רגועה — ראה orgData()
+    const noActivity = tot === 0 && behC.length === 0 && inClass(tests).length === 0;
     return {
       sig: [students.length, a.length, behC.length, inClass(tests).length].join('-'),
       text: [
         'כיתה: ' + (className || ''),
         'מספר תלמידים: ' + students.length,
-        'נוכחות כיתתית: ' + (tot ? (Math.round(((present + late) / tot) * 100) + '% הגעה, ' + absent + ' חיסורים סה"כ') : 'אין רישומים'),
-        'דיווחי מעקב: ' + behC.length + ' סה"כ, מתוכם ' + highSev + ' בחומרה גבוהה',
-        'התלמידים עם הכי הרבה דיווחי מעקב: ' + (topReported.length ? topReported.join(', ') : 'אין ריכוז בולט'),
-        'מבחנים: ' + (grades.length ? (grades.length + ' ציונים, ממוצע ' + Math.round(grades.reduce((x, y) => x + y, 0) / grades.length)) : 'אין'),
+        noActivity ? '⚠️ אין שום תיעוד בכיתה זו (לא נוכחות, לא מעקב, לא מבחנים) — כנראה חוסר עדכון מהמחנך, לא ראיה לכיתה רגועה' : [
+          'נוכחות כיתתית: ' + (tot ? (Math.round(((present + late) / tot) * 100) + '% הגעה, ' + absent + ' חיסורים סה"כ') : 'אין רישומי נוכחות'),
+          'דיווחי מעקב: ' + behC.length + ' סה"כ, מתוכם ' + highSev + ' בחומרה גבוהה',
+          'התלמידים עם הכי הרבה דיווחי מעקב: ' + (topReported.length ? topReported.join(', ') : 'אין ריכוז בולט'),
+          'מבחנים: ' + (grades.length ? (grades.length + ' ציונים, ממוצע ' + Math.round(grades.reduce((x, y) => x + y, 0) / grades.length)) : 'אין'),
+        ].join('\n'),
       ].join('\n'),
     };
   }
@@ -309,13 +323,23 @@
   }
 
   // ───────────────────────── סיכום מוסד ─────────────────────────
-  const ORG_PROMPT = METHOD_PROMPT +
+  // אזהרה משותפת (בקשת יוסף 09/09/2026): כיתה עם מעט/אין דיווחים לרוב
+  // אומרת "המורה לא מעדכן", לא "כיתה רגועה" — אי-אפשר להסיק חיובי מהיעדר
+  // נתונים. כיתות שסומנו ⚠️ בנתונים (ראה orgData/classData) הן פער-דיווח,
+  // לא נקודת חוזק — אסור לצטט אותן כ"מה תקין"/"נקודת חוזק".
+  const NO_DATA_RULE =
+    'חשוב: מעט/אין דיווחי מעקב, נוכחות או תל"א בכיתה **אינו** ראיה לכיתה רגועה — ' +
+    'זו לרוב עדות לכך שהצוות לא מעדכן את המערכת. כיתה שמסומנת בנתונים ⚠️ כחסרת תיעוד ' +
+    'היא פער דיווח שדורש בירור מול המורה, ואסור לציין אותה כ"נקודת חוזק"/"מה תקין" — ' +
+    'לכל היותר ציין אותה תחת "מה קורה כאן" כפער מידע. ';
+
+  const ORG_PROMPT = METHOD_PROMPT + NO_DATA_RULE +
     'לפניך תמונת מצב מצטברת על כל המוסד (לא תלמיד ותלמיד). התייחס לאקלים הכללי — ' +
     'האם יש ריכוז דיווחים אצל מעטים, מגמת נוכחות, כיתות שבולטות — ולא לתלמיד ספציפי. ' +
     'כתוב בעברית, קצר וממוקד (עד 8 שורות), בשלושה חלקים עם כותרות מודגשות: **מה קורה כאן**, ' +
     '**מה תקין** (נקודת חוזק מוסדית), **צעד אחד מעשי למנהל**. הסתמך רק על הנתונים.\n\nנתונים:\n';
 
-  const CLS_PROMPT = METHOD_PROMPT +
+  const CLS_PROMPT = METHOD_PROMPT + NO_DATA_RULE +
     'לפניך נתונים מצטברים על כיתה אחת בלבד (לא תלמיד יחיד ולא כל המוסד). התייחס לאקלים ' +
     'הכיתתי — האם יש ריכוז דיווחים אצל מעטים, מגמת נוכחות, וכו׳. ' +
     'כתוב בעברית, קצר וממוקד (עד 8 שורות), בשלושה חלקים עם כותרות מודגשות: **מה קורה כאן**, ' +
