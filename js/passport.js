@@ -355,7 +355,19 @@
       // border-collapse:collapse (מוגדר על table.tbl הכללי) שובר sticky על th
       // ברוב הדפדפנים — לכן כאן, בטבלה הזו בלבד, separate+spacing:0 (נראה זהה).
       '#pspWrap table.tbl{border-collapse:separate;border-spacing:0}' +
-      '#pspWrap table.tbl thead th{position:sticky;top:60px;z-index:5;background:var(--bg)}';
+      '#pspWrap table.tbl thead th{position:sticky;top:60px;z-index:5;background:var(--bg)}' +
+      // באג שהתגלה בפועל (09/09/2026, דיווח הרב וינברג — "לא רואה את אוליאל"):
+      // ל-.table-wrap הכללי יש overflow-x:auto (לגלילה אופקית של טבלאות רחבות).
+      // כל אב עם overflow שאינו visible — אפילו רק על ציר X — הופך ל"עוגן" של
+      // ה-sticky (מפרט ה-CSS מקדם overflow-y ל-auto אוטומטית ברגע שoverflow-x
+      // אינו visible, גם אם נכתב overflow-y:visible במפורש). כשהעוגן הזה לא
+      // גולל בפועל בעצמו (התוכן לא עולה עליו — כל הגלילה קורית בדף כולו),
+      // הדפדפן עדיין דוחף את ה-th ב-60px למטה מהמנוחה הטבעית שלו כל הזמן,
+      // גם בלי שום גלילה — וזה בדיוק כיסה את השורה הראשונה בטבלה (אוליאל).
+      // אומת חי: קינון wrapper פנימי נוסף עם overflow-x לא עוזר (אותה תקלה
+      // חוזרת על העוגן החדש) — הפתרון היחיד שאומת הוא לבטל את הגלילה האופקית
+      // בטבלה הזו בלבד (לא נוגעים ב-.table-wrap הכללי, שמשמש מסכים אחרים).
+      '#pspWrap{overflow-x:visible}';
     document.head.appendChild(s);
   }
 
