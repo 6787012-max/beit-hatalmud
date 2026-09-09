@@ -102,6 +102,15 @@
   function cacheSet(k, sig, text) {
     try { localStorage.setItem('cv3ai_' + CV + k, JSON.stringify({ sig: sig, text: text, at: Date.now() })); } catch (_) {}
   }
+  // כמו cacheGet אבל בלי בדיקת sig — מציג את הניתוח האחרון שנשמר גם אם
+  // הנתונים השתנו מאז, כדי שפתיחת מסך לא תפיק ניתוח חדש לבד (מכסת Gemini
+  // החינמית היא 20 בקשות; יוסף ביקש 09/09 שרענון מסך לא יצרוך ממנה).
+  function cacheGetLatest(k) {
+    try {
+      const raw = localStorage.getItem('cv3ai_' + CV + k);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
   const ago = ts => {
     const m = Math.round((Date.now() - ts) / 60000);
     if (m < 1) return 'עכשיו';
@@ -260,29 +269,40 @@
     'נתונים לדעת), **נקודת חוזק**, **צעד אחד מעשי לצוות**. הסתמך אך ורק על הנתונים שמופיעים ' +
     'כאן, בלי להמציא. אל תאבחן ואל תיתן חוות דעת רפואית/פסיכולוגית — זו הכוונה חינוכית בלבד.\n\nנתונים:\n';
 
-  async function renderStudent(host, student) {
+  // מציג את הניתוח האחרון שנשמר (אם יש) + קישור רענון, או — אם עוד אין —
+  // כפתור "הפק ניתוח" מפורש. ה-fetchFn רץ (וקורא ל-Gemini) רק בלחיצה,
+  // לא בפתיחת המסך. onRefresh הוא הקריאה החוזרת ל-render עם force=true.
+  function showCachedOrPrompt(host, ck, notePrefix, onRefresh) {
+    const hit = cacheGetLatest(ck);
+    if (hit) {
+      host.innerHTML = md(hit.text) +
+        '<div class="tl-note" style="font-size:.72rem;margin-top:6px">' + notePrefix + ' · <span title="' +
+        esc(new Date(hit.at).toLocaleString('he-IL')) + '">עודכן ' + ago(hit.at) + '</span>' +
+        ' · <a href="#" data-airefresh>רענון</a></div>';
+    } else {
+      host.innerHTML = '<div class="tl-note" style="margin-bottom:6px">עדיין לא הופק ניתוח AI כאן.</div>' +
+        '<a href="#" class="btn-ghost sm" data-airefresh><i class="bi bi-stars"></i> הפק ניתוח AI</a>';
+    }
+    const r = host.querySelector('[data-airefresh]');
+    if (r) r.addEventListener('click', e => { e.preventDefault(); onRefresh(); });
+  }
+
+  async function renderStudent(host, student, force) {
     if (!host) return;
+    const ck = 'stu' + student.id;
+    if (!force) { showCachedOrPrompt(host, ck, 'נוצר ע"י AI', () => renderStudent(host, student, true)); return; }
     host.innerHTML = '<div class="ld"><i class="bi bi-stars"></i> מנתח…</div>';
     try {
       const d = await studentData(student);
       const es = await eduSourcesText();
       const sig = d.sig + '|' + es.sig;
-      const ck = 'stu' + student.id;
       let hit = cacheGet(ck, sig);
       if (!hit) {
         const txt = await gemini(withEduSources(STU_PROMPT, es.text) + d.text, 1000);
         cacheSet(ck, sig, txt);
         hit = cacheGet(ck, sig) || { text: txt, at: Date.now() };
       }
-      host.innerHTML = md(hit.text) +
-        '<div class="tl-note" style="font-size:.72rem;margin-top:6px">נוצר ע"י AI · ' + ago(hit.at) +
-        ' · <a href="#" data-airefresh>רענון</a></div>';
-      const r = host.querySelector('[data-airefresh]');
-      if (r) r.addEventListener('click', e => {
-        e.preventDefault();
-        try { localStorage.removeItem('cv3ai_' + CV + ck); } catch (_) {}
-        renderStudent(host, student);
-      });
+      showCachedOrPrompt(host, ck, 'נוצר ע"י AI', () => renderStudent(host, student, true));
     } catch (e) {
       host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(e.message || e) + ')</div>';
     }
@@ -301,8 +321,9 @@
     'כתוב בעברית, קצר וממוקד (עד 8 שורות), בשלושה חלקים עם כותרות מודגשות: **מה קורה כאן**, ' +
     '**נקודת חוזק**, **צעד אחד מעשי לצוות**. הסתמך רק על הנתונים.\n\nנתונים:\n';
 
-  async function renderOrg(host) {
+  async function renderOrg(host, force) {
     if (!host) return;
+    if (!force) { showCachedOrPrompt(host, 'org', 'נוצר ע"י AI לפי ההרשאות שלך', () => renderOrg(host, true)); return; }
     host.innerHTML = '<div class="ld"><i class="bi bi-stars"></i> מנתח את נתוני המוסד…</div>';
     try {
       const d = await orgData();
@@ -314,15 +335,7 @@
         cacheSet('org', sig, txt);
         hit = cacheGet('org', sig) || { text: txt, at: Date.now() };
       }
-      host.innerHTML = md(hit.text) +
-        '<div class="tl-note" style="font-size:.72rem;margin-top:6px">נוצר ע"י AI לפי ההרשאות שלך · ' + ago(hit.at) +
-        ' · <a href="#" data-airefresh>רענון</a></div>';
-      const r = host.querySelector('[data-airefresh]');
-      if (r) r.addEventListener('click', e => {
-        e.preventDefault();
-        try { localStorage.removeItem('cv3ai_' + CV + 'org'); } catch (_) {}
-        renderOrg(host);
-      });
+      showCachedOrPrompt(host, 'org', 'נוצר ע"י AI לפי ההרשאות שלך', () => renderOrg(host, true));
     } catch (e) {
       host.innerHTML = '<div class="tl-note" style="color:#b91c1c">לא ניתן להפיק סיכום כרגע (' + esc(e.message || e) + ')</div>';
     }
