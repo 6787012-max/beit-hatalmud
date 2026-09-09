@@ -150,7 +150,12 @@
           '</tr>';
         }).join('') + '</tbody></table></div>';
 
-      if (!editable) return; // היסטוריה — בלי אינטרקציה
+      // ניווט השבועות חייב לעבוד גם בשבוע היסטורי (אחרת אי אפשר לצאת ממנו) —
+      // נרשם תמיד, לפני ה-guard הבא שחוסם רק את האינטרקציה של הטבלה עצמה.
+      box.querySelector('#txPrevWk')?.addEventListener('click', () => { if (selectedWeek > 1) { selectedWeek--; draw(); } });
+      box.querySelector('#txNextWk')?.addEventListener('click', () => { if (selectedWeek < curWeek) { selectedWeek++; draw(); } });
+
+      if (!editable) return; // היסטוריה — בלי עריכת הטבלה עצמה
 
       // שמירה מיידית בשינוי — כמו כל checkbox אחר במערכת, בלי כפתור "שמור" נפרד.
       async function saveRow(tr) {
@@ -244,9 +249,6 @@
           btn.disabled = false; btn.innerHTML = orig;
         }
       };
-
-      box.querySelector('#txPrevWk')?.addEventListener('click', () => { if (selectedWeek > 1) { selectedWeek--; draw(); } });
-      box.querySelector('#txNextWk')?.addEventListener('click', () => { if (selectedWeek < curWeek) { selectedWeek++; draw(); } });
     }
 
     page.querySelector('#txSummaryToggle').addEventListener('click', () => {
