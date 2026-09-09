@@ -43,7 +43,30 @@
           <h1>ברוכים הבאים</h1>
           <p>מערכת מעקב התנהגות ולמידה — בחרו תחום כדי להתחיל.</p>
         </div>
-        <div id="liveClock" class="hero-clock" title="תאריך ושעה נוכחיים"></div>
+        <div class="hero-clock-wrap">
+          <svg id="analogClock" class="hero-analog-clock" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="clock-face" cx="50" cy="50" r="46"/>
+            <g class="clock-ticks">
+              <line class="tick tick-major" x1="50" y1="6" x2="50" y2="17"/>
+              <line class="tick tick-minor" x1="72" y1="11.9" x2="69" y2="17.1"/>
+              <line class="tick tick-minor" x1="88.1" y1="28" x2="82.9" y2="31"/>
+              <line class="tick tick-major" x1="94" y1="50" x2="83" y2="50"/>
+              <line class="tick tick-minor" x1="88.1" y1="72" x2="82.9" y2="69"/>
+              <line class="tick tick-minor" x1="72" y1="88.1" x2="69" y2="82.9"/>
+              <line class="tick tick-major" x1="50" y1="94" x2="50" y2="83"/>
+              <line class="tick tick-minor" x1="28" y1="88.1" x2="31" y2="82.9"/>
+              <line class="tick tick-minor" x1="11.9" y1="72" x2="17.1" y2="69"/>
+              <line class="tick tick-major" x1="6" y1="50" x2="17" y2="50"/>
+              <line class="tick tick-minor" x1="11.9" y1="28" x2="17.1" y2="31"/>
+              <line class="tick tick-minor" x1="28" y1="11.9" x2="31" y2="17.1"/>
+            </g>
+            <line id="handHour" class="clock-hand hand-hour" x1="50" y1="50" x2="50" y2="27"/>
+            <line id="handMin" class="clock-hand hand-min" x1="50" y1="50" x2="50" y2="17"/>
+            <line id="handSec" class="clock-hand hand-sec" x1="50" y1="50" x2="50" y2="15"/>
+            <circle class="clock-center" cx="50" cy="50" r="2.6"/>
+          </svg>
+          <div id="liveClock" class="hero-clock" title="תאריך ושעה נוכחיים"></div>
+        </div>
       </div>
       <div class="home-grid">
         <div id="homeReports"></div>

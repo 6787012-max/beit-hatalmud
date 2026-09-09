@@ -296,11 +296,18 @@
   function startClock() {
     const el = $('#liveClock'); if (!el) return;
     const pad = n => String(n).padStart(2, '0');
+    const handHour = $('#handHour'), handMin = $('#handMin'), handSec = $('#handSec');
     const tick = () => {
       const now = new Date();
       const heb = (window.UI && window.UI.hebDate) ? window.UI.hebDate(now) : '';
       const time = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
       el.textContent = 'יום ' + CLOCK_DAYS[now.getDay()] + ' · ' + heb + ' · ' + time;
+      if (handSec) {
+        const s = now.getSeconds(), m = now.getMinutes(), h = now.getHours() % 12;
+        handSec.style.transform = 'rotate(' + (s * 6) + 'deg)';
+        handMin.style.transform = 'rotate(' + (m * 6 + s * 0.1) + 'deg)';
+        handHour.style.transform = 'rotate(' + (h * 30 + m * 0.5) + 'deg)';
+      }
     };
     tick();
     setInterval(tick, 1000);
