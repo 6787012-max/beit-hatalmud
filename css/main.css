@@ -67,27 +67,27 @@ body{
   display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap;
 }
 .home-hero::after{content:""; position:absolute; inset-inline-start:-30px; bottom:-50px; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle, rgba(255,255,255,.14), transparent 70%)}
-.home-hero::before{content:"\F19D"; font-family:"bootstrap-icons"; position:absolute; inset-inline-end:22px; top:50%; transform:translateY(-50%); font-size:4.6rem; opacity:.12; color:#fff}
 .home-hero-text{position:relative}
 .home-hero h1{font-size:1.6rem; font-weight:800; color:#fff; margin-bottom:4px; position:relative}
 .home-hero p{color:#d3e3e9; position:relative; max-width:60ch}
-/* השעון בתוך הבאנר, בצד הנגדי לטקסט (בקשת יוסף 08/09/2026: "ליד ברוכים
-   הבאים, בצד שמאל") — לא עוד שורה נפרדת מתחת לכותרת. */
-.hero-clock{
-  position:relative; color:#fff; font-size:1.55rem; font-weight:800;
-  font-variant-numeric:tabular-nums; white-space:nowrap; text-shadow:0 2px 10px rgba(0,0,0,.25);
-}
-.hero-clock:empty{display:none}
-@media (max-width:640px){ .hero-clock{font-size:1.15rem} }
+/* אזור השעון בתוך הבאנר, בצד הנגדי לטקסט — הכי בקצה השמאלי (בקשת יוסף
+   09/09/2026): השעון האנלוגי בקצה הקיצוני (איפה שהיה אייקון הסימניה
+   הדהוי — הוסר, השעון האמיתי תופס את מקומו), ולידו מימין יום+תאריך
+   בשתי שורות קומפקטיות זו-מעל-זו — לא ערימה אנכית שמגביהה את הבאנר. */
+.hero-clock-wrap{position:relative; display:flex; flex-direction:row; align-items:center; gap:10px}
+.hero-date-lines{display:flex; flex-direction:column; align-items:center; gap:2px}
+.clock-day{color:#fff; font-size:1.05rem; font-weight:800; white-space:nowrap; text-shadow:0 2px 10px rgba(0,0,0,.25)}
+.clock-date{color:#fff; font-size:.9rem; font-weight:600; white-space:nowrap; text-shadow:0 2px 10px rgba(0,0,0,.25)}
+@media (max-width:640px){ .clock-day{font-size:.92rem} .clock-date{font-size:.78rem} }
 
-/* שעון אנלוגי עם מחוגים ליד השעון הדיגיטלי (בקשת יוסף 09/09/2026: "לבן,
-   ושיהיה שעון עם מחוגים יפה ומעוצב"). פני-השעון שקופים-לבנים על גבי גרדיאנט
-   הניווי של הבאנר, המחוגים לבנים; מחוג השניות ומרכז השעון בזהב — תבלין
-   קטן, לא הצבע הדומיננטי (ר' feedback-design-rules-yosef). מסתובב עם
-   transform ולא עם ה-XML attribute כדי לקבל טרנזישן חלק בכל "טיק".*/
-.hero-clock-wrap{position:relative; display:flex; flex-direction:column; align-items:center; gap:6px}
+/* שעון אנלוגי עם מחוגים (בקשת יוסף 09/09/2026: "לבן, ושיהיה שעון עם
+   מחוגים יפה ומעוצב"). פני-השעון שקופים-לבנים על גבי גרדיאנט הניווי של
+   הבאנר, המחוגים לבנים; מחוג השניות ומרכז השעון בזהב — תבלין קטן, לא
+   הצבע הדומיננטי (ר' feedback-design-rules-yosef). מסתובב עם transform
+   ולא עם ה-XML attribute כדי לקבל טרנזישן חלק בכל "טיק". גודל מוקטן
+   (62px, היה 76px) כדי שהשורה לא תהיה גבוהה מבלוק הכותרת מנגד. */
 .hero-analog-clock{
-  width:76px; height:76px; overflow:visible;
+  width:62px; height:62px; overflow:visible; flex-shrink:0;
   filter:drop-shadow(0 3px 8px rgba(0,0,0,.3));
 }
 .clock-face{fill:rgba(255,255,255,.1); stroke:rgba(255,255,255,.6); stroke-width:2.5}
@@ -99,7 +99,7 @@ body{
 .hand-min{stroke-width:2.8}
 .hand-sec{stroke-width:1.4; stroke:var(--accent)}
 .clock-center{fill:var(--accent); stroke:#fff; stroke-width:1}
-@media (max-width:640px){ .hero-analog-clock{width:56px; height:56px} }
+@media (max-width:640px){ .hero-analog-clock{width:46px; height:46px} }
 
 /* ===== tile groups ===== */
 .tile-group{margin-bottom:24px}

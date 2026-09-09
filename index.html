@@ -44,6 +44,10 @@
           <p>מערכת מעקב התנהגות ולמידה — בחרו תחום כדי להתחיל.</p>
         </div>
         <div class="hero-clock-wrap">
+          <div class="hero-date-lines" title="תאריך נוכחי">
+            <div id="clockDay" class="clock-day"></div>
+            <div id="clockDate" class="clock-date"></div>
+          </div>
           <svg id="analogClock" class="hero-analog-clock" viewBox="0 0 100 100" aria-hidden="true">
             <circle class="clock-face" cx="50" cy="50" r="46"/>
             <g class="clock-ticks">
@@ -65,7 +69,6 @@
             <line id="handSec" class="clock-hand hand-sec" x1="50" y1="50" x2="50" y2="15"/>
             <circle class="clock-center" cx="50" cy="50" r="2.6"/>
           </svg>
-          <div id="liveClock" class="hero-clock" title="תאריך ושעה נוכחיים"></div>
         </div>
       </div>
       <div class="home-grid">

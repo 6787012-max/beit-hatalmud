@@ -294,14 +294,12 @@
   // לשכפל אותו; ראה ההערה ב-js/ui.js למה לא לקרוא ל-Intl(he-u-ca-hebrew) ישירות.
   const CLOCK_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
   function startClock() {
-    const el = $('#liveClock'); if (!el) return;
-    const pad = n => String(n).padStart(2, '0');
+    const dayEl = $('#clockDay'), dateEl = $('#clockDate'); if (!dayEl || !dateEl) return;
     const handHour = $('#handHour'), handMin = $('#handMin'), handSec = $('#handSec');
     const tick = () => {
       const now = new Date();
-      const heb = (window.UI && window.UI.hebDate) ? window.UI.hebDate(now) : '';
-      const time = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-      el.textContent = 'יום ' + CLOCK_DAYS[now.getDay()] + ' · ' + heb + ' · ' + time;
+      dayEl.textContent = 'יום ' + CLOCK_DAYS[now.getDay()];
+      dateEl.textContent = (window.UI && window.UI.hebDate) ? window.UI.hebDate(now) : '';
       if (handSec) {
         const s = now.getSeconds(), m = now.getMinutes(), h = now.getHours() % 12;
         handSec.style.transform = 'rotate(' + (s * 6) + 'deg)';
