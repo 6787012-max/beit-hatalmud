@@ -13,6 +13,12 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const normPhone = window.cv3NormPhone;
   const CAMPAIGN_UNIT_PER_CALL = 1.0;   // ראה js/yemot-line.js — RunCampaign (unitsPerMessage), פי 10 מצינתוק
+  // בדיקת יתרה לפני שיחה אמיתית — היה קיים ב-yemot-line.js אבל לא כאן (סריקת
+  // קוד): בלי זה RunCampaign עלול לרוץ עם יתרה חסרה ולהיכשל באמצע לחלק מהנמענים.
+  async function units() {
+    try { const s = await window.Yemot.call('GetSession'); return typeof s.units === 'number' ? s.units : null; }
+    catch (_) { return null; }
+  }
   const CATEGORIES = [
     { k: 'general',   lbl: 'כללי' },
     { k: 'meeting',   lbl: 'אסיפת הורים' },
@@ -638,7 +644,15 @@
     if (isRealCampaign && !voicePhones.length) { window.UI.toast('אין מספרי טלפון בקרב הנמענים שנבחרו — לא ניתן לשלוח שיחה קולית', 'err'); return; }
 
     const mailCount = mailRecipients.length;
-    const campaignCost = (voicePhones.length * CAMPAIGN_UNIT_PER_CALL).toFixed(1);
+    const campaignCostN = voicePhones.length * CAMPAIGN_UNIT_PER_CALL;
+    const campaignCost = campaignCostN.toFixed(1);
+    if (isRealCampaign) {
+      const bal = await units();
+      if (bal !== null && bal < campaignCostN) {
+        window.UI.toast('היתרה בקו היא ' + bal + ' יחידות — צריך כ-' + campaignCost + '. טענו יחידות קודם.', 'err');
+        return;
+      }
+    }
     const parts = [];
     if (mailOn) parts.push('מייל: ' + mailCount + ' כתובות' + (attachVoice ? ' (עם קובץ קול מצורף)' : ''));
     if (isRealCampaign) parts.push('שיחה אמיתית עם הקראת ההודעה: ' + voicePhones.length + ' מספרים · עלות משוערת כ-' + campaignCost + ' יחידות (לא ניתן לעצור אחרי ההרצה)');
