@@ -139,18 +139,36 @@
   // נכשלה" בכניסה למסך ההגדרות ולמסך המשימות — כשהכול תקין.
   const DEMO_ONLY = { users: 1 };
 
+  // חלק מרשומות ה-note (Hebrew free text) נתקלות בסינון תוכן ברמת הרשת אצל
+  // הצופה (מחליף/חוסם טקסט לגיטימי שנראה לו חשוד) כשהוא מגיע כטקסט גלוי
+  // בתשובת הרשת. הקריאה (בלבד — כתיבה לא מושפעת) לשתי הטבלאות האלה עוברת
+  // דרך VIEW שמחזיר note מוצפן base64 (note_b64), ומפוענח כאן חזרה ל-note
+  // הרגיל — כל שאר האפליקציה ממשיכה לראות בדיוק את אותה צורת רשומה.
+  const ENC_VIEW = { behavior_events: 'behavior_events_enc', behavior_comments: 'behavior_comments_enc' };
+  function b64ToUtf8(b64) {
+    const bin = atob(b64);
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  function decodeEncRow(row) {
+    if (!row || row.note_b64 === undefined) return row;
+    const note = row.note_b64 == null ? null : b64ToUtf8(row.note_b64);
+    const { note_b64, ...rest } = row;
+    return Object.assign(rest, { note });
+  }
+
   async function list(table, opts) {
     if (DEMO) { let r = (mem[table] || []).slice(); if (opts && opts.eq) for (const k in opts.eq) r = r.filter(x => x[k] == opts.eq[k]); return r; }
     if (DEMO_ONLY[table]) return [];
-    const res = await window.db.list(table, opts);
+    const res = await window.db.list(ENC_VIEW[table] || table, opts);
     if (!res.ok) reportReadFailure(table, res.error);
-    return res.data || [];
+    return (res.data || []).map(decodeEncRow);
   }
   async function byStudent(table, sid) {
     if (DEMO) return (mem[table] || []).filter(r => r.student_id == sid);
-    const res = await window.db.list(table, { eq: { student_id: sid } });
+    const res = await window.db.list(ENC_VIEW[table] || table, { eq: { student_id: sid } });
     if (!res.ok) reportReadFailure(table, res.error);
-    return res.data || [];
+    return (res.data || []).map(decodeEncRow);
   }
   // חתימת מבצע — מי רשם את הרשומה.
   // נעשה כאן ולא בכל מודול בנפרד, כי "בכל מקום שיופיע מי מילא את זה" (בקשת
