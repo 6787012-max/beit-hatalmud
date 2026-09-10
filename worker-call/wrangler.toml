@@ -1,0 +1,18 @@
+name = "cheder-call"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# משתנה לא-סודי: שלוחת המקור ב-PBX שממנה יוצאת השיחה (snumber). אין בה
+# הרשאה כשלעצמה — כל ההרשאה נבדקת בצד-שרת לפני שמגיעים אליה בכלל — ולכן
+# היא var רגיל ולא secret. כרגע יש שלוחת PBX ידועה אחת בלבד; אין עדיין
+# מיפוי per-staff של "איזו שלוחה מצלצלת קודם לאיזה מנהל" (ראה worker-call/README אם ייווצר,
+# ובינתיים ה-design notes).
+[vars]
+PBX_SOURCE_EXT = "7090473485"
+
+# סודות שצריך להגדיר בנפרד עם `wrangler secret put <NAME>` (ערכים בלבד — לא כאן, לא ב-git):
+#   PBX_AUTH_USER      — שם משתמש ל-API של Adel Telecom
+#   PBX_AUTH_PASS       — סיסמה ל-API של Adel Telecom
+#   SUPABASE_SERVICE_KEY — מפתח service-role של Supabase (עוקף RLS, הבדיקה המוסמכת של role/active)
+#   SUPABASE_URL          — כתובת פרויקט ה-Supabase
+#   SUPABASE_ANON_KEY     — מפתח anon, לכותרת apikey באימות /auth/v1/user בלבד

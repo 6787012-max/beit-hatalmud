@@ -378,7 +378,7 @@
           : avaHTML(s, 'lg')) +
         '<div><div class="det-name">' + esc(s.name) + '</div><span class="chip ' + (s.status === 'פעיל' ? 'ok' : 'off') + '">' + esc(s.status || '') + '</span></div></div>' +
         '<div class="det-grid">' + row('כיתה', classNameOf(classes, s.class_id)) + row('שם הורה', s.parent_name) +
-          (s.parent_phone ? '<div class="det-row"><span class="det-lbl">טלפון</span><span class="det-val"><a href="tel:' + esc(s.parent_phone) + '">' + esc(s.parent_phone) + '</a></span></div>' : '') +
+          (s.parent_phone ? '<div class="det-row"><span class="det-lbl">טלפון</span><span class="det-val"><a href="tel:' + esc(s.parent_phone) + '">' + esc(s.parent_phone) + '</a>' + (window.cv3Call ? window.cv3Call.buttonHTML(s) : '') + '</span></div>' : '') +
           row('הערות', s.notes) + '</div>' +
         '<div class="det-stats">' +
           '<div class="ds"><b>' + beh.length + '</b><span>דיווחים</span></div>' +
@@ -491,6 +491,7 @@
       const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
       const ctb = m.el.querySelector('[data-cert]'); if (ctb && window.cv3Cert) ctb.addEventListener('click', () => window.cv3Cert.openCertificate(s));
       const tlb = m.el.querySelector('[data-tla]'); if (tlb && window.cv3Tla) tlb.addEventListener('click', () => { m.close(); window.cv3Tla.openForStudent(s); });
+      if (window.cv3Call) window.cv3Call.wire(m.el, s);
       // סיכום AI נטען אחרי שהכרטיס כבר על המסך, כדי לא לעכב את הפתיחה
       if (window.cv3AI) setTimeout(() => window.cv3AI.renderStudent(m.el.querySelector('#aiStuSum'), s), 60);
       const dcb = m.el.querySelector('[data-docs]');

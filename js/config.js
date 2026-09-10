@@ -4,3 +4,9 @@ window.CV3.DEMO=!window.CV3.SUPABASE_URL||!window.CV3.SUPABASE_ANON_KEY;
 // אינדוקס מייל/דרייב לכרטיס תלמיד כבר עובד ברקע (Apps Script פותר ל-Supabase).
 // כתובת ה-web app מתעדכנת בכל deploy — לעדכן פה.
 window.CV3.GAS_URL='https://script.google.com/macros/s/AKfycbzUwbrUA-NkklgRolmYdmT2uznAJIuj4mtLvWJ_KhCgetSD5iB-2QysdkZDaUon9Lmp/exec';
+// כתובת חיוג הורים (call-parent) — Supabase Edge Function, לא Cloudflare Worker:
+// נטפרי חוסם *.workers.dev מהדפדפן (HTTP 418, נבדק בפועל גם על worker-tts
+// הקיים — הוא עובד רק כי ימות המשיח, שרת חיצוני, קורא לו, לא הדפדפן). קוד
+// ה-Worker המקורי (worker-call/) נשאר בדיסק כתיעוד, לא בשימוש. לעדכן כאן רק
+// אם שם הפונקציה/הפרויקט משתנה.
+window.CV3.CALL_WORKER_URL='https://jpcepdbhouuwpjdidqfo.supabase.co/functions/v1/call-parent';
