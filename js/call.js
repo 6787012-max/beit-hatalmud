@@ -20,7 +20,10 @@
   // תלמיד) וגם את js/quickdial.js (טקסט חופשי + בחירה מרשימת אנשי קשר) —
   // אותו קוד רשת בדיוק לשני הקוראים, כדי שטקסט הטוסטים לא יתפצל בין עותקים.
   // מחזיר true/false להצלחה, לא זורק.
-  async function dial(rawPhone) {
+  // snumber (אופציונלי): שלוחת-המקור לבקש במפורש (10/09/2026, "אפשר לבחור
+  // מאיפה לחייג"). בלי זה — ברירת המחדל בצד-שרת היא לפי מי שמחובר. השרת
+  // מקבל רק ערך מתוך רשימה סגורה וידועה-מראש; כל דבר אחר יתעלם ממנו.
+  async function dial(rawPhone, snumber) {
     // בדיקת-שפיות בצד לקוח, עוד לפני שנוגעים ברשת — אותו אלגוריתם שה-Worker
     // מריץ שוב בעצמו בצד-שרת (לא סומכים על הלקוח).
     const phone = window.cv3NormPhone ? window.cv3NormPhone(rawPhone) : null;
@@ -31,6 +34,8 @@
       const { data } = await window.sb.auth.getSession();
       const token = data && data.session && data.session.access_token;
       if (!token) { window.UI.toast('אין סשן פעיל — יש להתחבר מחדש', 'err'); return false; }
+      const body = { phone: phone };
+      if (snumber) body.snumber = snumber;
       const res = await fetch(CALL_WORKER_URL, {
         method: 'POST',
         headers: {
@@ -38,7 +43,7 @@
           Authorization: 'Bearer ' + token,
           apikey: window.CV3.SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ phone: phone }),
+        body: JSON.stringify(body),
       });
       if (res.status === 403) { window.UI.toast('אין הרשאת מנהל לחיוג', 'err'); return false; }
       if (res.status === 400) { window.UI.toast('מספר טלפון לא תקין', 'err'); return false; }

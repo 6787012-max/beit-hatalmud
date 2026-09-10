@@ -18,9 +18,11 @@
 //      לגמרי, לא תלוי בכך ש-policies.sql יישאר מוגדר נכון) ומאשרים רק
 //      role==='מנהל' && active!==false.
 //   4) רק אחרי זה — מנרמלים ומוודאים את מספר הטלפון בצד-שרת.
-//   5) בונים את כתובת ה-PBX ומחייגים. snumber (שלוחת המקור) הוא תמיד קבוע
-//      בקוד — לעולם לא ערך שמגיע מהלקוח, אחרת קורא מורשה (או באג) יכול להפוך
-//      את הנקודה הזו לרילי פתוח בין שני מספרים כלשהם.
+//   5) בונים את כתובת ה-PBX ומחייגים. snumber (שלוחת המקור) נבחר מרשימה
+//      סגורה וידועה-מראש בלבד (ALLOWED_SNUMBERS) — הלקוח יכול לבקש שלוחה
+//      ספציפית מתוכה (10/09/2026, "אפשר לבחור מאיפה לחייג"), אבל לעולם לא
+//      ערך חופשי, אחרת קורא מורשה (או באג) יכול להפוך את הנקודה הזו לרילי
+//      פתוח בין שני מספרים כלשהם.
 //
 // SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY מוזרקים
 // אוטומטית ע"י הפלטפורמה לכל Edge Function (כמו ב-supabase/functions/ai).
@@ -42,6 +44,12 @@ const SNUMBER_BY_USER: Record<string, string> = {
   '32f84274-a2e7-4929-b9f2-cd9c9258b2cc': '200', // הרב וינברג — 0527614415@bht.co.il
 };
 const DEFAULT_SNUMBER = '7090473485';
+
+// שלוחות שמותר לבקש במפורש (10/09/2026, בקשת יוסף: "אפשר גם לבחור מאיפה
+// לחייג" — לא רק אוטומטי לפי מי מחובר). רשימה סגורה מתוך הערכים הידועים
+// בלבד — ולידציה בצד-שרת, לא רק תיעוד: בלי זה כל מנהל מאומת יכול לבקש
+// snumber שרירותי ולהפוך את ה-endpoint לרילי פתוח בין שני מספרים כלשהם.
+const ALLOWED_SNUMBERS = new Set([...Object.values(SNUMBER_BY_USER), DEFAULT_SNUMBER]);
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -66,7 +74,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ ok: false, error: 'POST בלבד' }, 405);
 
-  let body: { phone?: string } = {};
+  let body: { phone?: string; snumber?: string } = {};
   try { body = await req.json(); } catch { return json({ ok: false, error: 'bad json' }, 400); }
 
   // (1) חילוץ הטוקן.
@@ -115,9 +123,15 @@ Deno.serve(async (req) => {
   if (!phone) return json({ ok: false, error: 'bad phone' }, 400);
 
   // (5) כתובת ה-PBX נבנית ביד עם ';' (לא URLSearchParams — זה משתמש ב-'&').
-  // snumber נגזר מהמיפוי הקבוע בקוד לפי userId (המאומת בשלב 2) — לעולם לא
-  // ערך שמגיע מהלקוח, אחרת קורא מורשה (או באג) יכול להזדהות כמישהו אחר.
-  const snumber = SNUMBER_BY_USER[userId] || DEFAULT_SNUMBER;
+  // snumber: ברירת המחדל היא לפי userId המאומת (שלב 2) — "מי מחובר, ממנו
+  // יוצאת השיחה". יוסף ביקש גם אפשרות לבחור ידנית מאיפה לחייג (למשל להתקשר
+  // "בשם" וינברג בזמן שהוא עצמו מחובר) — אז אם body.snumber קיים, הוא משמש
+  // *רק* אם הוא באחד מהערכים הידועים-מראש (ALLOWED_SNUMBERS); כל ערך אחר
+  // מתעלמים ממנו וחוזרים לברירת המחדל. זו עדיין לא בחירה חופשית — היא מוגבלת
+  // לרשימה סגורה, אחרת מנהל מאומת יכול להזין snumber שרירותי ולהפוך את
+  // ה-endpoint לרילי פתוח בין שני מספרים כלשהם.
+  const requested = typeof body.snumber === 'string' ? body.snumber.trim() : '';
+  const snumber = (requested && ALLOWED_SNUMBERS.has(requested)) ? requested : (SNUMBER_BY_USER[userId] || DEFAULT_SNUMBER);
   const pbxUser = Deno.env.get('PBX_AUTH_USER') || '';
   const pbxPass = Deno.env.get('PBX_AUTH_PASS') || '';
   const pbxUrl = 'https://adeltelecom.com/pbx_api/calls/make/?' +
