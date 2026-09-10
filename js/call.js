@@ -53,7 +53,7 @@
           Authorization: 'Bearer ' + token,
           apikey: window.CV3.SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ phone: phone }),
       });
       if (res.status === 403) { window.UI.toast('אין הרשאת מנהל לחיוג', 'err'); return false; }
       if (res.status === 400) { window.UI.toast('מספר טלפון לא תקין', 'err'); return false; }
