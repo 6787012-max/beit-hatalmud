@@ -173,7 +173,9 @@
             '<td>' + amtCell + '</td>' +
             '<td class="tl-note" data-dk style="font-size:.8rem">' + (dk == null ? '—' : dk + ' ₪') + '</td>' +
             '<td>' + (extra > 0 ? '<span class="chip warn" title="ייכנס אוטומטית לסכום">+' + extra + ' ₪</span>' : '') +
-              (canEdit ? ' <button class="btn-ghost xs tx-extra" type="button" title="הוסף טעינה חד-פעמית"><i class="bi bi-plus-circle"></i></button>' : '') + '</td>' +
+              // הכפתור רק בשבוע הנוכחי בפועל — "טעינה נוספת" היא תמיד ל"טעינה
+              // הבאה" האמיתית, ובשבוע עבר (גם פתוח לעריכה) זה מבלבל/לא רלוונטי.
+              ((selectedWeek === curWeek) ? ' <button class="btn-ghost xs tx-extra" type="button" title="הוסף טעינה חד-פעמית"><i class="bi bi-plus-circle"></i></button>' : '') + '</td>' +
             '<td class="tl-note" data-exp style="font-size:.78rem">' + (w && w.exported_at ? esc(new Date(w.exported_at).toLocaleDateString('he-IL')) : '—') + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table></div>';
@@ -205,8 +207,11 @@
           if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return; }
           w = (r.data && r.data[0]) || { id: null, tz, week_no: selectedWeek, approved, amount };
           weeklyByTz[tz] = w; allWeekly.push(w);
-          // הטעינה הנוספת נכנסה לתוך הסכום הזה — עכשיו אפשר לאפס אותה.
-          if (Number(c.extra_pending) > 0) {
+          // הטעינה הנוספת נכנסה לתוך הסכום הזה רק אם זה באמת השבוע הנוכחי
+          // (ראו extra למעלה — בשבוע עבר היא תמיד 0 ולא נכללה בסכום שנשמר
+          // כרגע). לאפס אותה גם כשמשלימים שבוע עבר היה מוחק טעינה אמיתית
+          // שעדיין לא נכנסה לשום ייצוא בפועל — נמצא בביקורת קוד 10/09.
+          if (selectedWeek === curWeek && Number(c.extra_pending) > 0) {
             await window.store.update('taitzer_cards', c.id, { extra_pending: 0 });
             c.extra_pending = 0;
           }
@@ -233,13 +238,18 @@
       });
 
       // "מלא הכל מדרכון" — דורס במפורש את כל שדות הסכום (גם שורות שכבר נערכו
-      // ידנית — זו לחיצה מפורשת, לא ברירת מחדל פסיבית) ושומר מיד.
+      // ידנית — זו לחיצה מפורשת, לא ברירת מחדל פסיבית) ושומר מיד. ⚠️ מדלג
+      // על שורות שכבר `exported_at` (הושלמו בפועל בעבר) — לשנות את הסכום
+      // אחרי שכבר יוצא קובץ אמיתי היה יוצר פער בין מה שנטען בפועל למה
+      // שרשום כאן, בלי שום קובץ חדש שמשקף את זה (נמצא בביקורת קוד 10/09).
       page.querySelector('#txFillDarkon').onclick = async () => {
         const btn = page.querySelector('#txFillDarkon');
         btn.disabled = true;
         let n = 0;
         const rows = [...box.querySelectorAll('#txBody tr')];
         for (const tr of rows) {
+          const already = weeklyByTz[tr.dataset.tz];
+          if (already && already.exported_at) continue;
           const dk = darkonAmount(tr.dataset.tz, selectedWeek);
           if (dk == null) continue;
           tr.querySelector('.tx-amt').value = dk;
@@ -254,9 +264,15 @@
         const btn = page.querySelector('#txExport');
         btn.disabled = true; const orig = btn.innerHTML; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> מכין קובץ…';
         try {
+          // ⚠️ 10/09/2026 (נמצא בביקורת קוד אחרי הוספת "פתח לעריכה" לשבוע
+          // עבר): מאושר-אבל-כבר-`exported_at` נשאר בחוץ בכוונה. בלי זה,
+          // פתיחת שבוע ישן שכבר יוצא ולחיצה על "יצוא לטייצר" מ-הרגל הייתה
+          // מייצרת מחדש קובץ אמיתי לכל השבוע (סיכון טעינה כפולה בפועל
+          // בטייצר!) ודורסת את exported_at ההיסטורי האמיתי. "יצוא" תמיד
+          // אומר "מה שעוד לא יצא" — גם בשבוע נוכחי, גם בהשלמת שבוע עבר.
           const approvedRows = [];
-          cards.forEach(c => { const w = weeklyByTz[c.tz]; if (w && w.approved) approvedRows.push({ c: c, w: w }); });
-          if (!approvedRows.length) { window.UI.toast('אין אף אחד מאושר', 'err'); return; }
+          cards.forEach(c => { const w = weeklyByTz[c.tz]; if (w && w.approved && !w.exported_at) approvedRows.push({ c: c, w: w }); });
+          if (!approvedRows.length) { window.UI.toast('אין מה לייצא — הכל כבר יוצא, או שאף אחד לא מאושר', 'err'); return; }
           const rows = approvedRows.map(({ c, w }) => exportRow(c.tz, w.amount));
           const blob = await window.XlsxWriteLite.build(HEADER, rows, NUMERIC_COLS);
           const a = document.createElement('a');
@@ -285,6 +301,10 @@
 
     page.querySelector('#txSummaryToggle').addEventListener('click', () => {
       view = view === 'summary' ? 'week' : 'summary';
+      // נעילה חוזרת גם כשעוברים דרך הסיכום ובחזרה — לא רק בניווט ◄/►
+      // (נמצא בביקורת קוד: שבוע שנפתח לעריכה נשאר פתוח אחרי סיבוב דרך
+      // הסיכום, בניגוד לכוונה שכל ניווט מהשבוע נועל בחזרה).
+      unlockedWeek = null;
       page.querySelector('#txSummaryToggle span').textContent = view === 'summary' ? 'חזרה לטבלה השבועית' : 'סיכום לפי תלמיד';
       const disableWeekBtns = view === 'summary';
       page.querySelector('#txFillDarkon').style.display = disableWeekBtns ? 'none' : '';
