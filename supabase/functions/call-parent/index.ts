@@ -33,7 +33,15 @@
 const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SB_SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const PBX_SOURCE_EXT = '7090473485'; // שלוחת המקור הידועה היחידה כרגע — לא סודי, לא מהלקוח.
+
+// מיפוי שלוחת-מקור לפי מנהל (יוסף אישר 09/09/2026: הוא 201, הרב וינברג 200).
+// לפי profiles.id (לא email — יציב יותר, לא תלוי בשינוי כתובת). מנהל שלא ברשימה
+// מקבל את שלוחת ברירת המחדל (השלוחה הידועה הראשונה, 7090473485) — לא סודי, לא מהלקוח.
+const SNUMBER_BY_USER: Record<string, string> = {
+  'efb7ba7d-3f92-4c36-957a-e3b18ad6882a': '201', // יוסף — 0556742853@bht.co.il
+  '32f84274-a2e7-4929-b9f2-cd9c9258b2cc': '200', // הרב וינברג — 0527614415@bht.co.il
+};
+const DEFAULT_SNUMBER = '7090473485';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -107,14 +115,16 @@ Deno.serve(async (req) => {
   if (!phone) return json({ ok: false, error: 'bad phone' }, 400);
 
   // (5) כתובת ה-PBX נבנית ביד עם ';' (לא URLSearchParams — זה משתמש ב-'&').
-  // snumber = PBX_SOURCE_EXT הקבוע בקוד בלבד, לעולם לא מהלקוח.
+  // snumber נגזר מהמיפוי הקבוע בקוד לפי userId (המאומת בשלב 2) — לעולם לא
+  // ערך שמגיע מהלקוח, אחרת קורא מורשה (או באג) יכול להזדהות כמישהו אחר.
+  const snumber = SNUMBER_BY_USER[userId] || DEFAULT_SNUMBER;
   const pbxUser = Deno.env.get('PBX_AUTH_USER') || '';
   const pbxPass = Deno.env.get('PBX_AUTH_PASS') || '';
   const pbxUrl = 'https://adeltelecom.com/pbx_api/calls/make/?' +
     'auth_username=' + pbxUser + ';' +
     'auth_password=' + pbxPass + ';' +
     'stype=phone;' +
-    'snumber=' + PBX_SOURCE_EXT + ';' +
+    'snumber=' + snumber + ';' +
     'cnumber=' + phone;
 
   try {
