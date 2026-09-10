@@ -23,8 +23,7 @@
         '<label class="fld" style="margin-bottom:10px"><span>לחייג משלוחה</span>' +
           '<select class="inp mb0" id="qdSnumber">' +
             '<option value="">אוטומטי — לפי מי שמחובר</option>' +
-            '<option value="201">יוסף (201)</option>' +
-            '<option value="200">הרב וינברג (200)</option>' +
+            '<option value="0772200030">יוסף (שלוחה 201)</option>' +
           '</select></label>' +
         '<div style="display:flex;gap:8px">' +
           '<input class="inp mb0" id="qdFreeInput" type="text" placeholder="הקלד מספר טלפון וחייג" style="flex:1">' +
