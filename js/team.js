@@ -252,5 +252,5 @@
     await reload();
   }
 
-  window.cv3Team = { render };
+  window.cv3Team = { render, loadAll, merge };
 })();
