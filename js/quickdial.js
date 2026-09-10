@@ -20,15 +20,13 @@
     const m = window.UI.modal({
       title: 'חיוג מהיר',
       bodyHTML:
-        '<label class="fld" style="margin-bottom:10px"><span>לחייג משלוחה</span>' +
-          '<select class="inp mb0" id="qdSnumber">' +
-            '<option value="">אוטומטי — לפי מי שמחובר</option>' +
-            '<option value="0772200030">יוסף (שלוחה 201)</option>' +
-          '</select></label>' +
         '<div style="display:flex;gap:8px">' +
           '<input class="inp mb0" id="qdFreeInput" type="text" placeholder="הקלד מספר טלפון וחייג" style="flex:1">' +
           '<button class="mini" id="qdFreeBtn" title="חייג"><i class="bi bi-telephone-outbound"></i> חייג</button>' +
         '</div>' +
+        // בדיקה מהירה: מחייג לטלפון-הבדיקה הידוע (לא "שלוחה" — ראה call.js).
+        '<button class="mini ghost" id="qdTestBtn" style="margin-top:8px">' +
+          '<i class="bi bi-telephone"></i> התקשר אליי לבדיקה (יוסף)</button>' +
         '<input class="inp mb0" id="qdFilter" type="text" placeholder="סינון אנשי קשר…" style="margin-top:12px">' +
         '<div class="tm-pick" id="qdList" style="margin-top:10px">' +
           '<div class="tl-note" style="padding:10px">טוען אנשי קשר…</div>' +
@@ -36,19 +34,20 @@
       onClose: () => {},
     });
 
-    const snumberSel = m.el.querySelector('#qdSnumber');
     const freeInput = m.el.querySelector('#qdFreeInput');
     const freeBtn = m.el.querySelector('#qdFreeBtn');
+    const testBtn = m.el.querySelector('#qdTestBtn');
     const filterInput = m.el.querySelector('#qdFilter');
     const listEl = m.el.querySelector('#qdList');
 
+    testBtn.addEventListener('click', () => window.cv3Call.dial('07722000030'));
+
     // חיוג טקסט חופשי — אותו codepath בדיוק כמו לחיצה על שם ברשימה למטה.
-    // הנירמול (ולכן גם בדיקת התקינות) קורה בתוך dial() עצמה. snumberSel.value
-    // ריק = "אוטומטי" → dial() לא מקבל שלוחה מפורשת, השרת בוחר לפי המחובר.
+    // הנירמול (ולכן גם בדיקת התקינות) קורה בתוך dial() עצמה.
     async function freeDial() {
       const v = freeInput.value.trim();
       if (!v) return;
-      const ok = await window.cv3Call.dial(v, snumberSel.value || null);
+      const ok = await window.cv3Call.dial(v);
       if (ok) freeInput.value = '';
     }
     freeBtn.addEventListener('click', freeDial);
@@ -66,7 +65,7 @@
         b.disabled = true;
         // המודאל נשאר פתוח אחרי חיוג מוצלח — כדי לאפשר לחייג כמה אנשים
         // ברצף בלי לפתוח את הפאנל מחדש בכל פעם.
-        const ok = await window.cv3Call.dial(p.phone, snumberSel.value || null);
+        const ok = await window.cv3Call.dial(p.phone);
         if (!ok) b.disabled = false; // בוטל/נכשל — לאפשר לנסות שוב על אותה שורה
       }));
     }

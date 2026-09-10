@@ -15,18 +15,22 @@
     return '<button class="mini" id="callParentBtn" title="חיוג להורה"><i class="bi bi-telephone-outbound"></i> חייג</button>';
   }
 
+  // מספרי-בדיקה ידועים (DID פנימי, לא בפורמט נייד/קווי רגיל) — מותר לחייג
+  // אליהם ישירות בלי לעבור את בדיקת ה-9/10-ספרות הרגילה. חייב להיות זהה
+  // ל-KNOWN_TEST_TARGETS בצד-שרת (supabase/functions/call-parent/index.ts).
+  const KNOWN_TEST_TARGETS = { '07722000030': 'יוסף — שלוחה 201' };
+
   // חיוג בפועל: נירמול → אישור → קריאה ל-Worker → טוסט לפי סטטוס. rawPhone
   // לא חייב להיות מנורמל מראש. משמש גם את wire() למטה (כפתור החיוג בכרטיס
   // תלמיד) וגם את js/quickdial.js (טקסט חופשי + בחירה מרשימת אנשי קשר) —
   // אותו קוד רשת בדיוק לשני הקוראים, כדי שטקסט הטוסטים לא יתפצל בין עותקים.
-  // מחזיר true/false להצלחה, לא זורק.
-  // snumber (אופציונלי): שלוחת-המקור לבקש במפורש (10/09/2026, "אפשר לבחור
-  // מאיפה לחייג"). בלי זה — ברירת המחדל בצד-שרת היא לפי מי שמחובר. השרת
-  // מקבל רק ערך מתוך רשימה סגורה וידועה-מראש; כל דבר אחר יתעלם ממנו.
-  async function dial(rawPhone, snumber) {
+  // מחזיר true/false להצלחה, לא זורק. snumber הוא קבוע בצד-שרת — לא נשלח
+  // מכאן (10/09/2026: התברר שזה לא "שלוחת המחייג", אלא ערך טכני קבוע).
+  async function dial(rawPhone) {
+    const raw = String(rawPhone == null ? '' : rawPhone).trim();
     // בדיקת-שפיות בצד לקוח, עוד לפני שנוגעים ברשת — אותו אלגוריתם שה-Worker
-    // מריץ שוב בעצמו בצד-שרת (לא סומכים על הלקוח).
-    const phone = window.cv3NormPhone ? window.cv3NormPhone(rawPhone) : null;
+    // מריץ שוב בעצמו בצד-שרת (לא סומכים על הלקוח). חריג: מספרי-בדיקה ידועים.
+    const phone = KNOWN_TEST_TARGETS[raw] ? raw : (window.cv3NormPhone ? window.cv3NormPhone(raw) : null);
     if (!phone) { window.UI.toast('מספר טלפון לא תקין', 'err'); return false; }
     // חיוג אמיתי (וכנראה בתשלום) — קליק בטעות לא יעלה כסף בלי אישור מפורש.
     if (!window.confirm('לחייג למספר ' + phone + '?')) return false;
@@ -34,8 +38,6 @@
       const { data } = await window.sb.auth.getSession();
       const token = data && data.session && data.session.access_token;
       if (!token) { window.UI.toast('אין סשן פעיל — יש להתחבר מחדש', 'err'); return false; }
-      const body = { phone: phone };
-      if (snumber) body.snumber = snumber;
       const res = await fetch(CALL_WORKER_URL, {
         method: 'POST',
         headers: {

@@ -1,5 +1,6 @@
 // supabase/functions/call-parent/index.ts
-// כפתור "חייג" בכרטיס תלמיד (בית התלמוד) → שיחת PBX (Adel Telecom) להורה.
+// כפתור "חייג" (כרטיס תלמיד + פאנל חיוג מהיר, בית התלמוד) → שיחת PBX
+// (Adel Telecom) ליעד שביקשו.
 //
 // למה Supabase Edge Function ולא Cloudflare Worker: נבדק בפועל שנטפרי חוסם
 // *.workers.dev מהדפדפן (HTTP 418, "unknown") — כולל את worker-tts הקיים,
@@ -17,12 +18,20 @@
 //   3) שולפים role/active מ-public.profiles עם מפתח service-role (עוקף RLS
 //      לגמרי, לא תלוי בכך ש-policies.sql יישאר מוגדר נכון) ומאשרים רק
 //      role==='מנהל' && active!==false.
-//   4) רק אחרי זה — מנרמלים ומוודאים את מספר הטלפון בצד-שרת.
-//   5) בונים את כתובת ה-PBX ומחייגים. snumber (שלוחת המקור) נבחר מרשימה
-//      סגורה וידועה-מראש בלבד (ALLOWED_SNUMBERS) — הלקוח יכול לבקש שלוחה
-//      ספציפית מתוכה (10/09/2026, "אפשר לבחור מאיפה לחייג"), אבל לעולם לא
-//      ערך חופשי, אחרת קורא מורשה (או באג) יכול להפוך את הנקודה הזו לרילי
-//      פתוח בין שני מספרים כלשהם.
+//   4) רק אחרי זה — מנרמלים ומוודאים את מספר היעד בצד-שרת.
+//   5) בונים את כתובת ה-PBX ומחייגים.
+//
+// ⚠️ תיקון הבנה מהותי (10/09/2026, אומת חי עם יוסף מול ה-API האמיתי):
+// בהתחלה הנחתי ש-snumber הוא "שלוחת-המקור של מי שמחייג" (משתנה לפי איזה
+// מנהל מחובר). זו הייתה טעות. אומת בפועל: **snumber הוא ערך קבוע** אחד
+// (7090473485) שזהה בכל קריאה — **cnumber הוא היעד שאליו בפועל רוצים
+// להתקשר** (הורה, איש צוות, או — לבדיקה עצמית — הטלפון של מנהל ספציפי).
+// אין יותר "בחירת שלוחה למחייג מפורשת" — זה לא היה המודל הנכון של ה-API הזה.
+//
+// ⚠️ מלכודת שנייה שכבר נתקלנו בה: Adel Telecom יכול להחזיר HTTP 200 גם
+// כשהפרמטרים לא תקינים בפועל (לא חייג בכלל) — ה-body עצמו הוא מה שמעיד על
+// הצלחה אמיתית: {"responses":[{"message":"OK","code":204,...}]}. code/message
+// אחר (גם עם HTTP 200!) נחשב כישלון אמיתי, לא רק status לא-2xx ברמת ה-HTTP.
 //
 // SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY מוזרקים
 // אוטומטית ע"י הפלטפורמה לכל Edge Function (כמו ב-supabase/functions/ai).
@@ -36,23 +45,8 @@ const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SB_SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// מיפוי שלוחת-מקור לפי מנהל. יוסף="שלוחה 201", הרב וינברג="שלוחה 200" —
-// אבל snumber ל-API הזה חייב להיות **מספר טלפון מלא (DID)**, לא הקוד הפנימי
-// הקצר: "201" עצמו נכשל בשקט (Adel Telecom החזיר {ok:true} גם כשזה לא באמת
-// חייג — נגלה רק בבדיקה אמיתית עם יוסף, 10/09/2026). 0772200030 = ה-DID
-// המלא של שלוחה 201, אומת חי (הטלפון של יוסף צלצל בפועל). ה-DID המלא של
-// שלוחה 200 (וינברג) עדיין לא ידוע — עד שיימסר, הוא נופל לברירת המחדל.
-// לפי profiles.id (לא email — יציב יותר, לא תלוי בשינוי כתובת).
-const SNUMBER_BY_USER: Record<string, string> = {
-  'efb7ba7d-3f92-4c36-957a-e3b18ad6882a': '0772200030', // יוסף — שלוחה 201
-};
-const DEFAULT_SNUMBER = '7090473485';
-
-// שלוחות שמותר לבקש במפורש (10/09/2026, בקשת יוסף: "אפשר גם לבחור מאיפה
-// לחייג" — לא רק אוטומטי לפי מי מחובר). רשימה סגורה מתוך הערכים הידועים
-// בלבד — ולידציה בצד-שרת, לא רק תיעוד: בלי זה כל מנהל מאומת יכול לבקש
-// snumber שרירותי ולהפוך את ה-endpoint לרילי פתוח בין שני מספרים כלשהם.
-const ALLOWED_SNUMBERS = new Set([...Object.values(SNUMBER_BY_USER), DEFAULT_SNUMBER]);
+// snumber קבוע — לא תלוי משתמש, לא ניתן לבחירה מהלקוח (אומת חי 10/09/2026).
+const SNUMBER = '7090473485';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -62,9 +56,10 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-// נירמול טלפון — כפילות *מכוונת* של window.cv3NormPhone (js/phone-utils.js).
-// Edge Function לא יכולה לייבא קוד דפדפן, אז האלגוריתם משוכפל כאן ביד. אם
-// cv3NormPhone משתנה — יש לעדכן גם כאן, אחרת השרת יאמת לפי כלל אחר מהלקוח.
+// נירמול מספר-יעד — כפילות *מכוונת* של window.cv3NormPhone (js/phone-utils.js),
+// למספרי הורים/צוות רגילים (05X נייד, 0-משהו קווי — 9-10 ספרות). Edge Function
+// לא יכולה לייבא קוד דפדפן, אז האלגוריתם משוכפל כאן ביד. אם cv3NormPhone
+// משתנה — יש לעדכן גם כאן, אחרת השרת יאמת לפי כלל אחר מהלקוח.
 function normPhone(v: unknown): string | null {
   if (!v) return null;
   let d = String(v).replace(/\D/g, '');
@@ -73,11 +68,24 @@ function normPhone(v: unknown): string | null {
   return (d.length >= 9 && d.length <= 10) ? d : null;
 }
 
+// מספרי-בדיקה ידועים (11 ספרות — DID פנימי, לא מספר נייד/קווי רגיל) שמותר
+// לחייג אליהם בלי לעבור את ולידציית ה-9/10-ספרות הרגילה של normPhone. רק
+// אלה — לא כל מחרוזת 11-ספרות שהלקוח שולח.
+const KNOWN_TEST_TARGETS: Record<string, string> = {
+  '07722000030': 'יוסף — שלוחה 201',
+};
+
+function resolveDestination(raw: unknown): string | null {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (s && KNOWN_TEST_TARGETS[s]) return s;
+  return normPhone(raw);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ ok: false, error: 'POST בלבד' }, 405);
 
-  let body: { phone?: string; snumber?: string } = {};
+  let body: { phone?: string } = {};
   try { body = await req.json(); } catch { return json({ ok: false, error: 'bad json' }, 400); }
 
   // (1) חילוץ הטוקן.
@@ -119,36 +127,35 @@ Deno.serve(async (req) => {
   }
   if (role !== 'מנהל' || active === false) return json({ ok: false, error: 'forbidden' }, 403);
 
-  // (4) נירמול+ולידציה של הטלפון — רק אחרי שעבר את שער ההרשאה. עוצר כאן גם
-  // מחרוזת טלפון מזוהמת שיכולה, אם הייתה מגיעה גולמית ל-';'-query למטה,
-  // להזריק פרמטרים נוספים.
-  const phone = normPhone(body.phone);
-  if (!phone) return json({ ok: false, error: 'bad phone' }, 400);
+  // (4) נירמול+ולידציה של היעד — רק אחרי שעבר את שער ההרשאה. עוצר כאן גם
+  // מחרוזת מזוהמת שיכולה, אם הייתה מגיעה גולמית ל-';'-query למטה, להזריק
+  // פרמטרים נוספים.
+  const cnumber = resolveDestination(body.phone);
+  if (!cnumber) return json({ ok: false, error: 'bad phone' }, 400);
 
   // (5) כתובת ה-PBX נבנית ביד עם ';' (לא URLSearchParams — זה משתמש ב-'&').
-  // snumber: ברירת המחדל היא לפי userId המאומת (שלב 2) — "מי מחובר, ממנו
-  // יוצאת השיחה". יוסף ביקש גם אפשרות לבחור ידנית מאיפה לחייג (למשל להתקשר
-  // "בשם" וינברג בזמן שהוא עצמו מחובר) — אז אם body.snumber קיים, הוא משמש
-  // *רק* אם הוא באחד מהערכים הידועים-מראש (ALLOWED_SNUMBERS); כל ערך אחר
-  // מתעלמים ממנו וחוזרים לברירת המחדל. זו עדיין לא בחירה חופשית — היא מוגבלת
-  // לרשימה סגורה, אחרת מנהל מאומת יכול להזין snumber שרירותי ולהפוך את
-  // ה-endpoint לרילי פתוח בין שני מספרים כלשהם.
-  const requested = typeof body.snumber === 'string' ? body.snumber.trim() : '';
-  const snumber = (requested && ALLOWED_SNUMBERS.has(requested)) ? requested : (SNUMBER_BY_USER[userId] || DEFAULT_SNUMBER);
   const pbxUser = Deno.env.get('PBX_AUTH_USER') || '';
   const pbxPass = Deno.env.get('PBX_AUTH_PASS') || '';
   const pbxUrl = 'https://adeltelecom.com/pbx_api/calls/make/?' +
     'auth_username=' + pbxUser + ';' +
     'auth_password=' + pbxPass + ';' +
     'stype=phone;' +
-    'snumber=' + snumber + ';' +
-    'cnumber=' + phone;
+    'snumber=' + SNUMBER + ';' +
+    'cnumber=' + cnumber;
 
   try {
     const cres = await fetch(pbxUrl);
     const ctext = await cres.text();
-    if (!cres.ok) {
-      console.error('pbx call failed', cres.status, ctext.slice(0, 500));
+    // הצלחה אמיתית = HTTP 2xx *וגם* גוף התשובה מדווח code 204/"OK" — Adel
+    // Telecom יכול להחזיר HTTP 200 גם כשלא חייג בפועל (נתפס בעבודה עם יוסף).
+    let bodyOk = false;
+    try {
+      const j = JSON.parse(ctext);
+      const first = j && Array.isArray(j.responses) ? j.responses[0] : null;
+      bodyOk = !!first && (first.code === 204 || first.message === 'OK');
+    } catch { /* לא JSON תקין — bodyOk נשאר false */ }
+    if (!cres.ok || !bodyOk) {
+      console.error('pbx call not confirmed', cres.status, ctext.slice(0, 500));
       return json({ ok: false, error: 'pbx failed' }, 502);
     }
     return json({ ok: true });
