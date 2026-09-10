@@ -41,6 +41,7 @@
       '.bk-order{background:#e8f5ee}.bk-home{background:#fff7e6}.bk-last{background:#eef2ff}' +
       '.bk-na{background:#f3f4f6}.bk-unk{background:#fdeaea}' +
       '.bk-src{font-size:.7rem;color:var(--muted,#6b7280);white-space:nowrap}' +
+      '.bk-amt{font-weight:600;white-space:nowrap}' +
       '.bk-src.mail{color:#1f8a5b;font-weight:600}' +
       '.bk-sum{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}' +
       '.bk-card{flex:1 1 190px;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:10px 12px;background:var(--card,#fff)}' +
@@ -157,11 +158,13 @@
           '<div class="table-wrap"><table class="bk-tbl"><thead><tr>' +
           '<th style="min-width:150px">תלמיד</th>' +
           bs.map(b => '<th>' + esc(b.name) + (b.detail ? '<small>' + esc(b.detail) + '</small>' : '') + '</th>').join('') +
-          '<th style="min-width:96px">מקור</th><th style="width:58px">שולם</th>' +
+          '<th style="min-width:96px">מקור</th><th style="width:80px">לתשלום</th><th style="width:58px">שולם</th>' +
           '</tr></thead><tbody>' +
           rows.map(s => {
             const first = bs.map(b => ordMap[s.id + ':' + b.id]).find(Boolean) || {};
             const mail = first.source === 'מייל הורים';
+            const anyOrder = bs.some(b => ((ordMap[s.id + ':' + b.id] || {}).status || 'unknown') === 'order');
+            const amt = anyOrder ? priceOf(c.id) : 0;
             return '<tr data-s="' + s.id + '"><td class="bk-nm">' + esc(nm(s)) + '</td>' +
               bs.map(b => {
                 const o = ordMap[s.id + ':' + b.id] || {};
@@ -172,12 +175,13 @@
               }).join('') +
               '<td class="bk-src' + (mail ? ' mail' : '') + '" title="' + esc(first.note || '') + '">' +
                 (mail ? 'אישור במייל' : 'ברירת מחדל') + '</td>' +
+              '<td class="bk-amt">' + (amt ? amt.toLocaleString('he-IL') + ' ₪' : '—') + '</td>' +
               '<td style="text-align:center"><input type="checkbox" data-paid="' + s.id + '"' +
                 (first.paid ? ' checked' : '') + '></td></tr>';
           }).join('') +
           '<tr class="bk-foot"><td>סה"כ להזמנה</td>' +
           totals.map(t => '<td>' + t + '</td>').join('') +
-          '<td colspan="2"></td></tr>' +
+          '<td></td><td>' + rows.reduce((sum, s) => sum + (bs.some(b => ((ordMap[s.id + ':' + b.id] || {}).status || 'unknown') === 'order') ? priceOf(c.id) : 0), 0).toLocaleString('he-IL') + ' ₪</td><td></td></tr>' +
           '</tbody></table></div></div>';
       }).join('') || '<div class="empty-state"><i class="bi bi-journal-x"></i><div>אין תלמידים תואמים לסינון</div></div>';
 
