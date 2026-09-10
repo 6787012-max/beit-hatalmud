@@ -9,6 +9,10 @@
 // ברירת המחדל של כל תלמיד היא "מזמין דרך המכינה". השדה `source` מבדיל בין
 // אישור אמיתי שהתקבל במייל לבין ברירת המחדל המוסדית; אל תמחק את ההבחנה הזאת,
 // היא כל ההבדל בין "ההורים אישרו" לבין "הנחנו".
+//
+// תשלום: `books.price` הוא מחיר לכל ספר בנפרד (מהרב וינברג, מייל 06/09/2026) —
+// לא "חבילה" אחידה לשיעור. הסכום שתלמיד משלם הוא סכום מחירי הספרים שבסטטוס
+// "מזמין" בלבד, כדי שמי שמביא חלק מהבית לא ישלם על מה שהוא לא מזמין.
 (function () {
   'use strict';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -54,12 +58,11 @@
 
   async function render(page) {
     style();
-    const [studs, classes, books, orders, packs] = await Promise.all([
+    const [studs, classes, books, orders] = await Promise.all([
       window.cv3Students ? window.cv3Students.getStudents() : window.store.list('students'),
       window.store.list('classes'),
       window.store.list('books'),
       window.store.list('book_orders'),
-      window.store.list('book_packages'),
     ]);
 
     const YEAR = 'תשפ"ז';
@@ -72,10 +75,12 @@
       .filter(c => bookList.some(b => b.class_id == c.id))
       .sort((a, b) => a.id - b.id);
 
-    const priceOf = cid => {
-      const p = (packs || []).find(x => x.class_id == cid && x.year === YEAR);
-      return p ? Number(p.price) || 0 : 0;
-    };
+    // מחיר לכל ספר (לא רק חבילה לשיעור) — מאפשר לחשב סכום אמיתי לפי מה שכל
+    // תלמיד בפועל מזמין, ולא "חבילה מלאה" גם למי שמביא חלק מהבית.
+    const bookPrice = b => Number(b.price) || 0;
+    const classTotal = cid => bookList.filter(b => b.class_id == cid).reduce((s, b) => s + bookPrice(b), 0);
+    const studentAmt = (cid, sid) => bookList.filter(b => b.class_id == cid)
+      .reduce((s, b) => s + (((ordMap[sid + ':' + b.id] || {}).status || 'unknown') === 'order' ? bookPrice(b) : 0), 0);
 
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
@@ -123,15 +128,14 @@
       classesWithBooks.forEach(c => {
         const bs = bookList.filter(b => b.class_id == c.id);
         (studs || []).filter(s => s.class_id == c.id).forEach(s => {
-          let anyOrder = false, mail = false;
+          let mail = false;
           bs.forEach(b => {
             const o = ordMap[s.id + ':' + b.id];
             const k = o ? o.status : 'unknown';
             counts[k] = (counts[k] || 0) + 1;
-            if (k === 'order') anyOrder = true;
             if (o && o.source === 'מייל הורים') mail = true;
           });
-          if (anyOrder) money += priceOf(c.id);
+          money += studentAmt(c.id, s.id);
           if (mail) confirmed++;
         });
       });
@@ -154,7 +158,7 @@
         if (!rows.length) return '';
         const totals = bs.map(b => rows.filter(s => ((ordMap[s.id + ':' + b.id] || {}).status || 'unknown') === 'order').length);
         return '<div class="bk-sec"><h3>' + esc(c.name) +
-          '<span class="bk-price">· ' + priceOf(c.id) + ' ₪ לתלמיד · ' + esc(bs[0] ? (bs[0].supplier || '') : '') + '</span></h3>' +
+          '<span class="bk-price">· עד ' + classTotal(c.id) + ' ₪ לתלמיד (לפי מה שמוזמן בפועל) · ' + esc(bs[0] ? (bs[0].supplier || '') : '') + '</span></h3>' +
           '<div class="table-wrap"><table class="bk-tbl"><thead><tr>' +
           '<th style="min-width:150px">תלמיד</th>' +
           bs.map(b => '<th>' + esc(b.name) + (b.detail ? '<small>' + esc(b.detail) + '</small>' : '') + '</th>').join('') +
@@ -163,8 +167,7 @@
           rows.map(s => {
             const first = bs.map(b => ordMap[s.id + ':' + b.id]).find(Boolean) || {};
             const mail = first.source === 'מייל הורים';
-            const anyOrder = bs.some(b => ((ordMap[s.id + ':' + b.id] || {}).status || 'unknown') === 'order');
-            const amt = anyOrder ? priceOf(c.id) : 0;
+            const amt = studentAmt(c.id, s.id);
             return '<tr data-s="' + s.id + '"><td class="bk-nm">' + esc(nm(s)) + '</td>' +
               bs.map(b => {
                 const o = ordMap[s.id + ':' + b.id] || {};
@@ -181,7 +184,7 @@
           }).join('') +
           '<tr class="bk-foot"><td>סה"כ להזמנה</td>' +
           totals.map(t => '<td>' + t + '</td>').join('') +
-          '<td></td><td>' + rows.reduce((sum, s) => sum + (bs.some(b => ((ordMap[s.id + ':' + b.id] || {}).status || 'unknown') === 'order') ? priceOf(c.id) : 0), 0).toLocaleString('he-IL') + ' ₪</td><td></td></tr>' +
+          '<td></td><td>' + rows.reduce((sum, s) => sum + studentAmt(c.id, s.id), 0).toLocaleString('he-IL') + ' ₪</td><td></td></tr>' +
           '</tbody></table></div></div>';
       }).join('') || '<div class="empty-state"><i class="bi bi-journal-x"></i><div>אין תלמידים תואמים לסינון</div></div>';
 
