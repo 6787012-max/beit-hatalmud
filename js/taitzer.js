@@ -54,20 +54,25 @@
                           String(a.first_name || '').localeCompare(String(b.first_name || ''), 'he'));
 
     // ── סכום מוצע מדרכון: shekels() — "שכר השבוע" האמיתי בש"ח, לא score()
-    // הגולמי (0–100, אחוז). תלמידים בלי רשומת דרכון לשבוע הנוכחי → 0/—. ──
+    // הגולמי (0–100, אחוז). תלמידים בלי רשומת דרכון לשבוע הנתון → 0/—.
+    // ⚠️ 10/09/2026 (בקשת יוסף — "ההיסטוריה לא נותן נתוני אמת"): לפני זה
+    // הפונקציה חישבה תמיד לפי הדרכון של **השבוע הנוכחי בלבד**, גם כשמסתכלים
+    // על שבוע עבר — כלומר שבוע 1/2 הציגו את הסכום של היום כאילו זה מה
+    // שהיה אז. עכשיו מקבלת week ומחשבת לפי הדרכון האמיתי של אותו שבוע
+    // בדיוק (הנתונים כבר נשלפים לכל השבועות, לא רק לנוכחי). ──
     const P = window.cv3Passport;
     const students = Array.isArray(studentsRes) ? studentsRes : [];
     const studentByTz = {};
     students.forEach(s => { if (s.tz) studentByTz[String(s.tz).trim()] = s; });
     const passportRows = passportRes.ok ? (passportRes.data || []) : [];
     const curWeek = P ? P.currentWeek() : 1;
-    const passportByStudent = {};
-    passportRows.forEach(r => { if (r.week_no === curWeek) passportByStudent[r.student_id] = r; });
-    function darkonAmount(tz) {
+    const passportByStudentByWeek = {};
+    passportRows.forEach(r => { (passportByStudentByWeek[r.week_no] = passportByStudentByWeek[r.week_no] || {})[r.student_id] = r; });
+    function darkonAmount(tz, week) {
       const s = studentByTz[tz];
       if (!s || !P) return null;                       // אין תלמיד תואם (למשל איש צוות) — לא "0", אלא "לא רלוונטי"
-      const pr = passportByStudent[s.id];
-      return pr ? P.shekels(pr) : 0;                    // יש תלמיד אבל עוד לא הוזן דרכון השבוע → 0 אמיתי
+      const pr = (passportByStudentByWeek[week] || {})[s.id];
+      return pr ? P.shekels(pr) : 0;                    // יש תלמיד אבל עוד לא הוזן דרכון לשבוע הזה → 0 אמיתי
     }
     // סה"כ שכבר נטען בפועל לכל כרטיס (שבועות שיוצאו בפועל, לא רק אושרו).
     const totalByTz = {};
@@ -79,6 +84,7 @@
 
     let selectedWeek = curWeek;
     let view = 'week'; // 'week' | 'summary'
+    let unlockedWeek = null; // week_no שנפתח במפורש לעריכה למרות שהוא לא השבוע הנוכחי
 
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>כרטיסי טייצר</h2>' +
@@ -89,7 +95,8 @@
       '</div></div>' +
       '<div class="qr-card"><p class="login-hint" style="margin:0"><i class="bi bi-info-circle"></i> ' +
       'הסכום ממולא אוטומטית משכר השבוע ב"דרכון" (אפשר לתקן ידנית, ותוסיף טעינה חד-פעמית ב-<i class="bi bi-plus-circle"></i>). ' +
-      'סמנו אישור, ואז "יצוא לטייצר" — מוריד קובץ Excel מוכן להעלאה (ת״ז/סכום/אישור בלבד).' +
+      'סמנו אישור, ואז "יצוא לטייצר" — מוריד קובץ Excel מוכן להעלאה (ת״ז/סכום/אישור בלבד). ' +
+      'שבועות קודמים (◄) מציגים רק מה שבאמת נשמר אז — ואפשר לפתוח כל שבוע לעריכה בנפרד אם צריך להשלים/לתקן.' +
       (cards.length ? '' : ' <b style="color:#b91c1c">אין עדיין כרטיסים ברשימה.</b>') + '</p></div>' +
       '<div id="txContent"></div>';
 
@@ -100,17 +107,23 @@
     }
 
     function drawSummary(box) {
+      // בקשת יוסף 10/09: "וגם לראות ... כל השבועות" — לא רק "טעינה אחרונה"
+      // אלא כל ההיסטוריה, שבוע-שבוע, לכל תלמיד. כולל רק שבועות שיוצאו
+      // בפועל (exported_at) — זו היסטוריה אמיתית, לא מה שרק אושר/הוקלד.
       box.innerHTML = '<div class="table-wrap"><table class="tbl"><thead><tr>' +
-        '<th>שם</th><th>ת״ז</th><th>סה״כ נטען עד היום</th><th>טעינה אחרונה</th><th>ממתין לטעינה הבאה</th>' +
+        '<th>שם</th><th>ת״ז</th><th>סה״כ נטען עד היום</th><th>היסטוריית טעינות — כל השבועות</th><th>ממתין לטעינה הבאה</th>' +
         '</tr></thead><tbody>' + cards.map(c => {
           const hist = allWeekly.filter(w => w.tz === c.tz && w.exported_at)
             .sort((a, b) => (b.week_no || 0) - (a.week_no || 0));
-          const last = hist[0];
           return '<tr>' +
             '<td>' + esc(c.holder_name || ((c.family || '') + ' ' + (c.first_name || '')).trim()) + '</td>' +
             '<td dir="ltr" style="text-align:left">' + esc(c.tz) + '</td>' +
             '<td><strong>' + (totalByTz[c.tz] || 0) + ' ₪</strong></td>' +
-            '<td class="tl-note">' + (last ? (last.amount + ' ₪ · ' + weekLabel(last.week_no)) : '—') + '</td>' +
+            '<td>' + (hist.length
+              ? '<div style="max-height:76px;overflow-y:auto;font-size:.8rem;line-height:1.8">' +
+                  hist.map(w => 'שבוע ' + w.week_no + ': <strong>' + w.amount + ' ₪</strong>').join('<br>') +
+                '</div>'
+              : '<span class="tl-note">אין עדיין טעינות</span>') + '</td>' +
             '<td>' + (Number(c.extra_pending) > 0 ? '<span class="chip warn">+' + c.extra_pending + ' ₪</span>' : '—') + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table></div>';
@@ -120,42 +133,61 @@
       const weeklyByTz = {};
       allWeekly.filter(w => w.week_no === selectedWeek).forEach(w => { weeklyByTz[w.tz] = w; });
       const editable = selectedWeek === curWeek;
+      // "אופציה להטעין" גם בשבוע עבר (בקשת יוסף 10/09) — נעול כברירת מחדל
+      // (למנוע שינוי בטעות של היסטוריה), אבל אפשר לפתוח לעריכה במפורש.
+      const canEdit = editable || unlockedWeek === selectedWeek;
 
       box.innerHTML =
         '<div class="tx-weeknav">' +
           '<button class="btn-ghost sm" id="txPrevWk"' + (selectedWeek <= 1 ? ' disabled' : '') + '><i class="bi bi-chevron-right"></i></button>' +
           '<strong>' + esc(weekLabel(selectedWeek)) + '</strong>' +
           '<button class="btn-ghost sm" id="txNextWk"' + (selectedWeek >= curWeek ? ' disabled' : '') + '><i class="bi bi-chevron-left"></i></button>' +
-          (editable ? '' : '<span class="chip off">היסטוריה — לצפייה בלבד</span>') +
+          (editable ? '' : (canEdit
+            ? '<span class="chip warn">היסטוריה — פתוח לעריכה</span>'
+            : '<span class="chip off">היסטוריה — לצפייה בלבד</span> <button class="btn-ghost xs" id="txUnlock" type="button"><i class="bi bi-unlock"></i> פתח לעריכה</button>')) +
         '</div>' +
         '<div class="table-wrap"><table class="tbl"><thead><tr>' +
-          '<th>שם</th><th>ת״ז</th><th>קבוצה</th><th>אישור</th><th>סכום להטענה</th><th>לפי דרכון</th><th></th><th>יוצא לאחרונה</th>' +
+          '<th>שם</th><th>ת״ז</th><th>קבוצה</th><th>אישור</th><th>סכום להטענה</th><th>לפי דרכון (שבוע זה)</th><th></th><th>יוצא לאחרונה</th>' +
         '</tr></thead><tbody id="txBody">' + cards.map(c => {
           const w = weeklyByTz[c.tz];
-          const dk = darkonAmount(c.tz);
-          const extra = Number(c.extra_pending) || 0;
-          // בפעם הראשונה שרואים תלמיד השבוע (אין עדיין שורת taitzer_weekly) —
-          // ממלאים מדרכון + כל טעינה נוספת ממתינה. אם כבר יש שורה — לא דורסים.
-          const startAmount = w ? w.amount : ((dk || 0) + extra);
+          // "לפי דרכון" תמיד מחושב לפי הדרכון האמיתי **של השבוע הזה בדיוק**
+          // (לא של היום) — זה בדיוק מה שהיה שבור: שבוע עבר הציג את נתוני
+          // היום כאילו זה מה שהיה אז. מוצג כמידע גם בשבוע נעול, גם אם אי
+          // אפשר לערוך לפיו.
+          const dk = darkonAmount(c.tz, selectedWeek);
+          // טעינה נוספת ממתינה רלוונטית רק ל"טעינה הבאה" האמיתית — כלומר
+          // רק כשמסתכלים בפועל על השבוע הנוכחי, לא בשחזור שבוע עבר.
+          const extra = (selectedWeek === curWeek) ? (Number(c.extra_pending) || 0) : 0;
+          // בפעם הראשונה שרואים תלמיד בשבוע הזה (אין עדיין שורת taitzer_weekly)
+          // — אם אפשר לערוך, ממלאים הצעה מדרכון+טעינה ממתינה; אם לא (היסטוריה
+          // נעולה) — אין שום נתון אמיתי להציג, ולכן לא ממציאים מספר.
+          const startAmount = w ? w.amount : (canEdit ? ((dk || 0) + extra) : null);
+          const amtCell = startAmount == null
+            ? '<span class="tl-note">לא נבדק</span>'
+            : '<input type="number" class="inp mb0 tx-amt" style="width:90px" step="0.01" value="' + startAmount + '"' + (canEdit ? '' : ' disabled') + '>';
           return '<tr data-tz="' + esc(c.tz) + '">' +
             '<td>' + esc(c.holder_name || ((c.family || '') + ' ' + (c.first_name || '')).trim()) + '</td>' +
             '<td dir="ltr" style="text-align:left">' + esc(c.tz) + '</td>' +
             '<td>' + esc(c.city_field || '') + '</td>' +
-            '<td><input type="checkbox" class="tx-app"' + (w && w.approved ? ' checked' : '') + (editable ? '' : ' disabled') + '></td>' +
-            '<td><input type="number" class="inp mb0 tx-amt" style="width:90px" step="0.01" value="' + startAmount + '"' + (editable ? '' : ' disabled') + '></td>' +
+            '<td><input type="checkbox" class="tx-app"' + (w && w.approved ? ' checked' : '') + (canEdit ? '' : ' disabled') + '></td>' +
+            '<td>' + amtCell + '</td>' +
             '<td class="tl-note" data-dk style="font-size:.8rem">' + (dk == null ? '—' : dk + ' ₪') + '</td>' +
             '<td>' + (extra > 0 ? '<span class="chip warn" title="ייכנס אוטומטית לסכום">+' + extra + ' ₪</span>' : '') +
-              (editable ? ' <button class="btn-ghost xs tx-extra" type="button" title="הוסף טעינה חד-פעמית"><i class="bi bi-plus-circle"></i></button>' : '') + '</td>' +
+              (canEdit ? ' <button class="btn-ghost xs tx-extra" type="button" title="הוסף טעינה חד-פעמית"><i class="bi bi-plus-circle"></i></button>' : '') + '</td>' +
             '<td class="tl-note" data-exp style="font-size:.78rem">' + (w && w.exported_at ? esc(new Date(w.exported_at).toLocaleDateString('he-IL')) : '—') + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table></div>';
 
       // ניווט השבועות חייב לעבוד גם בשבוע היסטורי (אחרת אי אפשר לצאת ממנו) —
       // נרשם תמיד, לפני ה-guard הבא שחוסם רק את האינטרקציה של הטבלה עצמה.
-      box.querySelector('#txPrevWk')?.addEventListener('click', () => { if (selectedWeek > 1) { selectedWeek--; draw(); } });
-      box.querySelector('#txNextWk')?.addEventListener('click', () => { if (selectedWeek < curWeek) { selectedWeek++; draw(); } });
+      // נעילה חוזרת בברירת מחדל בכל ניווט — לא "נשארים פתוחים" בטעות.
+      box.querySelector('#txPrevWk')?.addEventListener('click', () => { if (selectedWeek > 1) { unlockedWeek = null; selectedWeek--; draw(); } });
+      box.querySelector('#txNextWk')?.addEventListener('click', () => { if (selectedWeek < curWeek) { unlockedWeek = null; selectedWeek++; draw(); } });
+      box.querySelector('#txUnlock')?.addEventListener('click', () => { unlockedWeek = selectedWeek; draw(); });
 
-      if (!editable) return; // היסטוריה — בלי עריכת הטבלה עצמה
+      page.querySelector('#txFillDarkon').disabled = !canEdit;
+      page.querySelector('#txExport').disabled = !canEdit;
+      if (!canEdit) return; // היסטוריה נעולה — בלי עריכת הטבלה עצמה
 
       // שמירה מיידית בשינוי — כמו כל checkbox אחר במערכת, בלי כפתור "שמור" נפרד.
       async function saveRow(tr) {
@@ -208,7 +240,7 @@
         let n = 0;
         const rows = [...box.querySelectorAll('#txBody tr')];
         for (const tr of rows) {
-          const dk = darkonAmount(tr.dataset.tz);
+          const dk = darkonAmount(tr.dataset.tz, selectedWeek);
           if (dk == null) continue;
           tr.querySelector('.tx-amt').value = dk;
           await saveRow(tr);
@@ -279,21 +311,32 @@
     if (!cr.ok || !cr.data || !cr.data.length) return null;   // אין לתלמיד הזה כרטיס טייצר
     return { card: cr.data[0], history: wr.ok ? (wr.data || []) : [] };
   }
+  // גלילה פנימית מ-5 שורות ומעלה — אותו דפוס בדיוק כמו cardSection של דרכון
+  // (js/passport.js), כדי שכרטיס עם המון שבועות לא ימתח את כל הכרטיס.
+  function scrollWrap(html, n) { return n > 5 ? '<div class="det-scroll">' + html + '</div>' : html; }
   function cardSection(data) {
     if (!data) return '';
     const c = data.card;
     const hist = (data.history || []).filter(w => w.exported_at).sort((a, b) => (b.week_no || 0) - (a.week_no || 0));
     const total = hist.reduce((a, w) => a + (Number(w.amount) || 0), 0);
-    const last = hist[0];
     const extra = Number(c.extra_pending) || 0;
-    return '<div class="det-sec tx-sec"><h4><i class="bi bi-credit-card-fill"></i> טייצר' +
-      (c.card_number ? ' <span class="det-badge">#' + esc(c.card_number) + '</span>' : '') + '</h4>' +
+    const head = '<div class="det-sec tx-sec"><h4><i class="bi bi-credit-card-fill"></i> טייצר' +
+      (c.card_number ? ' <span class="det-badge">#' + esc(c.card_number) + '</span>' : '') + '</h4>';
+    if (!hist.length) {
+      return head + '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">עדיין לא נטען לכרטיס זה' +
+        (extra > 0 ? ' — <span class="chip warn">+' + extra + ' ₪ ממתין לטעינה הבאה</span>' : '.') + '</div></div>';
+    }
+    // בקשת יוסף 10/09 ("ואת כל ההיסטוריה גם") — לא רק "טעינה אחרונה" אלא
+    // כל שבוע שנטען בפועל, אותו דפוס בדיוק כמו רשימת השבועות בדרכון.
+    return head +
       '<div class="det-grid">' +
         '<div class="det-row"><span class="det-lbl">סה״כ נטען עד היום</span><span class="det-val"><strong>' + total + ' ₪</strong></span></div>' +
-        '<div class="det-row"><span class="det-lbl">טעינה אחרונה</span><span class="det-val">' +
-          (last ? (last.amount + ' ₪ · שבוע ' + last.week_no) : 'עדיין לא נטען') + '</span></div>' +
         (extra > 0 ? '<div class="det-row"><span class="det-lbl">ממתין לטעינה הבאה</span><span class="det-val"><span class="chip warn">+' + extra + ' ₪</span></span></div>' : '') +
-      '</div></div>';
+      '</div>' +
+      scrollWrap(hist.map(w =>
+        '<div class="det-item"><span class="di-main">שבוע ' + w.week_no + '</span><span class="di-meta"><strong>' + w.amount + ' ₪</strong></span></div>'
+      ).join(''), hist.length) +
+    '</div>';
   }
   window.cv3Taitzer = { forStudent, cardSection };
 })();
