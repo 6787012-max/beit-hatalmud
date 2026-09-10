@@ -15,10 +15,19 @@
     return '<button class="mini" id="callParentBtn" title="חיוג להורה"><i class="bi bi-telephone-outbound"></i> חייג</button>';
   }
 
-  // מספרי-בדיקה ידועים (DID פנימי, לא בפורמט נייד/קווי רגיל) — מותר לחייג
-  // אליהם ישירות בלי לעבור את בדיקת ה-9/10-ספרות הרגילה. חייב להיות זהה
-  // ל-KNOWN_TEST_TARGETS בצד-שרת (supabase/functions/call-parent/index.ts).
-  const KNOWN_TEST_TARGETS = { '07722000030': 'יוסף — שלוחה 201' };
+  // נירמול מקומי לצורך חיוג בלבד — טווח 8-11 ספרות, זהה בכוונה ל-normPhone
+  // של supabase/functions/call-parent/index.ts. שונה מ-window.cv3NormPhone
+  // הגלובלי (js/phone-utils.js, 9-10 ספרות) כי מספרי-בדיקה עצמית (DID, כמו
+  // 07722000030 — VOB 11 ספרות, אומת חי 10/09/2026) ארוכים ממספר נייד/קווי
+  // רגיל. לא לגעת ב-cv3NormPhone הגלובלי — הוא משמש גם תצוגה (כרטיס תלמיד/צוות)
+  // שלא אמורה לשנות התנהגות בגלל צורך צר של פיצ'ר החיוג.
+  function normPhoneForDial(v) {
+    if (!v) return null;
+    let d = String(v).replace(/\D/g, '');
+    if (d.startsWith('972')) d = '0' + d.slice(3);
+    if (!d.startsWith('0')) d = '0' + d;
+    return (d.length >= 8 && d.length <= 11) ? d : null;
+  }
 
   // חיוג בפועל: נירמול → אישור → קריאה ל-Worker → טוסט לפי סטטוס. rawPhone
   // לא חייב להיות מנורמל מראש. משמש גם את wire() למטה (כפתור החיוג בכרטיס
@@ -27,10 +36,9 @@
   // מחזיר true/false להצלחה, לא זורק. snumber הוא קבוע בצד-שרת — לא נשלח
   // מכאן (10/09/2026: התברר שזה לא "שלוחת המחייג", אלא ערך טכני קבוע).
   async function dial(rawPhone) {
-    const raw = String(rawPhone == null ? '' : rawPhone).trim();
     // בדיקת-שפיות בצד לקוח, עוד לפני שנוגעים ברשת — אותו אלגוריתם שה-Worker
-    // מריץ שוב בעצמו בצד-שרת (לא סומכים על הלקוח). חריג: מספרי-בדיקה ידועים.
-    const phone = KNOWN_TEST_TARGETS[raw] ? raw : (window.cv3NormPhone ? window.cv3NormPhone(raw) : null);
+    // מריץ שוב בעצמו בצד-שרת (לא סומכים על הלקוח).
+    const phone = normPhoneForDial(rawPhone);
     if (!phone) { window.UI.toast('מספר טלפון לא תקין', 'err'); return false; }
     // חיוג אמיתי (וכנראה בתשלום) — קליק בטעות לא יעלה כסף בלי אישור מפורש.
     if (!window.confirm('לחייג למספר ' + phone + '?')) return false;

@@ -56,29 +56,20 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-// נירמול מספר-יעד — כפילות *מכוונת* של window.cv3NormPhone (js/phone-utils.js),
-// למספרי הורים/צוות רגילים (05X נייד, 0-משהו קווי — 9-10 ספרות). Edge Function
-// לא יכולה לייבא קוד דפדפן, אז האלגוריתם משוכפל כאן ביד. אם cv3NormPhone
-// משתנה — יש לעדכן גם כאן, אחרת השרת יאמת לפי כלל אחר מהלקוח.
+// נירמול מספר-יעד. דומה ל-window.cv3NormPhone (js/phone-utils.js) אבל עם טווח
+// אורך רחב יותר בכוונה: מספרי הורים/צוות רגילים הם 9-10 ספרות (05X נייד,
+// 0-משהו קווי), אבל מספרי DID לבדיקה עצמית (כמו 07722000030 של יוסף — VOB
+// עם 11 ספרות, אומת חי 10/09/2026) ארוכים יותר. אין רשימה סגורה של מספרים
+// מותרים — כל מחרוזת-ספרות בטווח 8-11 עוברת; ההגנה מפני הזרקת פרמטרים היא
+// עצם זה שרק ספרות שורדות את ה-\D strip, לא איזה מספר ספציפי זה. Edge
+// Function לא יכולה לייבא קוד דפדפן, אז האלגוריתם משוכפל כאן ביד — אם
+// cv3NormPhone משתנה, לעדכן גם כאן.
 function normPhone(v: unknown): string | null {
   if (!v) return null;
   let d = String(v).replace(/\D/g, '');
   if (d.startsWith('972')) d = '0' + d.slice(3);
   if (!d.startsWith('0')) d = '0' + d;
-  return (d.length >= 9 && d.length <= 10) ? d : null;
-}
-
-// מספרי-בדיקה ידועים (11 ספרות — DID פנימי, לא מספר נייד/קווי רגיל) שמותר
-// לחייג אליהם בלי לעבור את ולידציית ה-9/10-ספרות הרגילה של normPhone. רק
-// אלה — לא כל מחרוזת 11-ספרות שהלקוח שולח.
-const KNOWN_TEST_TARGETS: Record<string, string> = {
-  '07722000030': 'יוסף — שלוחה 201',
-};
-
-function resolveDestination(raw: unknown): string | null {
-  const s = typeof raw === 'string' ? raw.trim() : '';
-  if (s && KNOWN_TEST_TARGETS[s]) return s;
-  return normPhone(raw);
+  return (d.length >= 8 && d.length <= 11) ? d : null;
 }
 
 Deno.serve(async (req) => {
@@ -130,7 +121,7 @@ Deno.serve(async (req) => {
   // (4) נירמול+ולידציה של היעד — רק אחרי שעבר את שער ההרשאה. עוצר כאן גם
   // מחרוזת מזוהמת שיכולה, אם הייתה מגיעה גולמית ל-';'-query למטה, להזריק
   // פרמטרים נוספים.
-  const cnumber = resolveDestination(body.phone);
+  const cnumber = normPhone(body.phone);
   if (!cnumber) return json({ ok: false, error: 'bad phone' }, 400);
 
   // (5) כתובת ה-PBX נבנית ביד עם ';' (לא URLSearchParams — זה משתמש ב-'&').
