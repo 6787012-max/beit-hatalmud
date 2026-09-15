@@ -205,6 +205,41 @@
       var s = document.createElement('div');
       s.className = 'shp';
       d.appendChild(s);
+    } else if (el.type === 'table') {
+      var tbl = document.createElement('table');
+      tbl.className = 'ae-tbl';
+      tbl.style.width = '100%'; tbl.style.height = '100%';
+      tbl.style.borderCollapse = 'collapse';
+      tbl.style.fontFamily = el.font || 'Asst, sans-serif';
+      tbl.style.fontSize = (el.size || 22) + 'px';
+      tbl.style.tableLayout = 'fixed';
+      var bw = el.borderW || 2;
+      var bc = el.borderColor || '#333';
+      (el.cells || []).forEach(function (row, ri) {
+        var tr = document.createElement('tr');
+        row.forEach(function (val, ci) {
+          var td = document.createElement('td');
+          td.textContent = val || '';
+          td.dataset.row = ri;
+          td.dataset.col = ci;
+          td.style.border = bw + 'px solid ' + bc;
+          td.style.padding = '6px 8px';
+          td.style.textAlign = 'center';
+          td.style.verticalAlign = 'middle';
+          td.style.overflow = 'hidden';
+          if (ri === 0) {
+            td.style.background = el.headerBg || '#003048';
+            td.style.color = el.headerColor || '#fff';
+            td.style.fontWeight = '800';
+          } else {
+            td.style.background = el.cellBg || '#fff';
+            td.style.color = el.cellColor || '#111';
+          }
+          tr.appendChild(td);
+        });
+        tbl.appendChild(tr);
+      });
+      d.appendChild(tbl);
     }
 
     // ידיות שינוי גודל
@@ -273,6 +308,49 @@
     hint('נוספה צורה: ' + shape);
   }
 
+  function addTable() {
+    var rows = 4, cols = 3;
+    var cells = [];
+    for (var r = 0; r < rows; r++) {
+      var row = [];
+      for (var c = 0; c < cols; c++) {
+        row.push(r === 0 ? ('כותרת ' + (c + 1)) : '');
+      }
+      cells.push(row);
+    }
+    var el = {
+      id: newId(), type: 'table',
+      x: Math.round(state.canvas.w * .1),
+      y: Math.round(state.canvas.h * .35),
+      w: Math.round(state.canvas.w * .8),
+      h: Math.round(state.canvas.h * .3),
+      rows: rows, cols: cols, cells: cells,
+      headerBg: '#003048', headerColor: '#ffffff',
+      cellBg: '#ffffff', cellColor: '#111',
+      borderColor: '#8A6A2E', borderW: 2,
+      font: 'Asst, sans-serif', size: 22,
+      rotation: 0, opacity: 1
+    };
+    state.elements.push(el);
+    state.selectedId = el.id;
+    render(); renderProps(); pushHistory();
+    hint('נוספה טבלה. לחיצה כפולה על תא לעריכה.');
+  }
+
+  function resizeTable(el, newRows, newCols) {
+    newRows = Math.max(1, Math.min(50, newRows|0));
+    newCols = Math.max(1, Math.min(20, newCols|0));
+    var cells = [];
+    for (var r = 0; r < newRows; r++) {
+      var row = [];
+      for (var c = 0; c < newCols; c++) {
+        row.push((el.cells[r] && el.cells[r][c]) != null ? el.cells[r][c] : '');
+      }
+      cells.push(row);
+    }
+    el.rows = newRows; el.cols = newCols; el.cells = cells;
+  }
+
   function delSelected() {
     if (!state.selectedId) return;
     state.elements = state.elements.filter(function (e) { return e.id !== state.selectedId; });
@@ -307,11 +385,24 @@
     }
     empty.hidden = true; panel.hidden = false;
 
-    // הצג/הסתר שדות טקסט וצורה
+    // הצג/הסתר שדות לפי סוג
     var isText = el.type === 'text';
     var isShape = el.type === 'shape';
+    var isTable = el.type === 'table';
     $$('.ae-fld-text', panel).forEach(function (f) { f.hidden = !isText; });
     $$('.ae-fld-shape', panel).forEach(function (f) { f.hidden = !isShape; });
+    $$('.ae-fld-table', panel).forEach(function (f) { f.hidden = !isTable; });
+    if (isTable) {
+      var $rows = $('#aePropRows'), $cols = $('#aePropCols');
+      if ($rows) $rows.value = el.rows || 1;
+      if ($cols) $cols.value = el.cols || 1;
+      var $hb = $('#aePropHeaderBg'); if ($hb) $hb.value = el.headerBg || '#003048';
+      var $hc = $('#aePropHeaderColor'); if ($hc) $hc.value = el.headerColor || '#ffffff';
+      var $cb = $('#aePropCellBg'); if ($cb) $cb.value = el.cellBg || '#ffffff';
+      var $cc = $('#aePropCellColor'); if ($cc) $cc.value = el.cellColor || '#111111';
+      var $bc = $('#aePropBorderColor'); if ($bc) $bc.value = el.borderColor || '#8A6A2E';
+      var $bw = $('#aePropBorderW'); if ($bw) $bw.value = el.borderW || 2;
+    }
 
     if (isText) {
       $('#aePropText').value = el.text || '';
@@ -364,10 +455,30 @@
   }
 
   /* ── אינטראקציה: גרירה + שינוי גודל + מגע ═════════════════ */
-  function beginTextEdit(elNode) {
+  function beginTextEdit(elNode, cellTd) {
     var id = elNode.dataset.id;
     var el = state.elements.find(function (x) { return x.id === id; });
-    if (!el || el.type !== 'text') return;
+    if (!el) return;
+    // עריכת תא בטבלה
+    if (el.type === 'table' && cellTd) {
+      var ri = parseInt(cellTd.dataset.row, 10);
+      var ci = parseInt(cellTd.dataset.col, 10);
+      cellTd.contentEditable = 'true';
+      elNode.classList.add('editing');
+      cellTd.focus();
+      var rng2 = document.createRange(); rng2.selectNodeContents(cellTd);
+      var sel2 = window.getSelection(); sel2.removeAllRanges(); sel2.addRange(rng2);
+      var blur2 = function () {
+        cellTd.removeEventListener('blur', blur2);
+        cellTd.contentEditable = 'false';
+        elNode.classList.remove('editing');
+        el.cells[ri][ci] = cellTd.textContent;
+        pushHistory();
+      };
+      cellTd.addEventListener('blur', blur2);
+      return;
+    }
+    if (el.type !== 'text') return;
     var t = elNode.querySelector('.txt');
     t.contentEditable = 'true';
     elNode.classList.add('editing');
@@ -479,10 +590,13 @@
       clearTimeout(pressTimer); pressTimer = null; drag = null;
     });
 
-    // עריכת טקסט בלחיצה כפולה (עכבר) — בנוסף ל-long-press
+    // עריכת טקסט/תא בלחיצה כפולה (עכבר) — בנוסף ל-long-press
     cv.addEventListener('dblclick', function (e) {
-      var elNode = e.target.closest('.ae-el.text');
-      if (elNode) beginTextEdit(elNode);
+      var elNode = e.target.closest('.ae-el');
+      if (!elNode) return;
+      if (elNode.classList.contains('text')) { beginTextEdit(elNode); return; }
+      var td = e.target.closest('td');
+      if (td && elNode.contains(td)) beginTextEdit(elNode, td);
     });
 
     /* ── פינץ' זום של הקנבס ═══════════════════════════════════ */
@@ -578,6 +692,28 @@
         ctx.translate(cx, cy);
         ctx.rotate(el.rotation * Math.PI / 180);
         ctx.translate(-cx, -cy);
+      }
+
+      if (el.type === 'table') {
+        var rows = el.rows || 1, cols = el.cols || 1;
+        var cw = el.w / cols, ch = el.h / rows;
+        var bw = el.borderW || 2, bc = el.borderColor || '#333';
+        ctx.font = '700 ' + (el.size || 22) + 'px ' + (el.font || 'Asst, sans-serif');
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.direction = 'rtl';
+        for (var r = 0; r < rows; r++) {
+          for (var c = 0; c < cols; c++) {
+            var cx1 = el.x + c * cw, cy1 = el.y + r * ch;
+            ctx.fillStyle = r === 0 ? (el.headerBg || '#003048') : (el.cellBg || '#fff');
+            ctx.fillRect(cx1, cy1, cw, ch);
+            ctx.fillStyle = r === 0 ? (el.headerColor || '#fff') : (el.cellColor || '#111');
+            var txt = (el.cells[r] && el.cells[r][c]) || '';
+            ctx.font = (r === 0 ? '800 ' : '500 ') + (el.size || 22) + 'px ' + (el.font || 'Asst, sans-serif');
+            ctx.fillText(txt, cx1 + cw / 2, cy1 + ch / 2);
+            ctx.lineWidth = bw; ctx.strokeStyle = bc;
+            ctx.strokeRect(cx1, cy1, cw, ch);
+          }
+        }
+        ctx.restore(); resolve(); return;
       }
 
       if (el.type === 'shape') {
@@ -763,6 +899,34 @@
     var addRect = $('#aeAddRect'); if (addRect) addRect.addEventListener('click', function () { addShape('rect'); });
     var addCirc = $('#aeAddCirc'); if (addCirc) addCirc.addEventListener('click', function () { addShape('circle'); });
     var addLine = $('#aeAddLine'); if (addLine) addLine.addEventListener('click', function () { addShape('line'); });
+    var addTbl = $('#aeAddTable'); if (addTbl) addTbl.addEventListener('click', addTable);
+
+    // שדות טבלה
+    var $rows = $('#aePropRows'); if ($rows) $rows.addEventListener('change', function (e) {
+      var el = getSel(); if (!el || el.type !== 'table') return;
+      resizeTable(el, parseInt(e.target.value, 10) || 1, el.cols);
+      render(); pushHistory();
+    });
+    var $cols = $('#aePropCols'); if ($cols) $cols.addEventListener('change', function (e) {
+      var el = getSel(); if (!el || el.type !== 'table') return;
+      resizeTable(el, el.rows, parseInt(e.target.value, 10) || 1);
+      render(); pushHistory();
+    });
+    function tblStyleBind(sel, key, colorField) {
+      var $f = $(sel); if (!$f) return;
+      $f.addEventListener('input', function (e) {
+        var el = getSel(); if (!el || el.type !== 'table') return;
+        el[key] = colorField ? e.target.value : (parseInt(e.target.value, 10) || 0);
+        render();
+      });
+      $f.addEventListener('change', pushHistory);
+    }
+    tblStyleBind('#aePropHeaderBg', 'headerBg', true);
+    tblStyleBind('#aePropHeaderColor', 'headerColor', true);
+    tblStyleBind('#aePropCellBg', 'cellBg', true);
+    tblStyleBind('#aePropCellColor', 'cellColor', true);
+    tblStyleBind('#aePropBorderColor', 'borderColor', true);
+    tblStyleBind('#aePropBorderW', 'borderW', false);
     var snapChk = $('#aeSnap'); if (snapChk) {
       snapChk.checked = state.snap;
       snapChk.addEventListener('change', function (e) { state.snap = !!e.target.checked; });

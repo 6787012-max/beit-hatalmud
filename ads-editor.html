@@ -54,6 +54,7 @@
             <button type="button" class="btn btn-s small" id="aeAddRect" title="מלבן">▭</button>
             <button type="button" class="btn btn-s small" id="aeAddCirc" title="עיגול">◯</button>
             <button type="button" class="btn btn-s small" id="aeAddLine" title="קו">━</button>
+            <button type="button" class="btn btn-s small" id="aeAddTable" title="טבלה">▦ טבלה</button>
           </div>
           <div class="ae-group">
             <label class="ae-lbl"><input type="checkbox" id="aeSnap" checked> סנאפ לגריד</label>
@@ -212,6 +213,48 @@
               <div class="ae-fld ae-fld-shape" hidden>
                 <label>עיגול פינות (px)</label>
                 <input id="aePropRadius" type="number" min="0" max="200" step="1" value="0">
+              </div>
+
+              <!-- טבלה -->
+              <div class="ae-fld ae-fld-table ae-fld-row" hidden>
+                <div>
+                  <label>שורות</label>
+                  <input id="aePropRows" type="number" min="1" max="50" step="1" value="4">
+                </div>
+                <div>
+                  <label>עמודות</label>
+                  <input id="aePropCols" type="number" min="1" max="20" step="1" value="3">
+                </div>
+              </div>
+              <div class="ae-fld ae-fld-table ae-fld-row" hidden>
+                <div>
+                  <label>רקע כותרת</label>
+                  <input id="aePropHeaderBg" type="color" value="#003048">
+                </div>
+                <div>
+                  <label>טקסט כותרת</label>
+                  <input id="aePropHeaderColor" type="color" value="#ffffff">
+                </div>
+              </div>
+              <div class="ae-fld ae-fld-table ae-fld-row" hidden>
+                <div>
+                  <label>רקע תא</label>
+                  <input id="aePropCellBg" type="color" value="#ffffff">
+                </div>
+                <div>
+                  <label>טקסט תא</label>
+                  <input id="aePropCellColor" type="color" value="#111111">
+                </div>
+              </div>
+              <div class="ae-fld ae-fld-table ae-fld-row" hidden>
+                <div>
+                  <label>צבע מסגרת</label>
+                  <input id="aePropBorderColor" type="color" value="#8A6A2E">
+                </div>
+                <div>
+                  <label>עובי מסגרת</label>
+                  <input id="aePropBorderW" type="number" min="0" max="20" step="1" value="2">
+                </div>
               </div>
 
               <div class="ae-fld ae-fld-row">
