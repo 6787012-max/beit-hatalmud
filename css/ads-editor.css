@@ -1,0 +1,233 @@
+/* ads-editor.css — עורך המודעות של מכינה בית התלמוד.
+ * מודל CSS מבודד: משתמש רק במשתנים שלו, לא נשען על main.css. */
+
+@font-face { font-family: 'Frank'; src: url('../fonts/frank-medium.woff2') format('woff2'); font-weight: 400 500; font-display: swap; }
+@font-face { font-family: 'Frank'; src: url('../fonts/frank-black.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
+@font-face { font-family: 'Asst'; src: url('../fonts/assistant-regular.woff2') format('woff2'); font-weight: 400 500; font-display: swap; }
+@font-face { font-family: 'Asst'; src: url('../fonts/assistant-semibold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Asst'; src: url('../fonts/assistant-extrabold.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
+@font-face { font-family: 'Drug'; src: url('../fonts/drugulin-bold.woff2') format('woff2'); font-weight: 400 900; font-display: swap; }
+@font-face { font-family: 'Heebo'; src: url('../fonts/heebo-black.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
+
+
+.ads-page {
+  --navy: #003048;
+  --gold: #a87830;
+  --gold-l: #c9a45a;
+  --cream: #f6f1e5;
+  --ink: #111;
+  --muted: #5f6f7e;
+  --line: #e4e9ef;
+  background: var(--cream);
+  min-height: 100dvh;
+  margin: 0;
+}
+
+.ads-page .appbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 18px; background: linear-gradient(135deg, var(--navy), #0a4256);
+  color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15);
+}
+.ads-page .appbar .brand { display: flex; align-items: center; gap: 12px; }
+.ads-page .appbar .logo { display: inline-flex; }
+.ads-page .appbar .logo-img { height: 46px; width: auto; }
+.ads-page .appbar .brand-txt strong { display: block; font-size: 17px; }
+.ads-page .appbar .brand-txt small { color: rgba(255,255,255,.75); font-size: 12.5px; }
+.ads-page .appbar-actions { margin-inline-start: auto; }
+.ads-page .icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.12);
+  color: #fff; text-decoration: none; font-size: 20px; border: 0; cursor: pointer;
+}
+.ads-page .icon-btn:hover { background: rgba(255,255,255,.22); }
+
+.ads-page #main { padding: 14px; max-width: 1400px; margin: 0 auto; }
+.ads-page .adm-sec .head { padding: 12px 4px; }
+.ads-page .eyebrow { color: var(--gold); font-size: 12px; letter-spacing: .06em; font-weight: 800; }
+.ads-page .adm-sec h2 { margin: 4px 0 4px; font-size: 22px; color: var(--navy); }
+.ads-page .adm-sec .head p { color: var(--muted); font-size: 14px; margin: 0; }
+
+/* כפתורים */
+.ads-page .btn {
+  border: 0; border-radius: 10px; padding: 9px 14px; font: inherit; cursor: pointer;
+  background: var(--navy); color: #fff; font-weight: 700;
+}
+.ads-page .btn:hover { filter: brightness(1.08); }
+.ads-page .btn.btn-s, .ads-page .btn.small { padding: 7px 12px; font-size: 13.5px; }
+.ads-page .btn.btn-g { background: var(--gold); }
+.ads-page .btn.btn-x { background: #9B1E1E; }
+
+/* עורך — הועתק מ-admin.css של המניין, עם התאמת צבעים */
+.ae {
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px;
+}
+.ae-topbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 4px 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px;
+}
+.ae-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ae-group.ae-right { margin-inline-start: auto; }
+.ae-lbl { font-size: 13.5px; color: var(--muted); }
+.ae-sel, .ae-props select, .ae-props input, .ae-props textarea {
+  font: inherit; font-size: 13.5px; padding: 6px 9px;
+  border: 1.5px solid var(--line); border-radius: 8px; background: #fff;
+  color: var(--navy);
+}
+.ae-sel { min-width: 200px; }
+
+.ae-work {
+  display: grid; grid-template-columns: 1fr 300px; gap: 14px;
+  align-items: start;
+}
+.ae-canvas-wrap {
+  background: repeating-conic-gradient(#e8e5da 0% 25%, #f3ede0 0% 50%) 50%/22px 22px;
+  border: 1px solid var(--line); border-radius: 12px; padding: 24px;
+  min-height: 640px; display: flex; align-items: flex-start; justify-content: center;
+  overflow: auto;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+.ae-canvas {
+  position: relative; background: #F6F1E5; box-shadow: 0 8px 30px rgba(0,0,0,.18);
+  transform-origin: top center; outline: none;
+  width: 1240px; height: 1754px;
+  touch-action: none;
+}
+.ae-canvas:focus { box-shadow: 0 8px 30px rgba(0,0,0,.18), 0 0 0 3px rgba(168,120,48,.35); }
+
+.ae-el {
+  position: absolute; cursor: move; box-sizing: border-box;
+  border: 1.5px dashed transparent;
+  transform-origin: center;
+  touch-action: none;
+}
+.ae-el:hover { border-color: rgba(168,120,48,.5); }
+.ae-el.sel { border-color: var(--gold); border-style: solid; }
+.ae-el.editing { cursor: text; border-color: var(--navy); }
+.ae-el img { width: 100%; height: 100%; display: block; object-fit: contain; user-select: none; pointer-events: none; }
+.ae-el.text {
+  padding: 4px 6px; white-space: pre-wrap; overflow-wrap: break-word;
+  display: flex; align-items: center;
+  line-height: 1.25;
+}
+.ae-el.text > .txt { width: 100%; }
+.ae-el.shape { display: block; }
+.ae-el.shape .shp {
+  width: 100%; height: 100%; display: block;
+  background: var(--shp-fill, #003048);
+  border: var(--shp-stroke-w, 0) solid var(--shp-stroke, #000);
+  border-radius: var(--shp-radius, 0);
+}
+.ae-el.shape[data-shape="circle"] .shp { border-radius: 50%; }
+.ae-el.shape[data-shape="line"] .shp {
+  background: transparent;
+  border-top: var(--shp-stroke-w, 4px) solid var(--shp-stroke, #003048);
+  height: 0; margin-top: 50%;
+}
+
+.ae-hnd {
+  position: absolute; width: 18px; height: 18px; background: var(--gold);
+  border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  display: none; z-index: 20; touch-action: none;
+}
+.ae-hnd::before {
+  content: ''; position: absolute; inset: -10px; border-radius: 50%;
+}
+.ae-el.sel .ae-hnd { display: block; }
+.ae-hnd.tl { top: -10px; inset-inline-start: -10px; cursor: nwse-resize; }
+.ae-hnd.tr { top: -10px; inset-inline-end: -10px; cursor: nesw-resize; }
+.ae-hnd.bl { bottom: -10px; inset-inline-start: -10px; cursor: nesw-resize; }
+.ae-hnd.br { bottom: -10px; inset-inline-end: -10px; cursor: nwse-resize; }
+.ae-hnd.rot { top: -38px; left: 50%; transform: translateX(-50%); background: var(--navy); cursor: grab; }
+@media (pointer: coarse) {
+  .ae-hnd { width: 26px; height: 26px; }
+  .ae-hnd.tl { top: -14px; inset-inline-start: -14px; }
+  .ae-hnd.tr { top: -14px; inset-inline-end: -14px; }
+  .ae-hnd.bl { bottom: -14px; inset-inline-start: -14px; }
+  .ae-hnd.br { bottom: -14px; inset-inline-end: -14px; }
+  .ae-hnd.rot { top: -46px; }
+}
+
+.ae-props {
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px; position: sticky; top: 14px;
+  max-height: calc(100dvh - 100px); overflow-y: auto;
+}
+.ae-props-empty { font-size: 13.5px; color: var(--muted); line-height: 1.65; }
+.ae-props-empty ul { padding-inline-start: 18px; margin: 6px 0 0; }
+.ae-props-empty hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+.ae-props hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0 10px; }
+.ae-fld { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.ae-fld > label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.ae-fld input, .ae-fld select, .ae-fld textarea { width: 100%; }
+.ae-fld textarea { resize: vertical; min-height: 62px; font-family: inherit; }
+.ae-fld input[type=color] { height: 34px; padding: 3px; cursor: pointer; }
+.ae-fld-row { flex-direction: row; gap: 8px; }
+.ae-fld-row > div { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.ae-btn-row { display: flex; gap: 6px; }
+
+.ae-hint {
+  font-size: 13px; color: var(--muted); margin: 4px 2px 0;
+  min-height: 18px;
+}
+.ae-hint.err { color: #9B1E1E; }
+.ae-hint.ok { color: #2C5F3F; }
+
+.ae-modal {
+  position: fixed; inset: 0; background: rgba(0,48,72,.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 18px;
+}
+.ae-modal-box {
+  background: #fff; border-radius: 14px; padding: 20px 22px;
+  width: min(500px, 100%); max-height: 90dvh; overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,.35);
+}
+.ae-modal-box h3 { margin: 0 0 12px; font-size: 20px; color: var(--navy); }
+.ae-modal-box .fld { display: block; margin-bottom: 10px; }
+.ae-modal-box .fld span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.ae-modal-box .fld input, .ae-modal-box .fld textarea {
+  width: 100%; font: inherit; font-size: 14px; padding: 8px 11px;
+  border: 1.5px solid var(--line); border-radius: 9px; background: var(--cream);
+}
+.ae-modal-box .fld textarea { resize: vertical; font-family: inherit; }
+.ae-modal-box .hint { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.55; }
+
+@media (max-width: 1000px) {
+  .ae-work { grid-template-columns: 1fr; }
+  .ae-props { position: static; max-height: none; }
+}
+
+/* מובייל: סרגל צף, פאנל תכונות תחתון */
+@media (max-width: 700px) {
+  .ads-page #main { padding: 6px; }
+  .ae-topbar {
+    position: sticky; top: 0; z-index: 30;
+    padding: 8px; overflow-x: auto; flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    background: linear-gradient(#fff, #f8f5ee);
+    border-bottom: 1px solid var(--line);
+  }
+  .ae-topbar .ae-group { flex-wrap: nowrap; }
+  .ae-topbar .ae-group.ae-right { margin-inline-start: 12px; }
+  .ae-sel { min-width: 130px; font-size: 13px; }
+  .ae-canvas-wrap { padding: 10px; min-height: 50vh; }
+  .ae-props {
+    position: fixed; inset: auto 0 0 0; z-index: 40;
+    max-height: 55vh; border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.18);
+    transition: transform .25s ease;
+    transform: translateY(calc(100% - 46px));
+  }
+  .ae-props.open { transform: translateY(0); }
+  .ae-props::before {
+    content: 'תכונות'; display: block;
+    text-align: center; font-weight: 700; color: var(--navy);
+    padding: 10px 0 6px; margin: -14px -14px 8px;
+    border-bottom: 1px solid var(--line); cursor: pointer;
+    background: #fff; border-radius: 16px 16px 0 0; position: sticky; top: -14px;
+  }
+  .btn.btn-s, .btn.small { padding: 8px 10px; font-size: 13.5px; min-height: 40px; }
+  .ae-modal-box { width: 100%; max-height: 95dvh; border-radius: 14px 14px 0 0; margin-bottom: 0; }
+  .ae-modal { align-items: flex-end; padding: 0; }
+}
