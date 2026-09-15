@@ -56,10 +56,18 @@
         var r = await fetch(GEN + model + ':generateContent',
           { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': uk },
             body: JSON.stringify(body), signal: signal });
+        // תוכנות סינון (נטפרי ודומותיה) לא תמיד חוסמות ברמת הרשת — לפעמים
+        // מחזירות 200 עם עמוד-חסימה HTML. fetch "מצליח" ולא נכנס ל-catch,
+        // אז בלי הבדיקה הזו הקריאה הישירה "מצליחה" בשקט עם גוף לא-JSON,
+        // הפרוקסי למטה אף פעם לא מופעל, והמשתמש מקבל "לא התקבלה תשובה
+        // מהמודל" (נעמי, 1.9 ו-15.9 — אומת מול הלוגים: אף קריאה לא הגיעה
+        // לשרת שלנו). בודקים שזה JSON אמיתי לפני שסומכים על זה.
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('json') === -1) throw new Error('תגובה לא-JSON מהקריאה הישירה');
         return r;
       } catch (e) {
         if (e && e.name === 'AbortError') throw e;
-        // כשל רשת (כנראה סינון שחוסם את גוגל) → פרוקסי
+        // כשל רשת או חסימה מוסווית → פרוקסי
       }
     }
     return proxy(model, body, signal);
