@@ -33,6 +33,176 @@
 
   var STORAGE_KEY = 'bht-ads-draft-v1';
 
+  // תוכן העורך — מוזרק ל-#page-ads ע"י mount() כשנכנסים למסך מתוך ה-SPA (במקום עמוד
+  // HTML נפרד). ‎.ads-page‎ עוטף רק את הבלוק הזה (לא את body) כדי שכללי ה-CSS
+  // "‎.ads-page ...‎" שב-ads-editor.css ימשיכו להתאים בלי לגעת בעיצוב שאר האפליקציה.
+  var ADS_SECTION_HTML = '<div class="ads-page"><section class="adm-sec" id="adsSec" data-panel>' +
+    '<div class="head" style="padding:12px 14px 6px">' +
+      '<div class="eyebrow">עיצוב · WYSIWYG</div>' +
+      '<h2>עורך מודעות והדפסות</h2>' +
+      '<p>גורר, משנה גודל, מחליף לוגו וגופנים. תבניות מוכנות: בלאנק רשמי, הודעה, לוח שיעורים, תעודת הוקרה, ריבוע לוואטסאפ.</p>' +
+    '</div>' +
+    '<div class="ae">' +
+      '<div class="ae-topbar">' +
+        '<div class="ae-group">' +
+          '<label class="ae-lbl">תבנית:</label>' +
+          '<select id="aeTpl" class="ae-sel"></select>' +
+          '<button type="button" class="btn btn-s small" id="aeLoadTpl">טעינה</button>' +
+        '</div>' +
+        '<div class="ae-group">' +
+          '<button type="button" class="btn btn-s small" id="aeAddText">+ טקסט</button>' +
+          '<button type="button" class="btn btn-s small" id="aeAddImg">+ תמונה/לוגו</button>' +
+          '<label class="btn btn-s small" for="aeUpload" style="cursor:pointer">העלאה…</label>' +
+          '<input type="file" id="aeUpload" accept="image/*" hidden>' +
+          '<button type="button" class="btn btn-s small" id="aeAddRect" title="מלבן">▭</button>' +
+          '<button type="button" class="btn btn-s small" id="aeAddCirc" title="עיגול">◯</button>' +
+          '<button type="button" class="btn btn-s small" id="aeAddLine" title="קו">━</button>' +
+          '<button type="button" class="btn btn-s small" id="aeAddTable" title="טבלה">▦ טבלה</button>' +
+        '</div>' +
+        '<div class="ae-group">' +
+          '<label class="ae-lbl"><input type="checkbox" id="aeSnap" checked> סנאפ לגריד</label>' +
+        '</div>' +
+        '<div class="ae-group">' +
+          '<button type="button" class="btn btn-s small" id="aeUndo" title="ביטול (Ctrl+Z)">↶</button>' +
+          '<button type="button" class="btn btn-s small" id="aeRedo" title="חזרה (Ctrl+Y)">↷</button>' +
+        '</div>' +
+        '<div class="ae-group ae-right">' +
+          '<button type="button" class="btn btn-s small" id="aeSaveTpl">שמירה כתבנית…</button>' +
+          '<button type="button" class="btn btn-s small" id="aeSave">שמירה</button>' +
+          '<button type="button" class="btn btn-s small" id="aeExportPng">PNG</button>' +
+          '<button type="button" class="btn btn-s small" id="aeExportPdf">PDF</button>' +
+          '<button type="button" class="btn btn-g small" id="aeSendMail">✉ שליחה למייל</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ae-work">' +
+        '<div class="ae-canvas-wrap" id="aeCanvasWrap"><div class="ae-canvas" id="aeCanvas" tabindex="0"></div></div>' +
+        '<aside class="ae-props" id="aeProps">' +
+          '<div class="ae-props-empty">' +
+            '<p><b>אין פריט נבחר.</b></p>' +
+            '<p>הוסף טקסט, תמונה או צורה מהסרגל, לחץ עליו כדי לערוך. ' +
+            'במחשב — גרירה עם העכבר, לחיצה כפולה לעריכת טקסט. בטלפון — לגרירה מגע רגילה, ' +
+            'ללחיצה ארוכה על טקסט תיפתח עריכה.</p>' +
+            '<hr>' +
+            '<p><b>קיצורים (מחשב):</b></p>' +
+            '<ul>' +
+              '<li>Del — מחיקה</li>' +
+              '<li>Ctrl+D — שכפול</li>' +
+              '<li>Ctrl+Z / Y — ביטול / חזרה</li>' +
+              '<li>Shift+חצים — הזזה גסה</li>' +
+              '<li>Shift בזמן סיבוב — צמידה לזוויות של 15°</li>' +
+            '</ul>' +
+          '</div>' +
+          '<div class="ae-props-panel" hidden>' +
+            '<div class="ae-fld ae-fld-text" hidden><label>טקסט</label><textarea id="aePropText" rows="3"></textarea></div>' +
+            '<div class="ae-fld ae-fld-text" hidden>' +
+              '<label>גופן</label>' +
+              '<select id="aePropFont">' +
+                '<option value="Frank, serif">Frank Ruhl (סריפי קלאסי)</option>' +
+                '<option value="Drug, serif">Drugulin (סריפי מודרני)</option>' +
+                '<option value="Asst, sans-serif">Assistant (סאנס)</option>' +
+                '<option value="Heebo, sans-serif">Heebo (סאנס עבה)</option>' +
+              '</select>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-text ae-fld-row" hidden>' +
+              '<div><label>גודל</label><input id="aePropSize" type="number" min="8" max="400" step="1"></div>' +
+              '<div><label>עובי</label>' +
+                '<select id="aePropWeight">' +
+                  '<option value="400">רגיל</option><option value="600">חצי-מודגש</option>' +
+                  '<option value="700">מודגש</option><option value="800">עבה</option><option value="900">שחור</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-text ae-fld-row" hidden>' +
+              '<div><label>יישור</label>' +
+                '<select id="aePropAlign"><option value="right">ימין</option><option value="center">מרכז</option><option value="left">שמאל</option></select>' +
+              '</div>' +
+              '<div><label>צבע</label><input id="aePropColor" type="color"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-text" hidden><label>ריווח שורות</label><input id="aePropLine" type="number" min="0.8" max="3" step="0.05"></div>' +
+            '<div class="ae-fld ae-fld-row">' +
+              '<div><label>מיקום X</label><input id="aePropX" type="number" step="1"></div>' +
+              '<div><label>מיקום Y</label><input id="aePropY" type="number" step="1"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-row">' +
+              '<div><label>רוחב</label><input id="aePropW" type="number" step="1"></div>' +
+              '<div><label>גובה</label><input id="aePropH" type="number" step="1"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-row">' +
+              '<div><label>סיבוב (°)</label><input id="aePropRot" type="number" step="1" min="-180" max="180"></div>' +
+              '<div><label>שכבה</label><div class="ae-btn-row"><button type="button" class="btn btn-s small" id="aeLayerUp">↑</button><button type="button" class="btn btn-s small" id="aeLayerDown">↓</button></div></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-row">' +
+              '<div><label>שקיפות</label><input id="aePropOpacity" type="range" min="0.05" max="1" step="0.05" value="1"></div>' +
+              '<div><label>הצללה</label><select id="aePropShadow"><option value="0">בלי</option><option value="1">כן</option></select></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-shape" hidden><label>מילוי צורה</label><input id="aePropFill" type="color"></div>' +
+            '<div class="ae-fld ae-fld-shape ae-fld-row" hidden>' +
+              '<div><label>מסגרת (עובי)</label><input id="aePropStrokeW" type="number" min="0" max="40" step="1" value="0"></div>' +
+              '<div><label>צבע מסגרת</label><input id="aePropStroke" type="color" value="#003048"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-shape" hidden><label>עיגול פינות (px)</label><input id="aePropRadius" type="number" min="0" max="200" step="1" value="0"></div>' +
+            '<div class="ae-fld ae-fld-table ae-fld-row" hidden>' +
+              '<div><label>שורות</label><input id="aePropRows" type="number" min="1" max="50" step="1" value="4"></div>' +
+              '<div><label>עמודות</label><input id="aePropCols" type="number" min="1" max="20" step="1" value="3"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-table ae-fld-row" hidden>' +
+              '<div><label>רקע כותרת</label><input id="aePropHeaderBg" type="color" value="#003048"></div>' +
+              '<div><label>טקסט כותרת</label><input id="aePropHeaderColor" type="color" value="#ffffff"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-table ae-fld-row" hidden>' +
+              '<div><label>רקע תא</label><input id="aePropCellBg" type="color" value="#ffffff"></div>' +
+              '<div><label>טקסט תא</label><input id="aePropCellColor" type="color" value="#111111"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-table ae-fld-row" hidden>' +
+              '<div><label>צבע מסגרת</label><input id="aePropBorderColor" type="color" value="#8A6A2E"></div>' +
+              '<div><label>עובי מסגרת</label><input id="aePropBorderW" type="number" min="0" max="20" step="1" value="2"></div>' +
+            '</div>' +
+            '<div class="ae-fld ae-fld-row">' +
+              '<button type="button" class="btn btn-s small" id="aeDup">שכפול</button>' +
+              '<button type="button" class="btn btn-x small" id="aeDel">מחיקה</button>' +
+            '</div>' +
+          '</div>' +
+          '<hr>' +
+          '<div class="ae-fld"><label>רקע הקנבס</label><input id="aeBgColor" type="color" value="#F6F1E5"></div>' +
+          '<div class="ae-fld"><label>גודל דף</label>' +
+            '<select id="aePageSize">' +
+              '<option value="A4">A4 · לאורך (1240×1754)</option>' +
+              '<option value="A4L">A4 · לרוחב (1754×1240)</option>' +
+              '<option value="A5">A5 · לאורך (874×1240)</option>' +
+              '<option value="Square">ריבועי (1080×1080)</option>' +
+              '<option value="Story">סטורי (1080×1920)</option>' +
+            '</select>' +
+          '</div>' +
+        '</aside>' +
+      '</div>' +
+      '<p class="ae-hint" id="aeHint">מוכן. בחר תבנית או התחל דף ריק.</p>' +
+    '</div>' +
+    '<div class="ae-modal" id="aeMailModal" hidden>' +
+      '<div class="ae-modal-box">' +
+        '<h3>שליחת מודעה במייל</h3>' +
+        '<label class="fld"><span>נמענים (מופרדים בפסיק)</span><input id="aeMailTo" type="text" placeholder="a@b.com, c@d.com"></label>' +
+        '<label class="fld"><span>נושא</span><input id="aeMailSubj" type="text" value="מודעה ממכינה בית התלמוד"></label>' +
+        '<label class="fld"><span>גוף ההודעה</span><textarea id="aeMailBody" rows="4">שלום,\nמצורפת המודעה בקבצי PNG ו-PDF.\nבברכה,\nמכינה בית התלמוד · מעלה עמוס</textarea></label>' +
+        '<p class="hint">הכפתור יפתח את תוכנת המייל שלך עם הנושא והגוף מוכנים, ובמקביל יוריד את קבצי PNG ו-PDF לצירוף (גרירה לחלון המייל).</p>' +
+        '<div class="ae-btn-row" style="justify-content:flex-end;margin-top:10px">' +
+          '<button type="button" class="btn btn-s small" id="aeMailCancel">ביטול</button>' +
+          '<button type="button" class="btn btn-g small" id="aeMailSend">פתיחת מייל + הורדה</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="ae-modal" id="aeTplModal" hidden>' +
+      '<div class="ae-modal-box">' +
+        '<h3>שמירת התבנית הנוכחית</h3>' +
+        '<label class="fld"><span>שם התבנית</span><input id="aeTplName" type="text" placeholder="לדוגמה: הזמנה לאירוע"></label>' +
+        '<p class="hint">התבנית תישמר בענן ותופיע ברשימת "תבנית" בפתח הבא — לכולם, לא רק במחשב הזה.</p>' +
+        '<div class="ae-btn-row" style="justify-content:flex-end;margin-top:10px">' +
+          '<button type="button" class="btn btn-s small" id="aeTplCancel">ביטול</button>' +
+          '<button type="button" class="btn btn-g small" id="aeTplSave">שמירה</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</section></div>';
+
   function snap(v) { return state.snap ? Math.round(v / state.grid) * state.grid : Math.round(v); }
 
   /* ── עזרים ─────────────────────────────────────────────────── */
@@ -91,19 +261,31 @@
 
   /* ── תבניות ────────────────────────────────────────────────── */
   function loadTemplates() {
-    return fetch('data/ads-templates.json', { cache: 'no-cache' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        state.templates = d.templates || [];
-        var sel = $('#aeTpl');
-        sel.innerHTML = '';
-        state.templates.forEach(function (t) {
-          var o = document.createElement('option');
-          o.value = t.id; o.textContent = t.name;
-          sel.appendChild(o);
+    var staticP = fetch('data/ads-templates.json', { cache: 'no-cache' }).then(function (r) { return r.json(); });
+    // תבניות שהצוות שמר מתוך העורך עצמו — ads_custom_templates בסופאבייס, לא בקובץ
+    // סטטי בריפו (אין לזה גישת-כתיבה מהדפדפן ב-GitHub Pages).
+    var customP = window.store ? window.store.list('ads_custom_templates').catch(function () { return []; }) : Promise.resolve([]);
+    return Promise.all([staticP, customP]).then(function (res) {
+      var staticTpls = (res[0] && res[0].templates) || [];
+      var customTpls = (res[1] || []).map(function (row) {
+        return { id: 'custom-' + row.id, dbId: row.id, name: row.name, canvas: row.canvas, elements: row.elements, custom: true };
+      });
+      state.templates = staticTpls.concat(customTpls);
+      var sel = $('#aeTpl');
+      sel.innerHTML = '';
+      var gStatic = document.createElement('optgroup'); gStatic.label = 'תבניות קבועות';
+      staticTpls.forEach(function (t) {
+        var o = document.createElement('option'); o.value = t.id; o.textContent = t.name; gStatic.appendChild(o);
+      });
+      sel.appendChild(gStatic);
+      if (customTpls.length) {
+        var gCustom = document.createElement('optgroup'); gCustom.label = 'התבניות שלנו';
+        customTpls.forEach(function (t) {
+          var o = document.createElement('option'); o.value = t.id; o.textContent = t.name; gCustom.appendChild(o);
         });
-      })
-      .catch(function (e) { hint('שגיאה בטעינת תבניות: ' + e.message, 'err'); });
+        sel.appendChild(gCustom);
+      }
+    }).catch(function (e) { hint('שגיאה בטעינת תבניות: ' + e.message, 'err'); });
   }
   function applyTemplate(id) {
     var t = state.templates.find(function (x) { return x.id === id; });
@@ -627,9 +809,13 @@
     wrap.addEventListener('pointercancel', endPointer);
     wrap.addEventListener('pointerleave', endPointer);
 
-    // קיצורי מקלדת
-    document.addEventListener('keydown', function (e) {
-      if ($('#adsSec').hidden) return;
+    // קיצורי מקלדת — מאזין גלובלי על document. mount() קורא ל-initInteraction()
+    // בכל כניסה למסך (ה-DOM נבנה מחדש בכל ניווט ב-SPA), אז מסירים את הקודם לפני
+    // שמוסיפים חדש — בלי זה Ctrl+Z/Del היו מוכפלים אחרי ביקור שני במסך.
+    if (state._onKeydown) document.removeEventListener('keydown', state._onKeydown);
+    state._onKeydown = function (e) {
+      var pg = document.getElementById('page-ads');
+      if (!pg || !pg.classList.contains('active')) return;
       var tag = (e.target.tagName || '').toLowerCase();
       var editing = tag === 'input' || tag === 'textarea' || tag === 'select' ||
                     (e.target.isContentEditable);
@@ -655,7 +841,8 @@
         updateSelected({ x: el.x, y: el.y });
         renderProps();
       }
-    });
+    };
+    document.addEventListener('keydown', state._onKeydown);
   }
 
   /* ── ייצוא PNG ═════════════════════════════════════════════ */
@@ -861,7 +1048,7 @@
 
   function sendMail() {
     var to = $('#aeMailTo').value.trim();
-    var subj = $('#aeMailSubj').value.trim() || 'מודעה מהמניין';
+    var subj = $('#aeMailSubj').value.trim() || 'מודעה ממכינה בית התלמוד';
     var body = $('#aeMailBody').value;
     if (!to) { $('#aeMailTo').focus(); return; }
     hint('מכין קבצים ופותח את תוכנת המייל…');
@@ -874,6 +1061,30 @@
       closeMailModal();
       hint('המייל נפתח והקבצים הורדו. גרור אותם לחלון המייל.', 'ok');
     });
+  }
+
+  /* ── שמירת תבנית חדשה (בענן, ב-ads_custom_templates — משותפת לכולם,
+     לא רק למחשב הזה) ═══════════════════════════════════════════ */
+  function openTplModal() {
+    $('#aeTplModal').hidden = false;
+    var inp = $('#aeTplName'); inp.value = '';
+    setTimeout(function () { inp.focus(); }, 50);
+  }
+  function closeTplModal() { $('#aeTplModal').hidden = true; }
+  function saveAsTemplate() {
+    var name = $('#aeTplName').value.trim();
+    if (!name) { $('#aeTplName').focus(); return; }
+    if (!window.store) { hint('אין חיבור לשרת — לא ניתן לשמור תבנית כרגע.', 'err'); return; }
+    var row = { name: name, canvas: clone(state.canvas), elements: clone(state.elements) };
+    window.store.add('ads_custom_templates', row).then(function (r) {
+      if (!r || !r.ok) { hint('שמירת התבנית נכשלה.', 'err'); return; }
+      closeTplModal();
+      return loadTemplates().then(function () {
+        var newRow = r.data && r.data[0];
+        if (newRow) $('#aeTpl').value = 'custom-' + newRow.id;
+        hint('התבנית "' + name + '" נשמרה. היא תופיע ברשימת "תבנית" לכולם, גם במחשבים אחרים.', 'ok');
+      });
+    }).catch(function () { hint('שמירת התבנית נכשלה.', 'err'); });
   }
 
   /* ── שמירה / פתיחה של קובץ פרויקט ═══════════════════════════ */
@@ -943,6 +1154,9 @@
     $('#aeSendMail').addEventListener('click', openMailModal);
     $('#aeMailCancel').addEventListener('click', closeMailModal);
     $('#aeMailSend').addEventListener('click', sendMail);
+    $('#aeSaveTpl').addEventListener('click', openTplModal);
+    $('#aeTplCancel').addEventListener('click', closeTplModal);
+    $('#aeTplSave').addEventListener('click', saveAsTemplate);
     $('#aeBgColor').addEventListener('input', function (e) {
       state.canvas.bg = e.target.value;
       $('#aeCanvas').style.background = state.canvas.bg;
@@ -1035,52 +1249,46 @@
       });
     }
 
-    // סקייל מחדש בשינוי גודל חלון
-    window.addEventListener('resize', function () {
-      if (!$('#adsSec').hidden) resizeCanvas();
-    });
+    // סקייל מחדש בשינוי גודל חלון — remove+add כדי לא לערום מאזינים בכל mount
+    if (state._onResize) window.removeEventListener('resize', state._onResize);
+    state._onResize = function () {
+      var pg = document.getElementById('page-ads');
+      if (pg && pg.classList.contains('active')) resizeCanvas();
+    };
+    window.addEventListener('resize', state._onResize);
   }
 
-  /* ── אתחול ═════════════════════════════════════════════════ */
-  function init() {
-    if (state.inited) return;
-    state.inited = true;
+  /* ── אתחול ═════════════════════════════════════════════════
+     נקרא מ-showPage('ads') של ה-SPA (app.js) — לא עוד עמוד HTML נפרד. כל
+     ניווט למסך מבצע target.innerHTML = 'טוען…' ואז קורא ל-render(id), ולכן
+     ה-DOM של #adsSec נבנה מחדש בכל ביקור; bind()/initInteraction() בטוחים
+     לריצה חזרה (ראו ה-remove-before-add על שני המאזינים הגלובליים למעלה).
+     state.templates/canvas/elements נשארים בזיכרון בין ביקורים באותה טעינת-עמוד. */
+  function mount(target) {
+    target.innerHTML = ADS_SECTION_HTML;
     bind();
     initInteraction();
-
-    var restored = loadDraft();
-    loadTemplates().then(function () {
-      if (!restored) {
-        applyTemplate('letterhead');  // ברירת מחדל = מודעת התרמה
-      } else {
-        resizeCanvas();
-        render();
-        pushHistory();
-        hint('שוחזר טיוטה מקומית. בחר תבנית מהתפריט אם רוצים להתחיל מחדש.', 'ok');
-      }
-    });
+    if (!state.templatesLoaded) {
+      var restored = loadDraft();
+      loadTemplates().then(function () {
+        state.templatesLoaded = true;
+        if (!restored) {
+          applyTemplate('letterhead');  // ברירת מחדל = בלאנק רשמי
+        } else {
+          resizeCanvas();
+          render();
+          renderProps();
+          pushHistory();
+          hint('שוחזר טיוטה מקומית. בחר תבנית מהתפריט אם רוצים להתחיל מחדש.', 'ok');
+        }
+      });
+    } else {
+      resizeCanvas();
+      render();
+      renderProps();
+    }
   }
 
-  // הפעל כשה-panel של המודעות נחשף
-  function watchPanel() {
-    var sec = $('#adsSec');
-    if (!sec) return;
-    var mo = new MutationObserver(function () {
-      if (!sec.hidden && !state.inited) {
-        // המתן טיפה ל-CSS ולפריסה
-        setTimeout(init, 30);
-      } else if (!sec.hidden) {
-        setTimeout(resizeCanvas, 30);
-      }
-    });
-    mo.observe(sec, { attributes: true, attributeFilter: ['hidden'] });
-    // אם כבר מוצג (אחרי טעינה + sessionStorage)
-    if (!sec.hidden) setTimeout(init, 60);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', watchPanel);
-  } else {
-    watchPanel();
-  }
+  window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
+  window.PAGE_RENDERERS.ads = mount;
 })();

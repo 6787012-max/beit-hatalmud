@@ -30,6 +30,9 @@
     // medications + form_responses יחד. לא שייך לשום מסך קיים.
     { id: 'trips',         label: 'טיולים',           icon: 'bi-signpost-split',  group: G2, color: '#0e7490' },
     { id: 'reports',       label: 'דשבורד ודוחות',    icon: 'bi-graph-up-arrow',  group: G3, color: '#34495e' },
+    // עורך מודעות והדפסות — עד 15/09/2026 היה עמוד HTML נפרד (ads-editor.html),
+    // מקושר מאייקון בודד בכותרת. הועבר להיות מסך רגיל כמו כל השאר (בקשת יוסף).
+    { id: 'ads',           label: 'עורך מודעות',      icon: 'bi-easel2',          group: G3, color: '#a87830' },
     // מסך "קופה כללית" (income/expenses) הוסר 25/08/2026 — תוכנו הועבר לקופה
     // הקטנה של בית התלמוד (migration_cashbox_to_petty.sql). הטבלאות נשארו במסד.
     // קופה קטנה — כמה קופות בתוכו (בית התלמוד · משמרת חיים).

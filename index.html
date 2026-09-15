@@ -13,6 +13,7 @@
   <link href="vendor/heebo.css" rel="stylesheet">
   <link rel="stylesheet" href="vendor/bootstrap-icons.css">
   <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/ads-editor.css">
   <!-- שכבת הנתונים המאובטחת (Supabase) — טעונה לפני הסקריפטים שלנו.
        מוגשת מקומית ולא מ-CDN: כשה-CDN לא היה נגיש (סינון תוכן/רשת איטית)
        window.sb נשאר null, המערכת נפלה בשקט למאגר-דמו בזיכרון,
@@ -32,7 +33,6 @@
     <div class="appbar-actions">
       <span id="userInfo" class="user-info" hidden></span>
       <span id="statusDot" class="status" title="מצב מערכת"><span class="dot"></span><span id="statusTxt">…</span></span>
-      <a class="icon-btn" href="ads-editor.html" title="עורך מודעות והדפסות" aria-label="עורך מודעות"><i class="bi bi-easel"></i></a>
       <button class="icon-btn" id="quickDialBtn" title="חיוג מהיר" aria-label="חיוג מהיר"><i class="bi bi-telephone"></i></button>
       <button class="icon-btn" id="darkBtn" title="מצב לילה/יום" aria-label="החלף מצב תצוגה"><i class="bi bi-moon-stars"></i></button>
     </div>
@@ -118,6 +118,7 @@
   <script src="vendor/jspdf.umd.min.js" defer></script>
   <script src="js/pdf.js"></script>
   <script src="js/exporter.js"></script>
+  <script src="js/ads-editor.js"></script>
   <script src="vendor/xlsx-write-lite.js"></script>
   <script src="js/taitzer.js"></script>
   <script src="vendor/xlsx-lite.js"></script>

@@ -91,6 +91,7 @@
   position: relative; background: #F6F1E5; box-shadow: 0 8px 30px rgba(0,0,0,.18);
   transform-origin: top center; outline: none;
   width: 1240px; height: 1754px;
+  flex-shrink: 0; /* בלי זה flexbox מכווץ רק את הרוחב (לא הגובה) כשה-wrap צר מהדף — הדף נראה "צר" ומעוות */
   touch-action: none;
 }
 .ae-canvas:focus { box-shadow: 0 8px 30px rgba(0,0,0,.18), 0 0 0 3px rgba(168,120,48,.35); }
@@ -178,6 +179,11 @@
   display: flex; align-items: center; justify-content: center;
   z-index: 100; padding: 18px;
 }
+/* בלי זה: ל-".ae-modal{display:flex}" ול-UA-default "[hidden]{display:none}" יש
+   אותה ספציפיות, וסדר-המקור מכריע — כלל המחבר גובר, אז מודאל עם hidden עדיין
+   מוצג פתוח. זה בדיוק מה שיוסף דיווח ("לא מצליח לצאת מזה"): המודאל פתוח
+   מהרגע הראשון בלי שהוא לחץ על כלום. */
+.ae-modal[hidden] { display: none; }
 .ae-modal-box {
   background: #fff; border-radius: 14px; padding: 20px 22px;
   width: min(500px, 100%); max-height: 90dvh; overflow-y: auto;
