@@ -6,8 +6,12 @@
 -- נכתבת לכאן במקום. loadTemplates() ב-js/ads-editor.js מציג את שתי הרשימות
 -- מאוחדות: הקבועות קודם, אחריהן "התבניות שלנו".
 --
--- הרשאות: כל איש צוות רשאי לקרוא/לשמור/למחוק — זו ספריית עיצוב משותפת,
--- לא נתון רגיש כמו תלמיד/רפואי. בלי update (recreate-לא-edit, מספיק לצורך).
+-- הרשאות: כל איש צוות רשאי לקרוא/לשמור/לערוך/למחוק — זו ספריית עיצוב
+-- משותפת, לא נתון רגיש כמו תלמיד/רפואי.
+--
+-- 15/09/2026 (המשך אותו יום): נוסף update — יוסף ביקש גם "לערוך את הקיים
+-- כולל העיצוב", לא רק ליצור חדש. "עדכון תבנית" ב-UI טוען קנבס+elements
+-- חדשים לאותה שורה (PATCH לפי id), לא יוצר שורה נוספת.
 --
 -- אידמפוטנטי.
 
@@ -28,6 +32,8 @@ drop policy if exists ads_tpl_write on public.ads_custom_templates;
 create policy ads_tpl_write on public.ads_custom_templates for insert with check (public.is_staff());
 drop policy if exists ads_tpl_delete on public.ads_custom_templates;
 create policy ads_tpl_delete on public.ads_custom_templates for delete using (public.is_staff());
+drop policy if exists ads_tpl_update on public.ads_custom_templates;
+create policy ads_tpl_update on public.ads_custom_templates for update using (public.is_staff()) with check (public.is_staff());
 
-grant select, insert, delete on public.ads_custom_templates to authenticated;
+grant select, insert, update, delete on public.ads_custom_templates to authenticated;
 grant usage, select on sequence public.ads_custom_templates_id_seq to authenticated;

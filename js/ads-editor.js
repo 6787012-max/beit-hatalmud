@@ -192,12 +192,21 @@
     '</div>' +
     '<div class="ae-modal" id="aeTplModal" hidden>' +
       '<div class="ae-modal-box">' +
-        '<h3>שמירת התבנית הנוכחית</h3>' +
-        '<label class="fld"><span>שם התבנית</span><input id="aeTplName" type="text" placeholder="לדוגמה: הזמנה לאירוע"></label>' +
+        '<h3>שמירת תבנית</h3>' +
+        '<div id="aeTplUpdateRow" hidden>' +
+          '<button type="button" class="btn btn-g" id="aeTplUpdate" style="width:100%">עדכון התבנית "<span id="aeTplCurName"></span>"</button>' +
+          '<p class="hint">שומר את השינויים הנוכחיים (כולל העיצוב) לתוך התבנית הזו, בלי ליצור תבנית נוספת.</p>' +
+          '<hr>' +
+          '<p class="hint">או — לשמור בתור תבנית חדשה ונפרדת:</p>' +
+        '</div>' +
+        '<label class="fld"><span>שם תבנית חדשה</span><input id="aeTplName" type="text" placeholder="לדוגמה: הזמנה לאירוע"></label>' +
         '<p class="hint">התבנית תישמר בענן ותופיע ברשימת "תבנית" בפתח הבא — לכולם, לא רק במחשב הזה.</p>' +
-        '<div class="ae-btn-row" style="justify-content:flex-end;margin-top:10px">' +
-          '<button type="button" class="btn btn-s small" id="aeTplCancel">ביטול</button>' +
-          '<button type="button" class="btn btn-g small" id="aeTplSave">שמירה</button>' +
+        '<div class="ae-btn-row" style="justify-content:space-between;margin-top:10px">' +
+          '<button type="button" class="btn btn-x small" id="aeTplDelete" hidden>מחיקת התבנית הזו</button>' +
+          '<div class="ae-btn-row" style="margin-inline-start:auto">' +
+            '<button type="button" class="btn btn-s small" id="aeTplCancel">ביטול</button>' +
+            '<button type="button" class="btn btn-g small" id="aeTplSave">שמירה כחדשה</button>' +
+          '</div>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -297,6 +306,9 @@
       return e;
     });
     state.selectedId = null;
+    // תבנית מותאמת-אישית (לא אחת מהקבועות) — זוכרים אותה כדי ש"שמירה
+    // כתבנית" יוכל להציע "עדכון" (PATCH לאותה שורה) ולא רק "שמירה כחדשה".
+    state.loadedTemplate = t.custom ? { dbId: t.dbId, name: t.name } : null;
     resizeCanvas();
     render();
     renderProps();
@@ -1066,6 +1078,14 @@
   /* ── שמירת תבנית חדשה (בענן, ב-ads_custom_templates — משותפת לכולם,
      לא רק למחשב הזה) ═══════════════════════════════════════════ */
   function openTplModal() {
+    var loaded = state.loadedTemplate;
+    var row = $('#aeTplUpdateRow'), delBtn = $('#aeTplDelete');
+    if (loaded) {
+      row.hidden = false; delBtn.hidden = false;
+      $('#aeTplCurName').textContent = loaded.name;
+    } else {
+      row.hidden = true; delBtn.hidden = true;
+    }
     $('#aeTplModal').hidden = false;
     var inp = $('#aeTplName'); inp.value = '';
     setTimeout(function () { inp.focus(); }, 50);
@@ -1081,10 +1101,36 @@
       closeTplModal();
       return loadTemplates().then(function () {
         var newRow = r.data && r.data[0];
-        if (newRow) $('#aeTpl').value = 'custom-' + newRow.id;
+        if (newRow) { $('#aeTpl').value = 'custom-' + newRow.id; state.loadedTemplate = { dbId: newRow.id, name: name }; }
         hint('התבנית "' + name + '" נשמרה. היא תופיע ברשימת "תבנית" לכולם, גם במחשבים אחרים.', 'ok');
       });
     }).catch(function () { hint('שמירת התבנית נכשלה.', 'err'); });
+  }
+  // "עדכון תבנית" — כותב את הקנבס הנוכחי (כולל העיצוב) לתוך אותה שורה
+  // שממנה נטענה התבנית, במקום ליצור עותק חדש.
+  function updateCurrentTemplate() {
+    var loaded = state.loadedTemplate; if (!loaded) return;
+    if (!window.store) { hint('אין חיבור לשרת — לא ניתן לעדכן תבנית כרגע.', 'err'); return; }
+    var patch = { name: loaded.name, canvas: clone(state.canvas), elements: clone(state.elements) };
+    window.store.update('ads_custom_templates', loaded.dbId, patch).then(function (r) {
+      if (!r || !r.ok) { hint('עדכון התבנית נכשל.', 'err'); return; }
+      closeTplModal();
+      return loadTemplates().then(function () {
+        $('#aeTpl').value = 'custom-' + loaded.dbId;
+        hint('התבנית "' + loaded.name + '" עודכנה.', 'ok');
+      });
+    }).catch(function () { hint('עדכון התבנית נכשל.', 'err'); });
+  }
+  function deleteCurrentTemplate() {
+    var loaded = state.loadedTemplate; if (!loaded) return;
+    if (!window.store) { hint('אין חיבור לשרת — לא ניתן למחוק תבנית כרגע.', 'err'); return; }
+    if (!window.confirm('למחוק את התבנית "' + loaded.name + '"? אי אפשר לשחזר.')) return;
+    window.store.remove('ads_custom_templates', loaded.dbId).then(function (r) {
+      if (!r || !r.ok) { hint('מחיקת התבנית נכשלה.', 'err'); return; }
+      closeTplModal();
+      state.loadedTemplate = null;
+      return loadTemplates().then(function () { hint('התבנית נמחקה.', 'ok'); });
+    }).catch(function () { hint('מחיקת התבנית נכשלה.', 'err'); });
   }
 
   /* ── שמירה / פתיחה של קובץ פרויקט ═══════════════════════════ */
@@ -1157,6 +1203,8 @@
     $('#aeSaveTpl').addEventListener('click', openTplModal);
     $('#aeTplCancel').addEventListener('click', closeTplModal);
     $('#aeTplSave').addEventListener('click', saveAsTemplate);
+    $('#aeTplUpdate').addEventListener('click', updateCurrentTemplate);
+    $('#aeTplDelete').addEventListener('click', deleteCurrentTemplate);
     $('#aeBgColor').addEventListener('input', function (e) {
       state.canvas.bg = e.target.value;
       $('#aeCanvas').style.background = state.canvas.bg;
