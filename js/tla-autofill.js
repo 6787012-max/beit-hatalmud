@@ -197,7 +197,7 @@
       systemInstruction: { parts: [{ text: SYS }] },
       contents: [{ parts: parts }],
       generationConfig: {
-        temperature: 0.1, maxOutputTokens: 8000,
+        temperature: 0.1, maxOutputTokens: 32000,
         responseMimeType: 'application/json', responseSchema: SCHEMA,
       },
     };
@@ -230,8 +230,17 @@
       }
       await new Promise(res => setTimeout(res, 2500 * (attempt + 1)));
     }
-    const txt = ((((d.candidates || [])[0] || {}).content || {}).parts || [])
+    const cand = (d.candidates || [])[0] || {};
+    const txt = (((cand.content || {}).parts) || [])
       .map(p => p.text || '').join('').trim();
+    // ⚠️ gemini-2.5-flash הוא מודל-חשיבה, ו-thinking נספר בתוך maxOutputTokens.
+    // עם 8000 אסימונים, אבחון ארוך (30K תווים) שרף את התקציב על החשיבה,
+    // ה-JSON נחתך באמצע, והמשתמשת ראתה "התשובה מהמודל אינה JSON תקין" —
+    // הודעה שנשמעת כמו קובץ פגום ושולחת לחפש במקום הלא נכון. 24/09/2026:
+    // התקרה הועלתה ל-32000, והמקרה הזה מקבל הודעה שאומרת מה באמת קרה.
+    if (cand.finishReason === 'MAX_TOKENS') {
+      throw new Error('המסמך ארוך מדי לניתוח בבת אחת');
+    }
     if (!txt) throw new Error('לא התקבלה תשובה מהמודל');
     try {
       return JSON.parse(txt);
