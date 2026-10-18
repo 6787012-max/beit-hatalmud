@@ -17,15 +17,15 @@
         '<div class="login-logo"><img src="img/logo.png" alt="לוגו המכינה" class="login-logo-img"></div>' +
         '<h2>כניסה למערכת</h2>' +
         '<p class="login-sub">מערכת מעקב — מכינה בית התלמוד</p>' +
-        '<label class="lbl">שם משתמש</label>' +
-        '<input type="text" id="loginTz" class="inp" placeholder="השם המלא שלך" autocomplete="username">' +
+        '<label class="lbl">' + (DEMO ? 'שם משתמש' : 'מספר טלפון') + '</label>' +
+        '<input type="text" id="loginTz" class="inp" placeholder="' + (DEMO ? 'השם המלא שלך' : 'מספר הטלפון שלך') + '" autocomplete="username"' + (DEMO ? '' : ' inputmode="tel"') + '>' +
         '<label class="lbl">סיסמה</label>' +
         '<input type="password" id="loginPw" class="inp" placeholder="סיסמה (בפעם הראשונה — מספר הטלפון)" autocomplete="current-password">' +
         '<button class="btn-primary" id="loginBtn"><i class="bi bi-box-arrow-in-left"></i> כניסה</button>' +
         '<div id="loginMsg" class="login-msg"></div>' +
         (DEMO
           ? '<div class="demo-note" style="margin-top:14px"><i class="bi bi-info-circle"></i> הדגמה — כניסה בשם + טלפון כסיסמה. מנהל: <b>עמנואל רקובסקי</b> / <b>0548451402</b></div>'
-          : '<p class="login-hint">כניסה בשם; סיסמה ראשונית — מספר הטלפון. אין גישה? פנה למנהל.</p>') +
+          : '<p class="login-hint">כניסה במספר הטלפון; בפעם הראשונה הסיסמה היא אותו מספר. אין גישה? פנה למנהל.</p>') +
       '</div></div>';
     $('#pages').appendChild(sec);
     $('#loginBtn').addEventListener('click', doLogin);
@@ -36,7 +36,7 @@
     const id = ($('#loginTz').value || '').trim();
     const pw = $('#loginPw').value || '';
     const msg = $('#loginMsg');
-    if (!id || !pw) { msg.textContent = 'נא להזין שם וסיסמה.'; return; }
+    if (!id || !pw) { msg.textContent = DEMO ? 'נא להזין שם וסיסמה.' : 'נא להזין מספר טלפון וסיסמה.'; return; }
     msg.textContent = 'מתחבר…';
     if (DEMO) {
       const users = await window.store.list('users');

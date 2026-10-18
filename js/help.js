@@ -35,7 +35,7 @@
     const g = G();
     const entry = screenId ? g.screens[screenId] : null;
     let body = '';
-    if (entry) body = guideHtml(entry);
+    if (entry) body = guideHtml(entry) + (entry.video ? '<div style="margin-top:14px;text-align:center"><a href="' + esc(entry.video) + '" class="btn-primary sm" style="text-decoration:none"><i class="bi bi-play-circle"></i> סרטון הדרכה למסך הזה</a></div>' : '');
     else body = guideHtml(g.common) + '<p style="margin-top:14px"><a href="hadracha/" style="color:var(--primary);font-weight:700"><i class="bi bi-play-circle"></i> לצפייה בסרטוני ההדרכה ›</a></p>';
     // תמיד מוסיפים גישה מהירה לכל ההדרכה
     body += '<div style="margin-top:14px;text-align:center"><a href="hadracha/" class="btn-ghost sm" style="text-decoration:none"><i class="bi bi-collection-play"></i> כל ההדרכות והסרטונים</a></div>';
