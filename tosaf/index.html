@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>תוסף "מעקב" — התקנה לצוות המכינה</title>
+<style>
+  :root{--acc:#2f6f6b;--acc-d:#245955;--bg:#f4f6f5;--ink:#1d2726;--muted:#5f6b6a;--line:#e2e7e6}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Segoe UI",Arial,sans-serif}
+  .hero{background:linear-gradient(160deg,var(--acc),var(--acc-d));color:#fff;padding:34px 20px 70px;text-align:center}
+  .mark{display:inline-grid;place-items:center;width:64px;height:64px;border-radius:18px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);font-size:34px;font-weight:800}
+  h1{margin:12px 0 4px;font-size:28px}
+  .hero p{margin:0;opacity:.9}
+  main{max-width:720px;margin:-46px auto 40px;padding:0 16px}
+  .card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.07);padding:22px 24px;margin-bottom:16px}
+  .dl{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .dl div{flex:1;min-width:220px}
+  .dl b{font-size:18px}
+  .dl small{display:block;color:var(--muted)}
+  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:#fff;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:12px;font-size:17px}
+  .btn:hover{background:var(--acc-d)}
+  h2{margin:0 0 12px;font-size:19px}
+  ol{margin:0;padding-inline-start:22px}
+  li{margin-bottom:9px}
+  code{background:#eef2f1;border-radius:6px;padding:1px 7px;direction:ltr;display:inline-block;font-family:Consolas,monospace;font-size:14px}
+  .warn{background:#fdf3e6;border-radius:10px;padding:8px 12px;color:#8a4a0a;font-size:14.5px;margin-top:6px}
+  ul{margin:0;padding-inline-start:22px}
+  .foot{text-align:center;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header class="hero">
+  <span class="mark">מ</span>
+  <h1>תוסף "מעקב" לכרום</h1>
+  <p>מערכת המעקב של מכינת בית התלמוד — בלחיצה אחת מכל אתר</p>
+</header>
+<main>
+  <section class="card dl">
+    <div><b>גרסה 2.2.0</b><small>Chrome או Edge · כניסה עם מספר הטלפון והסיסמה של מערכת המעקב</small></div>
+    <a class="btn" href="maakav-bht-2.2.0.zip" download>⬇ הורדת התוסף</a>
+  </section>
+
+  <section class="card">
+    <h2>התקנה (5 דקות, פעם אחת)</h2>
+    <ol>
+      <li>מורידים את הקובץ בכפתור למעלה.</li>
+      <li>מחלצים אותו (לחיצה ימנית ← "חלץ הכל") <b>לתיקייה קבועה</b>, למשל "המסמכים".
+        <div class="warn">לא למחוק ולא להזיז את התיקייה אחר כך — התוסף נטען ממנה.</div></li>
+      <li>בכרום כותבים בשורת הכתובת: <code>chrome://extensions</code></li>
+      <li>מדליקים בפינה את המתג <b>"מצב פיתוח"</b> (Developer mode).</li>
+      <li>לוחצים <b>"טעינת פריט לא ארוז"</b> (Load unpacked) ובוחרים את התיקייה <b>מעקב-בית-התלמוד</b> שחולצה.</li>
+      <li>לוחצים על סמל חלק הפאזל ליד שורת הכתובת ← <b>נעיצה</b> ליד "מעקב".</li>
+      <li>פותחים אתר כלשהו, לוחצים על הבועה הירוקה בפינה ונכנסים עם <b>מספר הטלפון והסיסמה של מערכת המעקב</b>.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>שימוש</h2>
+    <ul>
+      <li><b>הבועה</b> בפינת כל אתר פותחת וסוגרת את החלון. אפשר לגרור אותה ואת החלון לכל מקום.</li>
+      <li><b>Alt+M</b> פותח וסוגר מכל אתר. <b>/</b> קופץ לחיפוש תלמיד.</li>
+      <li>בפנים: כרטיס תלמיד, דיווחים, דרכון, הדפסות (יתרה, דיווח הדפסה וטעינה בנדרים פלוס) והוספת תלמיד.</li>
+      <li>הבועה לא מופיעה בדף "כרטיסייה חדשה" ובדפי ההגדרות של כרום — שם לוחצים על הסמל ליד שורת הכתובת.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>כשיש גרסה חדשה</h2>
+    <p style="margin:0">מורידים מכאן שוב, מחליפים את התוכן של התיקייה, ובדף <code>chrome://extensions</code> לוחצים על <b>החץ העגול</b> בכרטיס של "מעקב".</p>
+  </section>
+  <p class="foot">מכינת בית התלמוד · בעיה בהתקנה? פונים למזכירות</p>
+</main>
+</body>
+</html>
