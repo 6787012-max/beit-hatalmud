@@ -38,6 +38,9 @@
     // קופה קטנה — כמה קופות בתוכו (בית התלמוד · משמרת חיים).
     // "משמרת חיים" היא גוף אחר לגמרי; אין שום סיכום שחוצה קופות.
     { id: 'pettycash',     label: 'קופה קטנה',        icon: 'bi-receipt-cutoff',  group: G3, color: '#b45309' },
+    // הדפסות — יתרת כסף להדפסה לכל איש צוות. היה גיליון "נתוני הדפסות" + טופס גוגל
+    // נפרדים, עבר לכאן 18/10/2026 (בקשת יוסף). איש צוות רגיל רואה רק את שלו.
+    { id: 'prints',        label: 'הדפסות',           icon: 'bi-printer-fill',    group: G3, color: '#4338ca' },
     { id: 'yemot',         label: 'קו ימות המשיח',     icon: 'bi-telephone-inbound', group: G3, color: '#0e7490', adminOnly: true },
     { id: 'voicereports',  label: 'דיווחים קוליים',    icon: 'bi-mic-fill',        group: G3, color: '#8e44ad', adminOnly: true },
     // דיוור להורים: מזכירה/מנהל בלבד (adminOnly). מייל + קול + צינתוק בערוץ אחד.

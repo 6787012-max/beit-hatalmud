@@ -15,6 +15,9 @@
       window.store.list('audit_log'), window.store.list('feedback'),
       window.store.list('categories'),
     ]);
+    // עותק קריא של סיסמאות הצוות — מנהל בלבד (RLS ב-migration_prints.sql). אצל מי שאינו מנהל חוזר ריק.
+    const pwMap = {};
+    if (window.sb) { const r = await window.db.list('staff_passwords', { order: 'set_at' }); (r.data || []).forEach(p => { pwMap[p.user_id] = p; }); }
     const clsName = id => { const c = classes.find(x => x.id == id); return c ? c.name : ''; };
     const userClasses = uid => access.filter(a => a.user_id == uid).map(a => a.class_id);
     page.innerHTML =
@@ -83,9 +86,20 @@
           ? '<span class="chip ok" title="הוחלפה ב-' + esc(String(u.pw_changed_at).slice(0, 10)) + '">הוחלפה</span>'
           : '<span class="chip off" style="color:#b45309;border-color:#b45309" title="עדיין מספר הטלפון">ברירת מחדל</span>';
         return '<tr><td>' + esc(u.name) + '</td><td>' + esc(u.phone || u.tz || '') + '</td><td><span class="chip ' + (u.role === 'מנהל' ? 'ok' : 'off') + '">' + esc(u.role) + '</span></td><td>' + cls + '</td>' +
-          '<td>' + pw + '</td>' +
+          '<td style="min-width:170px">' + pw + (window.sb ? ' <button class="mini" data-upw="' + u.id + '" title="הצג סיסמה"><i class="bi bi-eye"></i></button>' +
+            '<button class="mini" data-uset="' + u.id + '" title="שינוי סיסמה"><i class="bi bi-key"></i></button>' +
+            '<div class="tl-note" data-pwshow="' + u.id + '" style="display:none;direction:ltr;text-align:right;white-space:normal;max-width:260px"></div>' : '') + '</td>' +
           '<td class="row-act"><button class="mini" data-ucard="' + u.id + '" title="כרטיס איש צוות"><i class="bi bi-person-vcard"></i></button><button class="mini" data-uedit="' + u.id + '" title="עריכה"><i class="bi bi-pencil"></i></button><button class="mini danger" data-udel="' + u.id + '" title="מחיקה"><i class="bi bi-trash"></i></button></td></tr>';
       }).join('');
+      page.querySelectorAll('[data-upw]').forEach(b => b.addEventListener('click', () => {
+        const box = page.querySelector('[data-pwshow="' + b.dataset.upw + '"]'); if (!box) return;
+        if (box.style.display !== 'none') { box.style.display = 'none'; b.innerHTML = '<i class="bi bi-eye"></i>'; return; }
+        const rec = pwMap[b.dataset.upw];
+        box.innerHTML = rec ? '<b style="font-size:1rem;user-select:all">' + esc(rec.password) + '</b> <span dir="rtl">(' + esc(rec.source) + ', ' + esc(String(rec.set_at).slice(0, 10).split('-').reverse().join('/')) + ')</span>'
+          : '<span dir="rtl">לא ידועה — נקבעה לפני שהמערכת שמרה סיסמאות. אפשר לקבוע חדשה בכפתור המפתח.</span>';
+        box.style.display = ''; b.innerHTML = '<i class="bi bi-eye-slash"></i>';
+      }));
+      page.querySelectorAll('[data-uset]').forEach(b => b.addEventListener('click', () => setPassword(users.find(x => x.id == b.dataset.uset))));
       page.querySelectorAll('[data-ucard]').forEach(b => b.addEventListener('click', () => { if (window.cv3StaffCard) window.cv3StaffCard.open(b.dataset.ucard); }));
       page.querySelectorAll('[data-uedit]').forEach(b => b.addEventListener('click', () => openUserForm(users.find(u => u.id == b.dataset.uedit))));
       page.querySelectorAll('[data-udel]').forEach(b => b.addEventListener('click', async () => {
@@ -101,6 +115,31 @@
         else { await window.store.remove('users', u.id); const i = users.indexOf(u); if (i >= 0) users.splice(i, 1); }
         drawUsers(); window.UI.toast(LIVE ? 'המשתמש הושבת' : 'נמחק');
       }));
+    }
+    // קביעת סיסמה לאיש צוות ע"י המנהל (RPC admin_set_password, migration_prints.sql)
+    function setPassword(u) {
+      if (!u) return;
+      const gen = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return String(100000 + (a[0] % 900000)) + String.fromCharCode(97 + (a[0] % 26)) + String.fromCharCode(97 + ((a[0] >> 8) % 26)); };
+      const cur = pwMap[u.id];
+      const sm = window.UI.modal({
+        title: 'שינוי סיסמה — ' + esc(u.name), saveLabel: 'קביעת הסיסמה',
+        bodyHTML: '<div class="form-grid">' +
+          '<div class="fld fld-wide"><span>הסיסמה הנוכחית</span><div style="padding-top:6px">' + (cur ? '<b style="direction:ltr;user-select:all">' + esc(cur.password) + '</b>' : '<span class="tl-note">לא ידועה</span>') + '</div></div>' +
+          '<label class="fld fld-wide"><span>סיסמה חדשה * <small style="font-weight:400;color:var(--muted)">(6 תווים לפחות)</small></span>' +
+          '<div style="display:flex;gap:6px"><input class="inp mb0" id="np_pw" type="text" autocomplete="off" style="flex:1;direction:ltr">' +
+          '<button type="button" class="btn-ghost sm" id="np_gen" title="הצעת סיסמה"><i class="bi bi-shuffle"></i> הגרלה</button></div></label>' +
+          '<p class="login-hint fld-wide" style="margin:0">הסיסמה מתחלפת מיד. מסרו אותה לאיש הצוות; הוא לא יידרש להחליף אותה.</p></div>',
+        onSave: async (mel) => {
+          const np = mel.querySelector('#np_pw').value.trim();
+          if (np.length < 6) { window.UI.toast('הסיסמה חייבת להכיל 6 תווים לפחות', 'err'); return false; }
+          const { error } = await window.sb.rpc('admin_set_password', { p_user: u.id, p_password: np });
+          if (error) { window.UI.toast('השינוי נכשל: ' + error.message, 'err'); return false; }
+          pwMap[u.id] = { password: np, source: 'מנהל', set_at: new Date().toISOString() };
+          if (np !== String(u.phone || u.tz || '')) u.pw_changed_at = new Date().toISOString();
+          drawUsers(); window.UI.toast('הסיסמה של ' + u.name + ' הוחלפה'); return true;
+        },
+      });
+      sm.el.querySelector('#np_gen').addEventListener('click', () => { sm.el.querySelector('#np_pw').value = gen(); });
     }
     function openUserForm(existing) {
       const u = existing || {};
@@ -120,7 +159,7 @@
           (existing
             ? '<label class="fld"><span>סיסמה</span><span style="display:flex;align-items:center;gap:6px;padding-top:7px">' +
                 '<input type="checkbox" id="u_pw_reset"> ' +
-                '<span style="font-weight:400;font-size:.85rem">אפס את דרישת הסיסמה — המשתמש יתבקש להחליף סיסמה חדשה בכניסה הבאה (לא קובע סיסמה בפועל, ולא ניתן להזין כאן סיסמה למשתמש קיים)</span></span></label>'
+                '<span style="font-weight:400;font-size:.85rem">אפס את דרישת הסיסמה — המשתמש יתבקש להחליף סיסמה חדשה בכניסה הבאה (לא קובע סיסמה בפועל. לקביעת סיסמה חדשה — כפתור המפתח <i class="bi bi-key"></i> בטבלת המשתמשים)</span></span></label>'
             : '<label class="fld"><span>סיסמה (ריק = הטלפון)</span>' +
                 '<div style="display:flex;gap:6px"><input class="inp mb0" id="u_pw" type="password" placeholder="סיסמה" style="flex:1">' +
                 '<button type="button" class="btn-ghost sm" id="u_pw_show" title="הצג/הסתר"><i class="bi bi-eye"></i></button></div></label>') +
@@ -186,6 +225,8 @@
             const upd = await window.store.update('profiles', uid, { name, role, tz: phone, perms, access_mode, active: true });
             if (upd && upd.ok === false) { window.UI.toast('המשתמש נוצר אך עדכון הפרופיל נכשל: ' + (upd.error || ''), 'err'); }
             users.push({ id: uid, name, phone, tz: phone, role, perms, access_mode });
+            // שומר עותק של הסיסמה הראשונית אצל המנהל (קובע מחדש את אותה סיסמה דרך ה-RPC)
+            try { const sp = await window.sb.rpc('admin_set_password', { p_user: uid, p_password: password }); if (!sp.error) pwMap[uid] = { password, source: password === phone ? 'ברירת מחדל' : 'מנהל', set_at: new Date().toISOString() }; } catch (_) {}
           }
           const chosen = [...mel.querySelectorAll('#classGrid input:checked')].map(c => Number(c.value));
           // user_class_access הוא מפתח מורכב ללא עמודת id — remove לפי id לא מוחק כלום,

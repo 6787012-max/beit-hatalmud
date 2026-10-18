@@ -68,11 +68,12 @@
 
   // יכולות לפי תפקיד (בקשת עמנואל): מסכים מותרים + מצב (מלא/צפייה-בלבד/הזנה-בלבד).
   function roleCaps(role) {
-    const money = ['pettycash', 'exporter', 'trips', 'ads'];
+    // prints — כל איש צוות רואה שם רק את היתרה שלו (RLS), ולכן הוא אצל כולם.
+    const money = ['pettycash', 'exporter', 'trips', 'ads', 'prints'];
     // מלמד: כל מעקב הלמידה — מעקב, נוכחות, מבחנים, מעקב קריאה ודרכון.
     // **בלי תל"א**: זו תכנית חינוכית אישית שנכתבת ע"י המחנך והצוות הרב-מקצועי.
-    const entry = ['behavior', 'followup', 'attendance', 'tests', 'readassess', 'passport', 'weekly'];
-    const nonMoney = ['behavior', 'followup', 'attendance', 'tests', 'readassess', 'weekly', 'tla', 'passport', 'students', 'medical', 'forms', 'calendar', 'trips', 'reports', 'exporter', 'ads'];
+    const entry = ['behavior', 'followup', 'attendance', 'tests', 'readassess', 'passport', 'weekly', 'prints'];
+    const nonMoney = ['behavior', 'followup', 'attendance', 'tests', 'readassess', 'weekly', 'tla', 'passport', 'students', 'medical', 'forms', 'calendar', 'trips', 'reports', 'exporter', 'ads', 'prints'];
     switch (role) {
       case 'מנהל':  return { perms: null, mode: 'full', scoped: false };          // הכל + שינויים + כספים
       case 'מפקח':  return { perms: null, mode: 'readonly', scoped: false };       // הכל, ללא שינויים
@@ -168,7 +169,7 @@
       bodyHTML: intro + '<div class="form-grid">' +
         '<label class="fld fld-wide"><span>סיסמה חדשה *</span><input class="inp mb0" id="cp_new" type="password" autocomplete="new-password"></label>' +
         '<label class="fld fld-wide"><span>אימות סיסמה *</span><input class="inp mb0" id="cp_conf" type="password" autocomplete="new-password"></label>' +
-        '<div class="fld fld-wide"><span class="login-hint" style="margin:0">6 תווים לפחות, ולא מספר הטלפון.</span></div>' +
+        '<div class="fld fld-wide"><span class="login-hint" style="margin:0">6 תווים לפחות, ולא מספר הטלפון. שימו לב: מנהל המערכת יכול לצפות בסיסמה — אל תשתמשו בסיסמה שיש לכם במקום אחר.</span></div>' +
         '</div>',
       onClose: opts.onClose,
       onSave: async (mel) => {
@@ -187,6 +188,8 @@
           // מתריעים על כך במפורש במקום "הצליח" מטעה.
           let marked = false;
           for (let i = 0; i < 3 && !marked; i++) {
+            // עותק לעיני המנהל (staff_passwords). נרשם רק אם תואם ל-hash האמיתי; כישלון לא חוסם.
+            try { await window.sb.rpc('pw_record_own', { p_password: p1 }); } catch (_) {}
             try { const r = await window.sb.rpc('pw_mark_changed'); marked = r.data === true; }
             catch (_) { marked = false; }
             if (!marked && i < 2) await new Promise(res => setTimeout(res, 400));
