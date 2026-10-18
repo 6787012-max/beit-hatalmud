@@ -272,3 +272,148 @@ select u.id, split_part(u.email, '@', 1), 'ברירת מחדל', now()
  where u.email like '%@bht.co.il'
    and u.encrypted_password = extensions.crypt(split_part(u.email, '@', 1), u.encrypted_password)
 on conflict (user_id) do nothing;
+
+-- ════════════════════ חלק ג: טעינה אוטומטית מנדרים פלוס ════════════════════
+-- (18/10/2026, בקשת יוסף: "שיוטען אוטומטית מטעינות ישירות של נדרים פלוס, וגם טעינה ידנית".)
+-- הזרימה: הרב לוחץ "טעינה בנדרים פלוס" → דף התשלום של המכינה (מוסד 7009572) עם
+-- קטגוריה "הדפסות" נעולה והערה "הדפסות #<staff_id>" → נדרים שולחים Webhook (POST JSON,
+-- פעם אחת בלבד) ל-Edge Function `nedarim-print` → print_nedarim_ingest() כאן.
+-- זיהוי איש הצוות: #מספר בהערות → ת"ז → טלפון → שם מלא (רק התאמה יחידה). מה שלא זוהה,
+-- או הגיע מכתובת IP שאינה של נדרים, נשמר כ"ממתין לשיוך" ולא נטען — המשרד משייך ידנית.
+-- ⚠️ לנדרים יש כתובת Webhook אחת למוסד ("עוד > Webhook"). אם כבר מוגדרת שם כתובת של
+-- מערכת אחרת — הגדרת שלנו תדרוס אותה.
+
+alter table public.print_credits add column if not exists source text not null default 'ידני';
+alter table public.print_credits add column if not exists nedarim_tx text unique;
+update public.print_credits set source = 'גיליון' where source = 'ידני' and note like 'יתרת טעינות מצטברת%';
+
+create table if not exists public.print_nedarim (
+  id         int primary key default 1 check (id = 1),
+  mosad      text not null default '7009572',
+  groupe     text not null default 'הדפסות',
+  secret     text not null,
+  updated_at timestamptz not null default now()
+);
+insert into public.print_nedarim (id, secret) values (1, encode(extensions.gen_random_bytes(16), 'hex'))
+on conflict (id) do nothing;
+alter table public.print_nedarim enable row level security;
+drop policy if exists print_nedarim_office on public.print_nedarim;
+create policy print_nedarim_office on public.print_nedarim for all
+  using (public.is_admin() or public.my_role() = 'מזכירה')
+  with check (public.is_admin() or public.my_role() = 'מזכירה');
+
+-- מה שכל איש צוות צריך כדי לבנות את קישור התשלום — בלי הסוד.
+create or replace function public.print_nedarim_link() returns table(mosad text, groupe text, staff_id bigint, name text)
+  language sql stable security definer set search_path = public as
+$$ select n.mosad, n.groupe, s.id, trim(coalesce(s.first_name, '') || ' ' || coalesce(s.last_name, ''))
+     from public.print_nedarim n left join public.staff s on s.id = public.my_staff_id()
+    where n.id = 1 and auth.uid() is not null $$;
+revoke all on function public.print_nedarim_link() from public, anon;
+grant execute on function public.print_nedarim_link() to authenticated;
+
+create table if not exists public.print_nedarim_payments (
+  id          bigint generated always as identity primary key,
+  tx          text not null unique,
+  received_at timestamptz not null default now(),
+  paid_at     timestamptz,
+  amount      numeric(10,2),
+  currency    text,
+  client_name text,
+  phone       text,
+  zeout       text,
+  groupe      text,
+  comments    text,
+  staff_id    bigint references public.staff(id),
+  credit_id   bigint references public.print_credits(id) on delete set null,
+  status      text not null default 'ממתין לשיוך',   -- 'נטען' / 'ממתין לשיוך'
+  note        text,
+  raw         jsonb
+);
+alter table public.print_nedarim_payments enable row level security;
+drop policy if exists print_nedarim_payments_office on public.print_nedarim_payments;
+create policy print_nedarim_payments_office on public.print_nedarim_payments for select
+  using (public.is_print_office());
+
+-- נקרא רק מה-Edge Function (service_role). p_trusted = הפניה הגיעה מכתובת IP של נדרים.
+create or replace function public.print_nedarim_ingest(p jsonb, p_trusted boolean) returns text
+  language plpgsql security definer set search_path = public as
+$$
+declare
+  v_tx text := nullif(trim(coalesce(p->>'TransactionId', '')), '');
+  v_groupe text := coalesce(p->>'Groupe', '');
+  v_comments text := coalesce(p->>'Comments', p->>'Comment', '');
+  v_name text := trim(coalesce(p->>'ClientName', ''));
+  v_amount numeric; v_paid timestamptz; v_pid bigint; v_sid bigint; v_cid bigint; v_why text;
+  v_zeout text := ltrim(regexp_replace(coalesce(p->>'Zeout', ''), '[^0-9]', '', 'g'), '0');
+  v_phone text := right(regexp_replace(coalesce(p->>'Phone', ''), '[^0-9]', '', 'g'), 9);
+begin
+  if v_tx is null then return 'אין מזהה עסקה'; end if;
+  if v_groupe not like '%הדפס%' and v_comments not like '%הדפס%' then return 'לא קשור להדפסות'; end if;
+  begin v_amount := nullif(regexp_replace(coalesce(p->>'Amount', ''), '[^0-9.]', '', 'g'), '')::numeric;
+  exception when others then v_amount := null; end;
+  begin v_paid := to_timestamp(p->>'TransactionTime', 'DD/MM/YYYY HH24:MI:SS')::timestamp at time zone 'Asia/Jerusalem';
+  exception when others then v_paid := null; end;
+  insert into public.print_nedarim_payments (tx, paid_at, amount, currency, client_name, phone, zeout, groupe, comments, raw)
+    values (v_tx, coalesce(v_paid, now()), v_amount, p->>'Currency', v_name, p->>'Phone', p->>'Zeout', v_groupe, v_comments, p)
+  on conflict (tx) do nothing returning id into v_pid;
+  if v_pid is null then return 'כפול — כבר נקלט'; end if;
+
+  -- זיהוי: #מספר בהערות, ואחריו ת"ז / טלפון / שם — רק אם יש התאמה אחת בדיוק.
+  select s.id into v_sid from public.staff s
+   where s.id = nullif(substring(v_comments from '#([0-9]+)'), '')::bigint and s.active;
+  if v_sid is null and v_zeout <> '' then
+    select min(s.id) into v_sid from public.staff s where s.active
+      and ltrim(regexp_replace(coalesce(s.tz, ''), '[^0-9]', '', 'g'), '0') = v_zeout
+    having count(*) = 1;
+  end if;
+  if v_sid is null and length(v_phone) = 9 then
+    select min(s.id) into v_sid from public.staff s where s.active
+      and right(regexp_replace(coalesce(s.phone, ''), '[^0-9]', '', 'g'), 9) = v_phone
+    having count(*) = 1;
+  end if;
+  if v_sid is null and v_name <> '' then
+    select min(s.id) into v_sid from public.staff s where s.active
+      and v_name in (trim(coalesce(s.first_name, '') || ' ' || coalesce(s.last_name, '')),
+                     trim(coalesce(s.last_name, '') || ' ' || coalesce(s.first_name, '')))
+    having count(*) = 1;
+  end if;
+
+  v_why := case when not p_trusted then 'הגיע מכתובת שאינה של נדרים — לבדוק לפני שיוך'
+                when v_sid is null then 'לא זוהה איש צוות'
+                when coalesce(nullif(p->>'Currency', ''), '1') <> '1' then 'מטבע זר'
+                when v_amount is null or v_amount <= 0 then 'סכום לא תקין' end;
+  if v_why is not null then
+    update public.print_nedarim_payments set staff_id = v_sid, note = v_why where id = v_pid;
+    return 'ממתין לשיוך: ' || v_why;
+  end if;
+  insert into public.print_credits (staff_id, amount, credited_at, note, source, nedarim_tx, created_by)
+    values (v_sid, v_amount, (coalesce(v_paid, now()) at time zone 'Asia/Jerusalem')::date,
+            'נדרים פלוס · ' || coalesce(nullif(v_name, ''), '—') || ' · עסקה ' || v_tx, 'נדרים פלוס', v_tx, null)
+    returning id into v_cid;
+  update public.print_nedarim_payments set staff_id = v_sid, credit_id = v_cid, status = 'נטען' where id = v_pid;
+  return 'נטען';
+end $$;
+revoke all on function public.print_nedarim_ingest(jsonb, boolean) from public, anon, authenticated;
+grant execute on function public.print_nedarim_ingest(jsonb, boolean) to service_role;
+
+-- שיוך ידני של תשלום שלא זוהה (משרד בלבד).
+create or replace function public.print_assign_nedarim(p_id bigint, p_staff bigint) returns boolean
+  language plpgsql security definer set search_path = public as
+$$
+declare r record; v_cid bigint;
+begin
+  if not coalesce(public.is_admin() or public.my_role() = 'מזכירה', false) then raise exception 'אין הרשאה'; end if;
+  select * into r from public.print_nedarim_payments where id = p_id for update;
+  if r.id is null then raise exception 'התשלום לא נמצא'; end if;
+  if r.status = 'נטען' then raise exception 'התשלום כבר נטען'; end if;
+  if r.amount is null or r.amount <= 0 then raise exception 'סכום לא תקין'; end if;
+  insert into public.print_credits (staff_id, amount, credited_at, note, source, nedarim_tx)
+    values (p_staff, r.amount, (coalesce(r.paid_at, now()) at time zone 'Asia/Jerusalem')::date,
+            'נדרים פלוס · ' || coalesce(nullif(r.client_name, ''), '—') || ' · עסקה ' || r.tx || ' (שויך ידנית)', 'נדרים פלוס', r.tx)
+    returning id into v_cid;
+  update public.print_nedarim_payments set staff_id = p_staff, credit_id = v_cid, status = 'נטען',
+         note = coalesce(note || ' · ', '') || 'שויך ידנית' where id = p_id;
+  return true;
+end $$;
+revoke all on function public.print_assign_nedarim(bigint, bigint) from public, anon;
+grant execute on function public.print_assign_nedarim(bigint, bigint) to authenticated;

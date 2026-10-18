@@ -114,6 +114,8 @@
     // חלונית "מעקב דחוף" יושבת בתוך home-grid, יחד עם homeReports — שייכת
     // לבית של המנהל/משרד. אצל מורה היא מוצגת בתוך teacherHome עצמו (renderTeacherHome).
     const hg = document.querySelector('.home-grid');
+    // כרטיס "יתרת ההדפסות שלי" — לכל משתמש שמקושר לאיש צוות, בשני סוגי הבית (prints.js).
+    if (window.cv3Prints) window.cv3Prints.homeCard($('#homePrints'));
     if (isTeacher && window.renderTeacherHome) {
       tg.style.display = 'none'; th.style.display = '';
       if (hg) hg.style.display = 'none';

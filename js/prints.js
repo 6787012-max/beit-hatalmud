@@ -55,13 +55,15 @@
     }
     page.innerHTML = HEAD +
       '<div class="qr-card"><div class="card-h-row"><h3><i class="bi bi-wallet2"></i> היתרה שלי — ' + esc(me.name) + '</h3>' +
-        '<button class="btn-primary sm" id="prNew"><i class="bi bi-plus-lg"></i> דיווח הדפסה</button></div>' +
+        '<span style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn-ghost sm" id="prPay" target="_blank" rel="noopener" style="display:none"><i class="bi bi-credit-card"></i> טעינה בנדרים פלוס</a>' +
+        '<button class="btn-primary sm" id="prNew"><i class="bi bi-plus-lg"></i> דיווח הדפסה</button></span></div>' +
         '<div style="font-size:2rem;' + balCls(Number(me.balance)) + '">' + money(me.balance) + '</div>' +
         (Number(me.balance) < 0 ? '<p class="login-hint" style="color:#b91c1c;margin:4px 0 0">אין יתרה — יש לטעון במזכירות.</p>' : '') +
         '<p class="login-hint" style="margin:6px 0 0">נטען: ' + money(me.credits) + ' · הודפס: ' + money(me.used) + ' (' + Number(me.pages || 0).toLocaleString('he-IL') + ' עמודים)</p>' +
         pricesLine(st) + '</div>' +
       '<div class="qr-card"><h3><i class="bi bi-clock-history"></i> היסטוריה</h3><div id="prHist">טוען…</div></div>';
     page.querySelector('#prNew').addEventListener('click', () => jobForm(st, me, () => render(page)));
+    payLink().then(u => { const a = page.querySelector('#prPay'); if (u && a) { a.href = u; a.style.display = ''; } });
     drawHistory(page.querySelector('#prHist'), me, st, false, () => render(page));
   }
 
@@ -71,7 +73,11 @@
 
   // ── משרד: כל הצוות ───────────────────────────────────────────────────
   function renderOffice(page, st) {
-    const rows = st.rows;
+    // הפעילים למעלה (בקשת יוסף): צוות פעיל שיש לו תנועות, לפי ההדפסה האחרונה; אחריו
+    // צוות פעיל בלי תנועות; ובסוף מי שהושבת ונשארה לו יתרה.
+    const act = r => (Number(r.jobs) > 0 || Number(r.credits) !== 0) ? 1 : 0;
+    const rows = st.rows.slice().sort((a, b) => ((b.active ? 1 : 0) - (a.active ? 1 : 0)) || (act(b) - act(a)) ||
+      String(b.last_print || '').localeCompare(String(a.last_print || '')) || String(a.name).localeCompare(String(b.name), 'he'));
     const neg = rows.filter(r => Number(r.balance) < 0);
     const tot = k => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
     page.innerHTML = HEAD +
@@ -94,7 +100,8 @@
         '<p class="login-hint" style="margin:8px 2px 0">הרשימה = הצוות הפעיל במסך "ניהול צוות". איש צוות שהושבת ויש לו תנועות נשאר מוצג באפור.</p></div>' +
       '<div class="qr-card" id="prHistCard" style="display:none"><div class="card-h-row"><h3 id="prHistTitle"></h3><button class="btn-ghost sm" id="prHistClose"><i class="bi bi-x-lg"></i></button></div><div id="prHist"></div></div>' +
       (canManage() ? '<div class="qr-card"><h3><i class="bi bi-tags"></i> מחירים לעמוד</h3><div id="prPrices"></div></div>' +
-        '<div class="qr-card"><h3><i class="bi bi-qr-code"></i> קישור לדיווח ליד המדפסת</h3><div id="prLink">טוען…</div></div>' : pricesLine(st));
+        '<div class="qr-card"><h3><i class="bi bi-qr-code"></i> קישור לדיווח ליד המדפסת</h3><div id="prLink">טוען…</div></div>' +
+        '<div class="qr-card"><h3><i class="bi bi-credit-card-2-front"></i> טעינות מנדרים פלוס</h3><div id="prNedarim">טוען…</div></div>' : pricesLine(st));
 
     const reload = () => render(page);
     const byId = id => rows.find(r => String(r.staff_id) === String(id));
@@ -110,7 +117,7 @@
     const nj = page.querySelector('#prNewJob'); if (nj) nj.addEventListener('click', () => jobForm(st, null, reload, rows));
     const nc = page.querySelector('#prNewCredit'); if (nc) nc.addEventListener('click', () => creditForm(rows, null, reload));
     const im = page.querySelector('#prImport'); if (im) im.addEventListener('click', () => importForm(rows, reload));
-    if (canManage()) { drawPrices(page.querySelector('#prPrices'), st, reload); drawLink(page.querySelector('#prLink')); }
+    if (canManage()) { drawPrices(page.querySelector('#prPrices'), st, reload); drawLink(page.querySelector('#prLink')); drawNedarim(page.querySelector('#prNedarim'), rows, reload); }
   }
 
   // היסטוריה: טעינות והדפסות בציר אחד, עם יתרה מתגלגלת (מהישן לחדש, מוצג מהחדש).
@@ -243,6 +250,97 @@
       drawLink(host);
     });
   }
+
+  // ── נדרים פלוס ──────────────────────────────────────────────────────
+  // דף התשלום של המכינה עם קטגוריה "הדפסות" נעולה והערה "הדפסות #<staff_id>" — לפיה
+  // ה-Webhook (Edge Function nedarim-print) יודע למי לטעון. בלי staff → קישור כללי,
+  // והזיהוי נעשה לפי ת"ז / טלפון / שם.
+  function nedarimUrl(mosad, groupe, staffId, name) {
+    const q = new URLSearchParams({ mosad, Groupe: groupe, GroupeLock: '1', OnlyNormal: '1' });
+    if (staffId) q.set('Avour', groupe + ' #' + staffId);
+    if (name) q.set('ClientName', name);
+    return 'https://www.matara.pro/nedarimplus/online/?' + q.toString();
+  }
+  async function payLink() {
+    const r = await rpc('print_nedarim_link'); const x = r.data[0];
+    return x && x.staff_id ? nedarimUrl(x.mosad, x.groupe, x.staff_id, x.name) : null;
+  }
+  async function drawNedarim(host, rows, reload) {
+    const [cfgRes, pays] = await Promise.all([
+      window.sb.from('print_nedarim').select('*').eq('id', 1).maybeSingle(),
+      window.db.list('print_nedarim_payments', { order: 'received_at', asc: false }),
+    ]);
+    const cfg = cfgRes.data;
+    if (!cfg) { host.innerHTML = '<div class="tl-note">לא מוגדר (' + esc(cfgRes.error && cfgRes.error.message) + ')</div>'; return; }
+    const hook = ((window.CV3 || {}).SUPABASE_URL || '') + '/functions/v1/nedarim-print?s=' + cfg.secret;
+    const generic = nedarimUrl(cfg.mosad, cfg.groupe);
+    const list = (pays.data || []).slice(0, 40);
+    const waiting = list.filter(p => p.status !== 'נטען');
+    const nameOf = id => { const r = rows.find(x => String(x.staff_id) === String(id)); return r ? r.name : '—'; };
+    const opts = rows.filter(r => r.active).map(r => '<option value="' + r.staff_id + '">' + esc(r.name) + '</option>').join('');
+    host.innerHTML =
+      '<p class="login-hint" style="margin:0 0 8px">כל תשלום בנדרים פלוס בקטגוריה "' + esc(cfg.groupe) + '" (מוסד ' + esc(cfg.mosad) + ') נטען לבד ליתרה של איש הצוות. ' +
+        'תשלום שלא זוהה למי הוא שייך מחכה כאן לשיוך ידני. טעינה במזומן — בכפתור "טעינה" למעלה, כרגיל.</p>' +
+      '<div class="fld"><span>קישור תשלום כללי להדפסות (לשליחה לרב בלי כניסה למערכת)</span>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap"><input class="inp mb0" readonly value="' + esc(generic) + '" style="flex:1;min-width:220px;direction:ltr">' +
+        '<button class="btn-ghost sm" data-copy="g"><i class="bi bi-clipboard"></i> העתקה</button></div></div>' +
+      '<details style="margin-top:8px"><summary>הגדרה חד-פעמית בנדרים פלוס (כתובת Webhook)</summary>' +
+        '<p class="login-hint" style="margin:6px 0">בנדרים פלוס של המכינה: עוד ← Webhook ← בשדה "עדכוני עסקאות" מדביקים את הכתובת ושומרים. ' +
+        '<b>אם כבר רשומה שם כתובת אחרת — לא לדרוס בלי לבדוק למה היא משמשת.</b> הכתובת סודית; לא לשלוח אותה לאף אחד.</p>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap"><input class="inp mb0" readonly value="' + esc(hook) + '" style="flex:1;min-width:220px;direction:ltr">' +
+        '<button class="btn-ghost sm" data-copy="h"><i class="bi bi-clipboard"></i> העתקה</button></div></details>' +
+      '<h4 style="margin:12px 0 6px">תשלומים אחרונים' + (waiting.length ? ' · <span style="color:#b45309">' + waiting.length + ' ממתינים לשיוך</span>' : '') + '</h4>' +
+      (list.length ? '<div class="table-wrap"><table class="tbl"><thead><tr><th>תאריך</th><th>שם המשלם</th><th>סכום</th><th>מצב</th><th>איש צוות</th></tr></thead><tbody>' +
+        list.map(p => '<tr><td>' + fmtDT(p.paid_at || p.received_at) + '</td><td>' + esc(p.client_name || '—') + (p.comments ? '<div class="tl-note">' + esc(p.comments) + '</div>' : '') + '</td>' +
+          '<td>' + money(p.amount) + '</td>' +
+          '<td>' + (p.status === 'נטען' ? '<span class="chip ok">נטען</span>' : '<span class="chip off" style="color:#b45309;border-color:#b45309">ממתין</span>') +
+            (p.note ? '<div class="tl-note">' + esc(p.note) + '</div>' : '') + '</td>' +
+          '<td>' + (p.status === 'נטען' ? esc(nameOf(p.staff_id)) :
+            '<span style="display:flex;gap:4px"><select class="inp mb0" data-assel="' + p.id + '"><option value="">— בחר —</option>' + opts + '</select>' +
+            '<button class="btn-primary sm" data-assign="' + p.id + '">שיוך</button></span>') + '</td></tr>').join('') +
+        '</tbody></table></div>' : '<div class="tl-note">עדיין לא התקבלו תשלומים מנדרים פלוס.</div>');
+    host.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => {
+      navigator.clipboard.writeText(b.dataset.copy === 'h' ? hook : generic).then(() => window.UI.toast('הועתק'));
+    }));
+    host.querySelectorAll('[data-assel]').forEach(sel => {
+      const p = list.find(x => String(x.id) === sel.dataset.assel); if (p && p.staff_id) sel.value = String(p.staff_id);
+    });
+    host.querySelectorAll('[data-assign]').forEach(b => b.addEventListener('click', async () => {
+      const sid = Number(host.querySelector('[data-assel="' + b.dataset.assign + '"]').value);
+      if (!sid) { window.UI.toast('יש לבחור איש צוות', 'err'); return; }
+      const { error } = await window.sb.rpc('print_assign_nedarim', { p_id: Number(b.dataset.assign), p_staff: sid });
+      if (error) { window.UI.toast('השיוך נכשל: ' + error.message, 'err'); return; }
+      window.UI.toast('התשלום שויך ונטען'); reload();
+    }));
+  }
+
+  // ── כרטיס במסך הבית: היתרה שלי + שלוש התנועות האחרונות (לכל מי שמקושר לאיש צוות) ──
+  async function homeCard(host) {
+    if (!host) return;
+    host.innerHTML = '';
+    if (!window.sb || !(window.Auth && window.Auth.currentUser)) return;
+    const link = await rpc('print_nedarim_link'); const me = link.data[0];
+    if (!me || !me.staff_id) return;
+    const [bal, jobs, credits] = await Promise.all([
+      rpc('print_balances'),
+      window.sb.from('print_jobs').select('printed_at,qty,size,color,cost').eq('staff_id', me.staff_id).order('printed_at', { ascending: false }).limit(3),
+      window.sb.from('print_credits').select('credited_at,amount,source').eq('staff_id', me.staff_id).order('credited_at', { ascending: false }).limit(3),
+    ]);
+    const row = (bal.data || []).find(r => String(r.staff_id) === String(me.staff_id));
+    if (!row) return;
+    const ev = [].concat(
+      (jobs.data || []).map(j => ({ at: j.printed_at, t: j.qty + ' × ' + j.size + ' ' + j.color, a: -Number(j.cost) })),
+      (credits.data || []).map(c => ({ at: c.credited_at, t: 'טעינה' + (c.source === 'נדרים פלוס' ? ' בנדרים פלוס' : ''), a: Number(c.amount) }))
+    ).sort((x, y) => String(y.at).localeCompare(String(x.at))).slice(0, 3);
+    const b = Number(row.balance);
+    host.innerHTML = '<div class="qr-card" style="margin:0 0 14px"><div class="card-h-row"><h3><i class="bi bi-printer"></i> יתרת ההדפסות שלי</h3>' +
+      '<span style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn-ghost sm" target="_blank" rel="noopener" href="' + esc(nedarimUrl(me.mosad, me.groupe, me.staff_id, me.name)) + '"><i class="bi bi-credit-card"></i> טעינה בנדרים פלוס</a>' +
+      '<button class="btn-primary sm" onclick="showPage(\'prints\')"><i class="bi bi-list-ul"></i> כל ההיסטוריה</button></span></div>' +
+      '<div style="font-size:1.6rem;' + balCls(b) + '">' + money(b) + (b < 0 ? ' <span style="font-size:.9rem">— אין יתרה, יש לטעון</span>' : '') + '</div>' +
+      (ev.length ? '<div class="tl-note" style="margin-top:4px">' + ev.map(e => fmtD(e.at) + ' · ' + esc(e.t) + ' · ' + (e.a >= 0 ? '+' : '') + money(e.a)).join('<br>') + '</div>' : '') +
+      '</div>';
+  }
+  window.cv3Prints = { homeCard };
 
   // ── יבוא מטופס הגוגל הישן (לתקופת המעבר, עד שהקישור החדש מחליף אותו) ──
   // מורידים מהגיליון את לשונית התשובות (הלשונית ששמה רווח, עם "חותמת זמן") כ-CSV.
