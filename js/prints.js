@@ -256,10 +256,12 @@
   // ה-Webhook (Edge Function nedarim-print) יודע למי לטעון. בלי staff → קישור כללי,
   // והזיהוי נעשה לפי ת"ז / טלפון / שם.
   function nedarimUrl(mosad, groupe, staffId, name) {
-    const q = new URLSearchParams({ mosad, Groupe: groupe, GroupeLock: '1', OnlyNormal: '1' });
-    if (staffId) q.set('Avour', groupe + ' #' + staffId);
-    if (name) q.set('ClientName', name);
-    return 'https://www.matara.pro/nedarimplus/online/?' + q.toString();
+    // encodeURIComponent ולא URLSearchParams: האחרון מקודד רווח כ-'+', ונדרים שומרים את
+    // ה-'+' כמו שהוא בהערה ("הדפסות+#1", נראה בתשלום האמיתי הראשון, 18/10/2026).
+    const q = { mosad, Groupe: groupe, GroupeLock: '1', OnlyNormal: '1' };
+    if (staffId) q.Avour = groupe + ' #' + staffId;
+    if (name) q.ClientName = name;
+    return 'https://www.matara.pro/nedarimplus/online/?' + Object.keys(q).map(k => k + '=' + encodeURIComponent(q[k])).join('&');
   }
   async function payLink() {
     const r = await rpc('print_nedarim_link'); const x = r.data[0];
@@ -272,7 +274,8 @@
     ]);
     const cfg = cfgRes.data;
     if (!cfg) { host.innerHTML = '<div class="tl-note">לא מוגדר (' + esc(cfgRes.error && cfgRes.error.message) + ')</div>'; return; }
-    const hook = ((window.CV3 || {}).SUPABASE_URL || '') + '/functions/v1/nedarim-print?s=' + cfg.secret;
+    // בלי הסוד: הפונקציה מקבלת בלעדיו רק פניות מכתובות ה-IP של נדרים.
+    const hook = ((window.CV3 || {}).SUPABASE_URL || '') + '/functions/v1/nedarim-print';
     const generic = nedarimUrl(cfg.mosad, cfg.groupe);
     const list = (pays.data || []).slice(0, 40);
     const waiting = list.filter(p => p.status !== 'נטען');
@@ -286,7 +289,7 @@
         '<button class="btn-ghost sm" data-copy="g"><i class="bi bi-clipboard"></i> העתקה</button></div></div>' +
       '<details style="margin-top:8px"><summary>הגדרה חד-פעמית בנדרים פלוס (כתובת Webhook)</summary>' +
         '<p class="login-hint" style="margin:6px 0">בנדרים פלוס של המכינה: עוד ← Webhook ← בשדה "עדכוני עסקאות" מדביקים את הכתובת ושומרים. ' +
-        '<b>אם כבר רשומה שם כתובת אחרת — לא לדרוס בלי לבדוק למה היא משמשת.</b> הכתובת סודית; לא לשלוח אותה לאף אחד.</p>' +
+        '<b>אם כבר רשומה שם כתובת אחרת — לא לדרוס בלי לבדוק למה היא משמשת.</b></p>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap"><input class="inp mb0" readonly value="' + esc(hook) + '" style="flex:1;min-width:220px;direction:ltr">' +
         '<button class="btn-ghost sm" data-copy="h"><i class="bi bi-clipboard"></i> העתקה</button></div></details>' +
       '<h4 style="margin:12px 0 6px">תשלומים אחרונים' + (waiting.length ? ' · <span style="color:#b45309">' + waiting.length + ' ממתינים לשיוך</span>' : '') + '</h4>' +

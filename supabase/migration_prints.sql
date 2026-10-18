@@ -417,3 +417,17 @@ begin
 end $$;
 revoke all on function public.print_assign_nedarim(bigint, bigint) from public, anon;
 grant execute on function public.print_assign_nedarim(bigint, bigint) to authenticated;
+
+-- ── יומן פניות ל-Webhook (18/10/2026): כל פניה ל-nedarim-print נרשמת — גם כזו שלא קשורה
+-- להדפסות וגם כזו שנחסמה — כדי שאפשר יהיה לראות שנדרים באמת מגיעים ומאומתים. ──
+create table if not exists public.print_nedarim_log (
+  id          bigint generated always as identity primary key,
+  received_at timestamptz not null default now(),
+  trusted     boolean,
+  ip          text,
+  tx          text,
+  result      text
+);
+alter table public.print_nedarim_log enable row level security;
+drop policy if exists print_nedarim_log_office on public.print_nedarim_log;
+create policy print_nedarim_log_office on public.print_nedarim_log for select using (public.is_print_office());
