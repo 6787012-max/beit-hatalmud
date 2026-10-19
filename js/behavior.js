@@ -28,41 +28,163 @@
   const ageTxt = n => n === 1 ? 'יום אחד' : n === 2 ? 'יומיים' : n + ' ימים';
   const daysSince = iso => { if (!iso) return null; const t = Date.parse(String(iso).slice(0, 10)); return isNaN(t) ? null : Math.max(0, Math.round((Date.parse(today()) - t) / 86400000)); };
 
-  // ── שלב 1 (19/10/2026): חומרה ותזכורת בתוך הטופס המהיר ─────────────────
-  // 80% מהדיווחים נשמרו בלי חומרה ובלי תזכורת, כי השדות היו רק בטופס העריכה.
-  // לכן הדגלים יצאו כמעט תמיד צהובים והתזכורת שקופצת מעצמה לא קפצה אף פעם.
-  // אותו רכיב משמש את מסך המעקב ואת דף הבית של המורה (teacher.js).
-  // צבע לעולם לא לבד: לכל חומרה גם אייקון וגם מילה.
+  // ── גרסה 2 (19/10/2026): סוג אירוע, מצב ו"למעקב של" ─────────────────────
+  // migration_behavior_v2.sql. סוג קבוע במקום קטגוריה (הקטגוריות ערבבו "מה קרה"
+  // עם "של מי המעקב"), ומצב (log/open/in_progress/closed) במקום followup לבד.
+  // followup עדיין קיים ומסונכרן בשרת, ולכן מסכים ישנים ממשיכים לעבוד.
   const SEVS = [['נמוכה', 'lo', 'bi-arrow-down-circle'], ['רגילה', 'mid', 'bi-dash-circle'], ['גבוהה', 'hi', 'bi-exclamation-triangle']];
-  const REMINDERS = [[0, 'בלי'], [1, 'מחר'], [3, 'בעוד 3 ימים'], [7, 'בעוד שבוע']];
-  function quickExtrasHtml(p) {
-    return '<div class="qx" id="' + p + 'Qx">' +
-      '<div class="qx-row"><span class="qx-lbl">חומרה</span><div class="seg" data-qx="sev">' +
-        SEVS.map(s => '<button type="button" class="seg-b' + (s[0] === 'רגילה' ? ' on' : '') + '" data-v="' + s[0] + '" aria-pressed="' + (s[0] === 'רגילה') + '">' +
-          '<i class="bi ' + s[2] + ' sev-ic ' + s[1] + '"></i> ' + s[0] + '</button>').join('') + '</div></div>' +
-      '<div class="qx-row"><span class="qx-lbl"><i class="bi bi-alarm"></i> תזכורת</span><div class="seg" data-qx="due">' +
-        REMINDERS.map(r => '<button type="button" class="seg-b' + (r[0] === 0 ? ' on' : '') + '" data-v="' + r[0] + '" aria-pressed="' + (r[0] === 0) + '">' + r[1] + '</button>').join('') + '</div></div>' +
-    '</div>';
+  const FOLLOWS = [[0, 'לא, רק לתעד'], [1, 'בדיקה מחר'], [7, 'בעוד שבוע'], [14, 'שבועיים']];
+  const STATUS = { log: 'תיעוד', open: 'פתוח', in_progress: 'בטיפול', closed: 'נסגר' };
+  const PLACES = ['בית מדרש', 'שיעור', 'תפילה', 'הפסקה', 'אחר'];
+  // ברירת מחדל אם הטבלה לא נטענה (מצב דמו / תקלה) — אותה רשימה כמו במיגרציה
+  const DEFAULT_TYPES = [['איחור', '⏰', 'corrective'], ['הפרעה', '🗣️', 'corrective'], ['לא מוכן', '📕', 'corrective'],
+    ['חברים', '🤝', 'corrective'], ['התנהגות', '⚠️', 'corrective'], ['שיחה עם תלמיד', '💬', 'neutral'],
+    ['שיחה עם הורים', '👪', 'neutral'], ['נקודת אור', '⭐', 'positive'], ['אחר', '📌', 'neutral']]
+    .map((t, i) => ({ id: i + 1, name: t[0], icon: t[1], direction: t[2], sort: (i + 1) * 10, active: true }));
+  let typesCache = null;
+  async function types() {
+    if (typesCache) return typesCache;
+    let t = [];
+    try { t = await window.store.list('behavior_types'); } catch (_) {}
+    const real = !!(t && t.length);
+    t = (real ? t : DEFAULT_TYPES).filter(x => x.active !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0));
+    // ברירת המחדל לא נשמרת במטמון מחוץ לדמו: קריאה לפני הכניסה מחזירה ריק (RLS)
+    if (real || DEMO) typesCache = t;
+    return t;
   }
-  // followCb: תיבת "מעקב" של הטופס — תזכורת בלי מעקב לא קופצת, ולכן בחירת
-  // תזכורת מסמנת גם מעקב.
-  function wireQuickExtras(root, p, followCb) {
-    const box = root.querySelector('#' + p + 'Qx');
-    box.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', ev => {
-      const b = ev.target.closest('.seg-b'); if (!b) return;
-      seg.querySelectorAll('.seg-b').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); });
-      if (seg.dataset.qx === 'due' && b.dataset.v !== '0' && followCb) followCb.checked = true;
-    }));
-    const val = k => { const b = box.querySelector('[data-qx="' + k + '"] .seg-b.on'); return b ? b.dataset.v : null; };
-    return {
-      read() { const n = Number(val('due') || 0); return { severity: val('sev') || 'רגילה', due_date: n ? addDays(n) : null }; },
-      reset() {
-        box.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('.seg-b').forEach((x, i) => {
-          const on = seg.dataset.qx === 'sev' ? x.dataset.v === 'רגילה' : i === 0;
-          x.classList.toggle('on', on); x.setAttribute('aria-pressed', on);
-        }));
-      },
+  // שם הסוג לתצוגה במסכים אחרים (בית, כרטיס תלמיד, לוח שנה) — אחרי await types()
+  const typeName = e => { const t = e && e.type_id && (typesCache || []).find(x => x.id == e.type_id); return t ? t.icon + ' ' + t.name : ''; };
+  const typeLabel = (ts, e, catName) => {
+    const t = ts.find(x => x.id == e.type_id);
+    if (t) return '<span class="ty ty-' + t.direction + '">' + esc(t.icon) + ' ' + esc(t.name) + '</span>';
+    return catName ? '<span class="ty">' + esc(catName) + '</span>' : '<span class="ty ty-none">לא מסווג</span>';
+  };
+  const statusChip = e => {
+    const s = e.status || (e.followup ? 'open' : 'log');
+    if (s === 'log') return '';
+    return '<span class="chip st-' + s + '"><i class="bi ' + (s === 'closed' ? 'bi-check2-circle' : 'bi-flag-fill') + '"></i> ' + STATUS[s] + '</span>';
+  };
+  const staffOpts = sel => (window.Author ? window.Author.all() : [])
+    .filter(s => s.active && s.name && ['מנהל', 'מחנך', 'מלמד', 'מפקח'].includes(s.role))
+    .sort((a, b) => a.name.localeCompare(b.name, 'he'))
+    .map(s => '<option value="' + esc(s.id) + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
+  const friendlyErr = msg => /DUPLICATE_REPORT/.test(msg || '') ? 'הדיווח הזה כבר נשמר לפני רגע'
+    : /ASSIGNEE_STATUS_ONLY/.test(msg || '') ? 'כאחראי על המקרה אפשר לשנות רק מצב ותאריך בדיקה'
+    : /RESTORE_ADMIN_ONLY/.test(msg || '') ? 'רק מנהל משחזר מסל המחזור'
+    : /row-level security|42501/.test(msg || '') ? 'אין הרשאה לפעולה הזו' : 'השמירה נכשלה';
+
+  // טופס הדיווח המהיר: מי (אפשר כמה) → מה קרה → כמה חמור → הערה → צריך המשך?
+  // אותו רכיב במסך המעקב ובדף הבית של המורה. opts.onSaved(rows).
+  async function quickForm(host, p, opts) {
+    opts = opts || {};
+    const [ts, studs] = await Promise.all([types(), students()]);
+    if (window.Author) await window.Author.load();
+    const pickHtml = await window.cv3Picker.html(p);
+    const seg = (key, items, on) => '<div class="seg" data-qf="' + key + '">' + items.map(it =>
+      '<button type="button" class="seg-b' + (String(it[0]) === String(on) ? ' on' : '') + '" data-v="' + esc(it[0]) + '">' + it[1] + '</button>').join('') + '</div>';
+    host.innerHTML =
+      '<div class="qf">' +
+        '<div class="qf-step"><b>1</b> מי? <small>אפשר לבחור כמה</small></div>' + pickHtml +
+        '<div class="qf-chips" id="' + p + 'Chips"></div>' +
+        '<button type="button" class="btn-ghost sm qf-all" id="' + p + 'All" hidden></button>' +
+        '<div class="qf-step"><b>2</b> מה קרה?</div>' +
+        '<div class="qf-types" id="' + p + 'Types">' + ts.map(t =>
+          '<button type="button" class="qf-type ty-' + t.direction + '" data-v="' + t.id + '"><span>' + esc(t.icon) + '</span>' + esc(t.name) + '</button>').join('') + '</div>' +
+        '<div class="qf-sevrow" id="' + p + 'SevRow"><div class="qf-step"><b>3</b> כמה חמור?</div>' +
+          seg('sev', SEVS.map(s => [s[0], '<i class="bi ' + s[2] + ' sev-ic ' + s[1] + '"></i> ' + s[0]]), 'רגילה') + '</div>' +
+        '<textarea class="inp mb0 ta-auto" id="' + p + 'Note" rows="2" placeholder="הערה (רשות) — שורה אחת מספיקה"></textarea>' +
+        '<div class="qf-when"><input class="inp mb0" id="' + p + 'Date" type="date" value="' + today() + '" title="תאריך">' +
+          '<span class="heb-date" id="' + p + 'DateHeb"></span>' +
+          '<input class="inp mb0" id="' + p + 'Time" type="time" title="שעה (רשות)"></div>' +
+        '<div class="qf-step"><i class="bi bi-flag-fill" style="color:var(--danger)"></i> צריך המשך?</div>' + seg('fu', FOLLOWS, 0) +
+        '<label class="qf-asg" id="' + p + 'AsgRow" hidden><span>למעקב של</span><select class="inp mb0" id="' + p + 'Asg">' +
+          '<option value="">המחנך של השיעור (אוטומטי)</option>' + staffOpts(null) + '</select></label>' +
+        '<button type="button" class="btn-primary qs-save" id="' + p + 'Save"><i class="bi bi-check-lg"></i> שמירה</button>' +
+        '<div class="count-line" id="' + p + 'Msg"></div>' +
+      '</div>';
+    const $ = s => host.querySelector(s);
+    let chosen = [], typeId = null;
+    const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
+    const drawChips = () => {
+      $('#' + p + 'Chips').innerHTML = chosen.map(id => '<span class="qf-chip">' + esc(nameOf(id)) +
+        '<button type="button" data-rm="' + id + '" title="הסרה">×</button></span>').join('');
     };
+    const classSel = () => host.querySelector('.pk-class');
+    const drawAll = () => {
+      const b = $('#' + p + 'All'), c = classSel(), cid = c && c.value;
+      const inClass = cid ? studs.filter(s => String(s.class_id) === String(cid)) : [];
+      b.hidden = !inClass.length;
+      if (inClass.length) { b.textContent = '+ כל השיעור (' + inClass.length + ')'; b.dataset.ids = inClass.map(s => s.id).join(','); }
+    };
+    const pick = window.cv3Picker.wire(host, p, () => {
+      const v = pick && pick.value();
+      if (v && !chosen.includes(Number(v))) { chosen.push(Number(v)); drawChips(); }
+      if (v) setTimeout(() => pick.reset(), 0);
+    });
+    if (classSel()) classSel().addEventListener('change', drawAll);
+    drawAll();
+    $('#' + p + 'All').addEventListener('click', ev => {
+      ev.currentTarget.dataset.ids.split(',').map(Number).forEach(id => { if (!chosen.includes(id)) chosen.push(id); });
+      drawChips();
+    });
+    $('#' + p + 'Chips').addEventListener('click', ev => {
+      const b = ev.target.closest('[data-rm]'); if (!b) return;
+      chosen = chosen.filter(id => id != b.dataset.rm); drawChips();
+    });
+    $('#' + p + 'Types').addEventListener('click', ev => {
+      const b = ev.target.closest('.qf-type'); if (!b) return;
+      typeId = Number(b.dataset.v);
+      host.querySelectorAll('.qf-type').forEach(x => x.classList.toggle('on', x === b));
+      // "נקודת אור" — אין "כמה חמור"
+      $('#' + p + 'SevRow').hidden = b.classList.contains('ty-positive');
+    });
+    host.querySelectorAll('.seg').forEach(sg => sg.addEventListener('click', ev => {
+      const b = ev.target.closest('.seg-b'); if (!b) return;
+      sg.querySelectorAll('.seg-b').forEach(x => x.classList.toggle('on', x === b));
+      if (sg.dataset.qf === 'fu') $('#' + p + 'AsgRow').hidden = b.dataset.v === '0';
+    }));
+    const dEl = $('#' + p + 'Date'), dHeb = $('#' + p + 'DateHeb');
+    const syncHeb = () => { dHeb.textContent = hebDate(dEl.value) || ''; };
+    dEl.addEventListener('change', syncHeb); syncHeb();
+    const segVal = k => { const b = host.querySelector('[data-qf="' + k + '"] .seg-b.on'); return b ? b.dataset.v : null; };
+    const reset = () => {
+      chosen = []; typeId = null; drawChips();
+      host.querySelectorAll('.qf-type').forEach(x => x.classList.remove('on'));
+      host.querySelectorAll('.seg').forEach(sg => sg.querySelectorAll('.seg-b').forEach((x, i) =>
+        x.classList.toggle('on', sg.dataset.qf === 'sev' ? x.dataset.v === 'רגילה' : i === 0)));
+      $('#' + p + 'SevRow').hidden = false; $('#' + p + 'AsgRow').hidden = true; $('#' + p + 'Asg').value = '';
+      $('#' + p + 'Note').value = ''; $('#' + p + 'Time').value = '';
+    };
+    $('#' + p + 'Save').addEventListener('click', async ev => {
+      const btn = ev.currentTarget;
+      const v = pick.value();
+      if (v && !chosen.includes(Number(v))) chosen.push(Number(v));
+      if (!chosen.length) { window.UI.toast('בחר תלמיד', 'err'); return; }
+      if (!typeId) { window.UI.toast('בחר מה קרה', 'err'); return; }
+      const fu = Number(segVal('fu') || 0);
+      const positive = $('#' + p + 'SevRow').hidden;
+      const base = {
+        type_id: typeId, severity: positive ? 'רגילה' : (segVal('sev') || 'רגילה'),
+        note: $('#' + p + 'Note').value.trim() || null,
+        event_date: dEl.value || today(), event_time: $('#' + p + 'Time').value || null,
+        status: fu ? 'open' : 'log', due_date: fu ? addDays(fu) : null,
+        assignee: fu ? ($('#' + p + 'Asg').value || null) : null, source: 'site',
+      };
+      const gid = chosen.length > 1 && window.crypto && crypto.randomUUID ? crypto.randomUUID() : null;
+      const saved = [];
+      for (const sid of chosen) {
+        const r = await saveQuick(btn, Object.assign({ student_id: sid, group_id: gid }, base));
+        if (!r) return;                                   // ביטול באישור הכפילות
+        if (!r.ok) { window.UI.toast(friendlyErr(r.error) + (saved.length ? ' (נשמרו ' + saved.length + ')' : ''), 'err'); break; }
+        saved.push((r.data && r.data[0]) || Object.assign({ student_id: sid }, base));
+      }
+      if (!saved.length) return;
+      $('#' + p + 'Msg').textContent = '✓ נשמר' + (saved.length > 1 ? ' ל-' + saved.length + ' תלמידים' : '');
+      window.UI.toast(saved.length > 1 ? 'נשמר ל-' + saved.length + ' תלמידים' : 'הדיווח נשמר');
+      reset();
+      if (opts.onSaved) opts.onSaved(saved);
+    });
+    return { reset };
   }
 
   // ── חסימת שמירה כפולה ─────────────────────────────────────────────────
@@ -72,7 +194,7 @@
   let lastQuick = null;
   async function saveQuick(btn, row) {
     if (btn.disabled) return null;
-    const key = [row.student_id, row.event_date, row.category_id || '', (row.note || '').trim()].join('|');
+    const key = [row.student_id, row.event_date, row.type_id || row.category_id || '', (row.note || '').trim()].join('|');
     if (lastQuick && lastQuick.key === key && Date.now() - lastQuick.at < 120000 &&
         !(await window.UI.confirm('דיווח זהה בדיוק נשמר לפני רגע. לשמור אותו שוב?'))) return null;
     const html = btn.innerHTML;
@@ -100,9 +222,9 @@
           if (!note) { window.UI.toast('כתוב משפט סיכום קצר', 'err'); return false; }
           const c = await addComment(ev.id, { comment_date: today(), note: 'סיכום סגירה: ' + note });
           if (!c || c.ok === false) { window.UI.toast('שמירת הסיכום נכשלה', 'err'); return false; }
-          const r = await updEvent(ev.id, { followup: false });
-          if (!r || r.ok === false) { window.UI.toast('הסיכום נשמר, אבל ההסרה מהמעקב נכשלה', 'err'); return false; }
-          ev.followup = false; done = true;
+          const r = await updEvent(ev.id, { status: 'closed' });
+          if (!r || r.ok === false) { window.UI.toast('הסיכום נשמר, אבל הסגירה נכשלה', 'err'); return false; }
+          Object.assign(ev, (r.data && r.data[0]) || { status: 'closed', followup: false, closed_at: new Date().toISOString() }); done = true;
           window.UI.toast('המקרה נסגר'); return true;
         },
         onClose: () => resolve(done),
@@ -203,64 +325,148 @@
   async function openEventForm(ev, opts) {
     opts = opts || {};
     const isNew = !ev || !ev.id;
-    const [studs, cs] = await Promise.all([students(), cats()]);
-    const cur = ev || { student_id: opts.studentId || null, event_date: today(), severity: 'רגילה' };
+    const [studs, ts] = await Promise.all([students(), types()]);
+    if (window.Author) await window.Author.load();
+    const cur = ev || { student_id: opts.studentId || null, event_date: today(), severity: 'רגילה', status: 'log' };
+    const curStatus = cur.status || (cur.followup ? 'open' : 'log');
     const nm = x => window.UI.fullName ? window.UI.fullName(x) : x.name;
-    const stuOpts = studs.map(x => '<option value="' + x.id + '"' +
-      (String(x.id) === String(cur.student_id) ? ' selected' : '') + '>' + esc(nm(x)) + '</option>').join('');
-    const catSel = cs.map(c => '<option value="' + c.id + '"' +
-      (String(c.id) === String(cur.category_id) ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
-    const sevSel = ['נמוכה', 'רגילה', 'גבוהה'].map(x =>
-      '<option' + ((cur.severity || 'רגילה') === x ? ' selected' : '') + '>' + x + '</option>').join('');
+    const opt = (v, label, selV) => '<option value="' + esc(v) + '"' + (String(v) === String(selV == null ? '' : selV) ? ' selected' : '') + '>' + esc(label) + '</option>';
+    const stuOpts = studs.map(x => opt(x.id, nm(x), cur.student_id)).join('');
+    const typeSel = (cur.type_id ? '' : '<option value="">— לא מסווג —</option>') + ts.map(t => opt(t.id, t.icon + ' ' + t.name, cur.type_id)).join('');
+    const sevSel = ['נמוכה', 'רגילה', 'גבוהה'].map(x => opt(x, x, cur.severity || 'רגילה')).join('');
+    const stSel = Object.keys(STATUS).map(k => opt(k, STATUS[k], curStatus)).join('');
+    const placeSel = '<option value="">—</option>' + PLACES.map(x => opt(x, x, cur.place)).join('');
     // כשהתלמיד נעול (דיווח מתוך הכרטיס שלו) מציגים את שמו ולא בורר
     const lockStu = isNew && opts.studentId;
     const stuRec = lockStu ? (studs.find(x => String(x.id) === String(opts.studentId)) || {}) : null;
+    // "למעקב של" שאינו רשאי לערוך: רק מצב, תאריך בדיקה ואחראי (נאכף גם בשרת)
+    const me = window.currentUser && window.currentUser.id;
+    const statusOnly = !isNew && window.Auth && window.Auth.canEditRow && !window.Auth.canEditRow(cur) && cur.assignee === me;
+    const dis = statusOnly ? ' disabled' : '';
     const m = window.UI.modal({
       title: isNew ? ('דיווח חדש' + (stuRec ? ' — ' + esc(nm(stuRec)) : '')) : 'עריכת דיווח',
       saveLabel: 'שמירה',
       bodyHTML:
+        (statusOnly ? '<div class="fu-hint"><i class="bi bi-person-check"></i> המקרה בטיפולך: אפשר לעדכן מצב, תאריך בדיקה ואחראי.</div>' : '') +
         '<div class="form-grid">' +
           (lockStu
             ? '<input type="hidden" id="ee_stu" value="' + esc(opts.studentId) + '">'
-            : '<label class="fld"><span>תלמיד</span><select class="inp mb0" id="ee_stu"><option value="">— בחר —</option>' + stuOpts + '</select></label>') +
-          '<label class="fld"><span>קטגוריה</span><select class="inp mb0" id="ee_cat"><option value="">ללא</option>' + catSel + '</select></label>' +
-          '<label class="fld"><span>תאריך</span><input class="inp mb0" id="ee_date" type="date" value="' + esc(String(cur.event_date || today()).slice(0, 10)) + '"></label>' +
-          '<label class="fld"><span>שעה</span><input class="inp mb0" id="ee_time" type="time" value="' + esc(cur.event_time || '') + '"></label>' +
-          '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev">' + sevSel + '</select></label>' +
-          '<label class="fld"><span>מעקב</span><span style="display:flex;align-items:center;gap:6px;padding-top:7px">' +
-            '<input type="checkbox" id="ee_follow"' + (cur.followup ? ' checked' : '') + '> ' +
-            '<i class="bi bi-flag-fill" id="ee_flagIcon"></i>' +
-            '<span style="font-weight:400;font-size:.85rem">דיווח פתוח שדורש טיפול המשך — ' +
-              'צבע הדגל נקבע לפי ה"חומרה" למעלה</span></span></label>' +
-          '<label class="fld"><span>תזכורת (תאריך יעד למעקב)</span><input class="inp mb0" id="ee_due" type="date" max="2099-12-31" value="' + esc(cur.due_date || '') + '"></label>' +
-          '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="5">' + esc(cur.note || '') + '</textarea></label>' +
-        '</div>',
+            : '<label class="fld"><span>תלמיד</span><select class="inp mb0" id="ee_stu"' + dis + '><option value="">— בחר —</option>' + stuOpts + '</select></label>') +
+          '<label class="fld"><span>סוג</span><select class="inp mb0" id="ee_type"' + dis + '>' + typeSel + '</select></label>' +
+          '<label class="fld"><span>חומרה</span><select class="inp mb0" id="ee_sev"' + dis + '>' + sevSel + '</select></label>' +
+          '<label class="fld"><span>מקום (רשות)</span><select class="inp mb0" id="ee_place"' + dis + '>' + placeSel + '</select></label>' +
+          '<label class="fld"><span>תאריך</span><input class="inp mb0" id="ee_date" type="date"' + dis + ' value="' + esc(String(cur.event_date || today()).slice(0, 10)) + '"></label>' +
+          '<label class="fld"><span>שעה</span><input class="inp mb0" id="ee_time" type="time"' + dis + ' value="' + esc(cur.event_time || '') + '"></label>' +
+          '<label class="fld"><span>מצב</span><select class="inp mb0" id="ee_status">' + stSel + '</select></label>' +
+          '<label class="fld"><span>תאריך בדיקה</span><input class="inp mb0" id="ee_due" type="date" max="2099-12-31" value="' + esc(cur.due_date || '') + '"></label>' +
+          '<label class="fld"><span>למעקב של</span><select class="inp mb0" id="ee_asg"><option value="">המחנך של השיעור (אוטומטי)</option>' + staffOpts(cur.assignee) + '</select></label>' +
+          '<label class="fld fld-wide"><span>הערה</span><textarea class="inp mb0 ta-auto" id="ee_note" rows="5"' + dis + '>' + esc(cur.note || '') + '</textarea></label>' +
+        '</div>' +
+        (!isNew && canSeeStats() ? '<div style="margin-top:8px"><button type="button" class="btn-ghost sm" id="ee_hist"><i class="bi bi-clock-history"></i> היסטוריית שינויים</button></div>' : ''),
       onSave: async (mel) => {
-        const row = {
-          student_id: Number(mel.querySelector('#ee_stu').value) || null,
-          category_id: Number(mel.querySelector('#ee_cat').value) || null,
-          event_date: mel.querySelector('#ee_date').value || today(),
-          event_time: mel.querySelector('#ee_time').value || null,
-          severity: mel.querySelector('#ee_sev').value,
-          note: mel.querySelector('#ee_note').value.trim() || null,
-          followup: mel.querySelector('#ee_follow').checked,
-          due_date: mel.querySelector('#ee_due').value || null,
+        const v = id => mel.querySelector(id).value;
+        const status = v('#ee_status');
+        let row = {
+          status, due_date: v('#ee_due') || null, assignee: v('#ee_asg') || null,
         };
-        if (!row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
+        if (!statusOnly) Object.assign(row, {
+          student_id: Number(v('#ee_stu')) || null,
+          type_id: Number(v('#ee_type')) || null,
+          event_date: v('#ee_date') || today(),
+          event_time: v('#ee_time') || null,
+          severity: v('#ee_sev'),
+          place: v('#ee_place') || null,
+          note: v('#ee_note').trim() || null,
+        });
+        if (!statusOnly && !row.student_id) { window.UI.toast('חובה לבחור תלמיד', 'err'); return false; }
+        if (isNew && !row.type_id) { window.UI.toast('בחר סוג', 'err'); return false; }
+        // מעבר ל"נסגר" מהטופס — גם כאן מבקשים משפט סיכום
+        if (!isNew && status === 'closed' && curStatus !== 'closed') {
+          const summary = await new Promise(res => {
+            let val = null;
+            window.UI.modal({ title: 'משפט סיכום לסגירה', saveLabel: 'שמירה',
+              bodyHTML: '<textarea class="inp mb0 ta-auto" id="rs2" rows="3" placeholder="איך זה נגמר?"></textarea>',
+              onSave: mm => { val = mm.querySelector('#rs2').value.trim(); if (!val) { window.UI.toast('כתוב משפט סיכום', 'err'); return false; } return true; },
+              onClose: () => res(val) });
+          });
+          if (!summary) return false;
+          await addComment(ev.id, { comment_date: today(), note: 'סיכום סגירה: ' + summary });
+        }
         const r = isNew ? await addEvent(row) : await updEvent(ev.id, row);
-        if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return false; }
-        if (!isNew) Object.assign(ev, row);
+        if (!r || r.ok === false) { window.UI.toast(friendlyErr(r && r.error), 'err'); return false; }
+        const saved = r.data && r.data[0];
+        if (!isNew) Object.assign(ev, saved || row);
         window.UI.toast(isNew ? 'הדיווח נשמר' : 'הדיווח עודכן');
-        if (opts.onSaved) { try { await opts.onSaved(); } catch (_) {} }
+        if (opts.onSaved) { try { await opts.onSaved(saved || row); } catch (_) {} }
         return true;
       },
     });
-    // תצוגה חיה של צבע הדגל לפי החומרה הנבחרת — כדי שברור מיד "מה קובע את הצבע"
-    // בלי לחפש בתפריט עזרה. אותה מוסכמת צבע בדיוק כמו flagColor() ברשימות עצמן.
-    const sevEl = m.el.querySelector('#ee_sev'), flagIcon = m.el.querySelector('#ee_flagIcon');
-    const paintFlag = () => { flagIcon.style.color = flagColor(sevEl.value); };
-    sevEl.addEventListener('change', paintFlag);
-    paintFlag();
+    const hb = m.el.querySelector('#ee_hist');
+    if (hb) hb.addEventListener('click', () => openHistory(ev));
+  }
+
+  // ── יומן שינויים (מנהל ומפקח) ─────────────────────────────────────────
+  const b64text = b => { try { return b ? new TextDecoder('utf-8').decode(Uint8Array.from(atob(b), c => c.charCodeAt(0))) : null; } catch (_) { return null; } };
+  const b64json = b => { try { return b ? JSON.parse(new TextDecoder('utf-8').decode(Uint8Array.from(atob(b), c => c.charCodeAt(0)))) : null; } catch (_) { return null; } };
+  const FIELD = { student_id: 'תלמיד', type_id: 'סוג', category_id: 'קטגוריה', severity: 'חומרה', event_date: 'תאריך', event_time: 'שעה',
+    note: 'הערה', status: 'מצב', due_date: 'תאריך בדיקה', assignee: 'למעקב של', place: 'מקום', deleted_at: 'סל מחזור' };
+  async function openHistory(ev) {
+    const [ts, studs] = await Promise.all([types(), students()]);
+    const r = DEMO ? { ok: true, data: [] } : await window.db.list('behavior_audit_enc', { eq: { event_id: ev.id }, order: 'at', asc: true });
+    const fmt = (k, v) => v == null || v === '' ? '—'
+      : k === 'type_id' ? ((ts.find(t => t.id == v) || {}).name || v)
+      : k === 'assignee' ? (window.Author ? window.Author.name(v) : v)
+      : k === 'student_id' ? ((studs.find(s => s.id == v) || {}).name || v)
+      : k === 'status' ? (STATUS[v] || v) : k === 'deleted_at' ? 'כן' : String(v);
+    const rows = ((r && r.data) || []).map(a => {
+      const o = b64json(a.old_b64) || {}, n = b64json(a.new_b64) || {};
+      const ch = Object.keys(FIELD).filter(k => JSON.stringify(o[k]) !== JSON.stringify(n[k]));
+      const what = a.op === 'trash' ? 'הועבר לסל המחזור' : a.op === 'restore' ? 'שוחזר מהסל'
+        : ch.map(k => '<div><b>' + FIELD[k] + ':</b> <s>' + esc(fmt(k, o[k])) + '</s> ← ' + esc(fmt(k, n[k])) + '</div>').join('') || 'שינוי טכני';
+      return '<div class="tl-item" style="align-items:flex-start"><div class="tl-main">' + what + '</div>' +
+        '<div class="tl-meta">' + esc(String(a.at || '').slice(0, 16).replace('T', ' ')) + ' · ' + (window.Author ? window.Author.cell(a.actor) : '') + '</div></div>';
+    });
+    window.UI.modal({ title: 'היסטוריית שינויים', cancelLabel: 'סגירה',
+      bodyHTML: rows.length ? rows.join('') : '<div class="tl-note">אין שינויים מאז שנוצר (היומן פעיל מ-19/10/2026)</div>' });
+  }
+
+  // ── סל מחזור (מנהל) ──────────────────────────────────────────────────
+  async function openTrash(opts) {
+    opts = opts || {};
+    if (DEMO) { window.UI.toast('סל המחזור לא זמין במצב הדגמה'); return; }
+    // מה שבסל יותר מ-30 יום נמחק סופית בכל פתיחה של הסל (גם היומן, העדכונים ויומן השינויים)
+    try { await window.sb.rpc('behavior_purge_trash', { p_id: null }); } catch (_) {}
+    const [ts, studs] = await Promise.all([types(), students()]);
+    const r = await window.db.list('behavior_events_trash_enc', { order: 'deleted_at', asc: false });
+    const items = ((r && r.data) || []).map(x => Object.assign({}, x, { note: b64text(x.note_b64) }));
+    const nameOf = id => (studs.find(s => s.id == id) || {}).name || '—';
+    const html = () => items.length ? items.map(x => {
+      const left = 30 - (daysSince(x.deleted_at) || 0);
+      return '<div class="tl-item"><div class="tl-main"><strong>' + esc(nameOf(x.student_id)) + '</strong> · ' + typeLabel(ts, x, '') +
+        (x.note ? ' <span class="tl-note nt">— ' + esc(x.note) + '</span>' : '') + '</div>' +
+        '<div class="tl-meta">נמחק ' + esc(hebDate(String(x.deleted_at).slice(0, 10)) || '') + ' · ' + (window.Author ? window.Author.cell(x.deleted_by) : '') +
+          ' · עוד ' + Math.max(0, left) + ' ימים</div>' +
+        '<button class="mini" data-restore="' + x.id + '" title="שחזור"><i class="bi bi-arrow-counterclockwise"></i></button>' +
+        '<button class="mini danger" data-purge="' + x.id + '" title="מחיקה לצמיתות"><i class="bi bi-x-octagon"></i></button></div>';
+    }).join('') : '<div class="tl-note">הסל ריק</div>';
+    const m = window.UI.modal({ title: 'סל מחזור — נמחק סופית אחרי 30 יום', cancelLabel: 'סגירה', bodyHTML: '<div id="trashList">' + html() + '</div>' });
+    m.el.querySelector('#trashList').addEventListener('click', async ev => {
+      const rb = ev.target.closest('[data-restore]'), pb = ev.target.closest('[data-purge]');
+      if (rb) {
+        const u = await window.db.update('behavior_events', Number(rb.dataset.restore), { deleted_at: null });
+        if (!u.ok) { window.UI.toast(friendlyErr(u.error), 'err'); return; }
+        window.UI.toast('הדיווח שוחזר');
+      } else if (pb) {
+        if (!(await window.UI.confirm('למחוק לצמיתות? אי אפשר לבטל.'))) return;
+        const { error } = await window.sb.rpc('behavior_purge_trash', { p_id: Number(pb.dataset.purge) });
+        if (error) { window.UI.toast(friendlyErr(error.message), 'err'); return; }
+        window.UI.toast('נמחק לצמיתות');
+      } else return;
+      const id = Number((rb || pb).dataset.restore || (rb || pb).dataset.purge);
+      items.splice(items.findIndex(x => x.id === id), 1);
+      m.el.querySelector('#trashList').innerHTML = html();
+      if (opts.onChange) opts.onChange();
+    });
   }
   async function removeEvent(ev, onDone) {
     if (!ev) return;
@@ -329,11 +535,11 @@
     open: openEventForm, remove: removeEvent, comments: openComments, toggleFollowup: toggleFollowup,
     renderFollowupWidget: (container, opts) => renderFollowupWidget(container, opts),
     commentCounts: commentCounts,
-    quickExtrasHtml: quickExtrasHtml, wireQuickExtras: wireQuickExtras, saveQuick: saveQuick,
+    quickForm: quickForm, saveQuick: saveQuick, types: types, typeLabel: typeLabel, statusChip: statusChip, typeName: typeName,
   };
 
   async function renderBehavior(page) {
-    const [studs, cs, evs, cls, allCmtsInit] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
+    const [studs, cs, evs, cls, allCmtsInit, ts] = await Promise.all([students(), cats(), events(), classes(), allComments(), types()]);
     // let, לא const: אחרי הוספת/מחיקת תגובה מרעננים את שתיהן מהשרת (ראה
     // data-cmt למטה) כדי שתת-הדיווח המקונן יציג את התוכן העדכני, לא רק מונה.
     let allCmts = allCmtsInit;
@@ -342,10 +548,10 @@
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
     const clsOf = sid => { const s = studs.find(x => x.id == sid); const c = s && cls.find(x => x.id == s.class_id); return c ? c.name : 'ללא כיתה'; };
-    const catOpts = cs.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
-    const pickAdd = await window.cv3Picker.html('q');
     const pickFilter = await window.cv3Picker.html('f', { placeholder: 'כל התלמידים' });
-    const catFilterOpts = cs.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+    const typeFilterOpts = ts.map(t => '<option value="' + t.id + '">' + esc(t.icon + ' ' + t.name) + '</option>').join('') +
+      '<option value="__none">לא מסווג (ישן)</option>';
+    const typeOf = e => ts.find(t => t.id == e.type_id);
     const authorName = uid => (window.Author ? window.Author.name(uid) : (uid ? 'לא ידוע' : '—'));
     // מפתח יציב לסינון: המזהה עצמו, ו-'__none' למי שאין לו (רשומות ישנות)
     const authorKey = e => e.created_by || '__none';
@@ -354,31 +560,23 @@
       .map(([k, v]) => '<option value="' + esc(k) + '">' + esc(v) + '</option>').join('');
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>מעקב תלמידים</h2>' +
-      '<div class="head-actions"><button class="btn-ghost sm" id="behCsv"><i class="bi bi-download"></i> ייצוא דוח CSV</button></div></div>' +
+      '<div class="head-actions">' + (isAdmin() ? '<button class="btn-ghost sm" id="behBin"><i class="bi bi-trash3"></i> סל מחזור</button>' : '') +
+        '<button class="btn-ghost sm" id="behCsv"><i class="bi bi-download"></i> ייצוא דוח CSV</button></div></div>' +
       (await voiceAlertHtml()) +
       // בטלפון: הרשימה קודם, והטופס נפתח מכפתור קבוע בתחתית (beh-fab).
-      '<div class="qr-card beh-quick" id="behQuick"><h3><i class="bi bi-lightning-charge"></i> רישום חדש' +
+      '<div class="qr-card beh-quick" id="behQuick"><h3><i class="bi bi-lightning-charge"></i> דיווח חדש' +
         '<button type="button" class="mini beh-quick-x" id="behQuickX" title="סגירה"><i class="bi bi-x-lg"></i></button></h3>' +
-        '<div class="qr-grid" style="grid-template-columns:repeat(3,1fr) auto">' +
-          pickAdd +
-          '<div style="display:flex;gap:6px"><select class="inp mb0" id="qCat" style="flex:1"><option value="">קטגוריה…</option>' + catOpts + '</select>' +
-            (isAdmin() ? '<button class="btn-ghost sm" id="qCatAdd" type="button" title="הוסף קטגוריה"><i class="bi bi-plus-lg"></i></button>' : '') + '</div>' +
-          '<div style="display:flex;flex-direction:column;gap:2px"><input class="inp mb0" id="qDate" type="date" value="' + today() + '" title="תאריך">' +
-            '<span class="heb-date" id="qDateHeb" style="font-size:.72rem;color:var(--muted,#888);padding-right:2px"></span></div>' +
-          '<input class="inp mb0" id="qTime" type="time" title="שעה">' +
-          '<textarea class="inp mb0 fld-wide ta-auto" id="qNote" rows="3" placeholder="הערה — אפשר לכתוב כמה שורות" style="grid-column:1/-2"></textarea>' +
-          '<label style="display:flex;align-items:center;gap:5px;font-size:.82rem;color:var(--muted);white-space:nowrap;cursor:pointer"><input type="checkbox" id="qFollow"> מעקב</label>' +
-          quickExtrasHtml('q') +
-          '<button class="btn-primary sm qs-save" id="qSave"><i class="bi bi-plus-lg"></i> רישום</button>' +
-        '</div></div>' +
+        '<div id="behQuickForm"></div></div>' +
       '<button type="button" class="beh-fab" id="behFab"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' +
       // "מי דיווח" — מי שרשם את הדיווח. הרשימה נבנית מהדיווחים עצמם ולא
       // מטבלת המשתמשים, כדי שיופיעו גם מי שכבר לא פעיל וגם "לא ידוע"
       // (רשומות מלפני שהמערכת התחילה לתעד מי רשם).
-      '<div class="toolbar" style="grid-template-columns:1fr auto auto auto auto">' + pickFilter +
-        '<select class="inp mb0" id="fCat"><option value="">כל הקטגוריות</option>' + catFilterOpts + '</select>' +
+      '<div class="toolbar" style="grid-template-columns:1fr auto auto auto auto auto">' + pickFilter +
+        '<select class="inp mb0" id="fCat" title="סוג"><option value="">כל הסוגים</option>' + typeFilterOpts + '</select>' +
+        '<select class="inp mb0" id="fStatus" title="מצב"><option value="">כל המצבים</option><option value="active">פתוח / בטיפול</option>' +
+          '<option value="closed">נסגר</option><option value="log">תיעוד בלבד</option><option value="positive">⭐ חיובי בלבד</option></select>' +
         '<select class="inp mb0" id="fBy" title="מי דיווח"><option value="">כל המדווחים</option>' + byFilterOpts + '</select>' +
-        '<select class="inp mb0" id="fGroup" title="תצוגה לפי"><option value="">ללא קיבוץ</option><option value="student">לפי תלמיד</option><option value="class">לפי כיתה</option><option value="cat">לפי קטגוריה</option><option value="by">לפי מי שרשם</option></select>' +
+        '<select class="inp mb0" id="fGroup" title="תצוגה לפי"><option value="">ללא קיבוץ</option><option value="student">לפי תלמיד</option><option value="class">לפי כיתה</option><option value="cat">לפי סוג</option><option value="by">לפי מי שרשם</option></select>' +
         '<span class="count-line" id="evCount" style="align-self:center"></span></div>' +
       // פילוח פעילות הצוות — למנהל ולמפקח. עונה על "מי מעדכן, כמה, ומה".
       (canSeeStats() ? '<div class="qr-card" id="byCard"><div class="card-h-row">' +
@@ -388,37 +586,16 @@
       '<div id="timeline"></div>' +
       '<div id="evEmpty" class="empty-state" hidden><i class="bi bi-clipboard-check"></i><div>אין דיווחים עדיין — השתמש בדיווח המהיר למעלה</div></div>';
 
-    const pick = window.cv3Picker.wire(page, 'q');
     const fpick = window.cv3Picker.wire(page, 'f', () => draw());
-    // תאריך עברי חי ליד בורר התאריך (בקשת עמנואל)
-    const qDateEl = page.querySelector('#qDate'), qDateHeb = page.querySelector('#qDateHeb');
-    const syncHeb = () => { if (qDateHeb) qDateHeb.textContent = hebDate(qDateEl.value); };
-    if (qDateEl) { qDateEl.addEventListener('change', syncHeb); syncHeb(); }
-    // הוספת קטגוריה מהירה — למנהל בלבד (בקשת עמנואל: לחסום למחנך)
-    const qCatAddBtn = page.querySelector('#qCatAdd');
-    if (qCatAddBtn) qCatAddBtn.addEventListener('click', () => {
-      window.UI.modal({
-        title: 'קטגוריה חדשה', saveLabel: 'הוסף',
-        bodyHTML: '<div class="form-grid"><label class="fld fld-wide"><span>שם הקטגוריה *</span><input class="inp mb0" id="nc_name" autofocus></label></div>',
-        onSave: async (mel) => {
-          const name = mel.querySelector('#nc_name').value.trim();
-          if (!name) { window.UI.toast('שם חובה', 'err'); return false; }
-          const r = await window.store.add('categories', { name, kind: 'behavior' });
-          const nc = (r.data && r.data[0]) || { id: Date.now(), name, kind: 'behavior' };
-          cs.push(nc);
-          const sel = page.querySelector('#qCat'), o = document.createElement('option');
-          o.value = nc.id; o.textContent = name; sel.appendChild(o); sel.value = String(nc.id);
-          window.UI.toast('קטגוריה נוספה'); return true;
-        },
-      });
-    });
     let list = evs;
     const filtered = () => {
-      const f = fpick.value(), fc = page.querySelector('#fCat').value;
+      const f = fpick.value(), fc = page.querySelector('#fCat').value, fs = page.querySelector('#fStatus').value;
       const fb = (page.querySelector('#fBy') || {}).value || '';
+      const st = e => e.status || (e.followup ? 'open' : 'log');
       return list.filter(e =>
         (!f || String(e.student_id) === f) &&
-        (!fc || String(e.category_id) === fc) &&
+        (!fc || (fc === '__none' ? !e.type_id : String(e.type_id) === fc)) &&
+        (!fs || (fs === 'active' ? ['open', 'in_progress'].includes(st(e)) : fs === 'positive' ? (typeOf(e) || {}).direction === 'positive' : st(e) === fs)) &&
         (!fb || authorKey(e) === fb));
     };
     // תגובות מוצגות כתת-דיווח מקונן ממש מתחת לדיווח, לא רק מאחורי הכפתור —
@@ -434,8 +611,10 @@
     const itemHtml = e => {
       const cn = cmtCounts[e.id] || 0;
       return '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
-      '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + esc(catOf(e.category_id)) +
-      (e.followup ? ' <span class="chip warn" style="color:' + flagColor(e.severity) + '"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') +
+      '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + typeLabel(ts, e, catOf(e.category_id)) +
+      ' ' + statusChip(e) +
+      (e.assignee && ['open', 'in_progress'].includes(e.status) ? ' <span class="chip off"><i class="bi bi-person-check"></i> למעקב של ' + esc(authorName(e.assignee)) + '</span>' : '') +
+      (e.group_id ? ' <span class="chip off" title="דיווח משותף לכמה תלמידים"><i class="bi bi-people"></i> קבוצתי</span>' : '') +
       (e.due_date ? ' <span class="chip" style="' + (isOverdue(e)
           ? 'background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)'
           : 'background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)') + '">' +
@@ -455,7 +634,7 @@
     };
     const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id)
       : g === 'by' ? (window.Author ? window.Author.name(e.created_by) : 'לא ידוע')
-      : catOf(e.category_id) || 'ללא קטגוריה';
+      : (typeOf(e) ? typeOf(e).icon + ' ' + typeOf(e).name : (catOf(e.category_id) || 'לא מסווג'));
     // ── פילוח פעילות הצוות ──────────────────────────────────────────────
     // "כמה כל אחד מעדכן ואיזה דברים" — לכן גם ספירה, גם התפלגות קטגוריות,
     // גם כמה תלמידים הוא נגע בהם, וגם מתי דיווח לאחרונה. נבנה תמיד על **כל**
@@ -521,8 +700,10 @@
       page.querySelector('#evCount').textContent = rows.length + ' דיווחים';
       page.querySelector('#evEmpty').hidden = rows.length > 0;
       page.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
-        const ok = await window.UI.confirm('למחוק את הדיווח?'); if (!ok) return;
-        await delEvent(Number(b.dataset.del)); list = list.filter(e => e.id != b.dataset.del); draw(); window.UI.toast('נמחק');
+        const ok = await window.UI.confirm('להעביר את הדיווח לסל המחזור? (מנהל יכול לשחזר במשך 30 יום)'); if (!ok) return;
+        const r = await delEvent(Number(b.dataset.del));
+        if (r && r.ok === false) { window.UI.toast(friendlyErr(r.error), 'err'); return; }
+        list = list.filter(e => e.id != b.dataset.del); draw(); window.UI.toast('הועבר לסל המחזור');
       }));
       page.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
         const ev = list.find(x => x.id == b.dataset.edit); if (ev) editEvent(ev);
@@ -552,147 +733,136 @@
       const n = ev.target.closest('.nt'); if (n) n.classList.toggle('full');
     });
     page.querySelector('#fCat').addEventListener('change', draw);
+    page.querySelector('#fStatus').addEventListener('change', draw);
+    const binBtn = page.querySelector('#behBin');
+    if (binBtn) binBtn.addEventListener('click', () => openTrash({ onChange: async () => { list = await events(); draw(); } }));
     const fByEl = page.querySelector('#fBy'); if (fByEl) fByEl.addEventListener('change', draw);
     page.querySelector('#fGroup').addEventListener('change', draw);
     page.querySelector('#behCsv').addEventListener('click', () => {
-      const head = ['תלמיד', 'קטגוריה', 'תאריך', 'שעה', 'הערה', 'נרשם ע"י', 'תפקיד'];
+      const head = ['תלמיד', 'סוג', 'חומרה', 'מצב', 'למעקב של', 'תאריך', 'שעה', 'הערה', 'נרשם ע"י', 'תפקיד'];
       const lines = [head.join(',')].concat(filtered().map(e =>
-        [nameOf(e.student_id), catOf(e.category_id), e.event_date, e.event_time || '', e.note || '',
+        [nameOf(e.student_id), typeOf(e) ? typeOf(e).name : catOf(e.category_id), e.severity || '', STATUS[e.status] || '',
+         e.assignee ? authorName(e.assignee) : '', e.event_date, e.event_time || '', e.note || '',
          window.Author ? window.Author.name(e.created_by) : '',
          window.Author ? window.Author.role(e.created_by) : '']
           .map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')));
       const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'behavior_report.csv'; a.click();
     });
-    const qx = wireQuickExtras(page, 'q', page.querySelector('#qFollow'));
     const quickCard = page.querySelector('#behQuick');
     const openQuick = on => { quickCard.classList.toggle('open', on); if (on) quickCard.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
     page.querySelector('#behFab').addEventListener('click', () => openQuick(true));
     page.querySelector('#behQuickX').addEventListener('click', () => openQuick(false));
-    page.querySelector('#qSave').addEventListener('click', async ev => {
-      const sid = pick.value(), cid = page.querySelector('#qCat').value;
-      if (!sid) { window.UI.toast('בחר תלמיד', 'err'); return; }
-      const row = Object.assign({ student_id: Number(sid), category_id: cid ? Number(cid) : null, event_date: page.querySelector('#qDate').value || today(), event_time: page.querySelector('#qTime').value, note: page.querySelector('#qNote').value.trim(), followup: page.querySelector('#qFollow').checked }, qx.read());
-      const r = await saveQuick(ev.currentTarget, row); if (!r) return;
-      if (!r.ok) { window.UI.toast('שגיאה', 'err'); return; }
-      list = [(r.data && r.data[0]) || row].concat(list);
-      page.querySelector('#qNote').value = ''; page.querySelector('#qTime').value = ''; page.querySelector('#qCat').selectedIndex = 0; page.querySelector('#qFollow').checked = false;
-      qx.reset(); openQuick(false);
-      draw(); window.UI.toast('דווח בהצלחה');
+    await quickForm(page.querySelector('#behQuickForm'), 'q', {
+      onSaved: rows => { list = rows.concat(list); openQuick(false); draw(); },
     });
     draw();
   }
 
-  // ── מעקב דחוף ────────────────────────────────────────────────────────
-  // לשונית מרוכזת של כל הדיווחים שסומנו "במעקב" בכל הכיתות (בקשת יוסף):
-  // מלמד/מחנך רואה רק את התלמידים שלו (אותו scope כמו בכל מסך אחר, דרך
-  // accessibleIds ב-events()); מנהל/מפקח רואים הכל. כל כרטיס מציג את
-  // הדיווח המקורי + ציר-הזמן המלא של העדכונים עליו + טופס הוספת עדכון
-  // מיידי, כדי לראות את כל הסיפור (התקרית → שיחת הורים → הפניה לאבחון...)
-  // במקום אחד בלי לפתוח כל דיווח בנפרד.
+  // ── לוח המעקב (גרסה 2, 19/10/2026) ──────────────────────────────────
+  // במקום רשימה אחת שרק מתארכת: ארבעה טורים — פתוח / בטיפול / ממתין לדיווח קולי
+  // (מנהל) / נסגר השבוע. לכל כרטיס אחראי, גיל ותאריך בדיקה; צבע הפס = חומרה.
+  // מלמד/מחנך רואה כברירת מחדל רק מה ששלו (אחראי או רושם); מנהל ומפקח — הכול.
   async function renderFollowup(page) {
-    const [studs, cs, evs, cls, allCmts0] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
+    const [studs, evs, cls, allCmts0, ts] = await Promise.all([students(), events(), classes(), allComments(), types()]);
     let allCmts = allCmts0;
     if (window.Author) await window.Author.load();
+    const me = window.currentUser && window.currentUser.id;
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
-    const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
-    const clsOf = sid => { const s = studs.find(x => x.id == sid); const c = s && cls.find(x => x.id == s.class_id); return c ? c.name : 'ללא כיתה'; };
+    const clsOf = sid => { const s = studs.find(x => x.id == sid); const c = s && cls.find(x => x.id == s.class_id); return c ? c.name : ''; };
     const cmtsOf = id => allCmts.filter(c => c.event_id == id)
       .sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
-    // ממוין לפי דחיפות — מי שבאיחור או קרוב לתזכורת קודם; ללא תזכורת נדחק לסוף.
-    // בתוך אותו תאריך יעד (וגם בלי תאריך) — הוותיק קודם, כדי שמקרים שנשכחו לא ייקברו בסוף.
-    const byUrgency = (a, b) => byDueDate(a, b) || String(a.event_date || '').localeCompare(String(b.event_date || ''));
-    let list = evs.filter(e => e.followup).sort(byUrgency);
-    // "פתוח N ימים" — מתאריך הדיווח (אין עמודה של "מתי סומן"); "שקט" — מהעדכון האחרון.
+    const st = e => e.status || (e.followup ? 'open' : 'log');
     const STALE = 21;
     const lastTouch = e => { const c = cmtsOf(e.id); return c.length ? c[c.length - 1].comment_date : e.event_date; };
     const isStale = e => !isOverdue(e) && !(e.due_date && e.due_date >= today()) && (daysSince(lastTouch(e)) || 0) >= STALE;
+    const byUrgency = (a, b) => byDueDate(a, b) || String(a.event_date || '').localeCompare(String(b.event_date || ''));
+    const weekAgo = Date.now() - 7 * 86400000;
+    let list = evs.filter(e => ['open', 'in_progress'].includes(st(e)) || (st(e) === 'closed' && e.closed_at && Date.parse(e.closed_at) > weekAgo));
+    let mineOnly = !canSeeStats();
+    let voice = [];
+    if (isAdmin() && !DEMO && window.db && !window.db.DEMO) {
+      try { const r = await window.db.list('voice_reports', { eq: { status: 'draft' }, order: 'created_at', asc: true }); voice = (r && r.ok && r.data) || []; } catch (_) {}
+    }
 
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
-        '<h2><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h2>' +
-      '<div class="head-actions"><span class="count-line" id="fuCount"></span></div></div>' +
-      (await voiceAlertHtml()) +
-      '<div id="fuHint"></div>' +
-      '<div id="fuList"></div>' +
-      '<div id="fuEmpty" class="empty-state" hidden><i class="bi bi-emoji-smile"></i><div>אין כרגע דיווחים במעקב — כל הפתוח טופל</div></div>';
+        '<h2><i class="bi bi-flag-fill" style="color:var(--danger)"></i> לוח המעקב</h2>' +
+      '<div class="head-actions"><label class="fu-mine"><input type="checkbox" id="fuMine"' + (mineOnly ? ' checked' : '') + '> רק שלי</label>' +
+        '<span class="count-line" id="fuCount"></span></div></div>' +
+      '<div id="fuHint"></div><div class="fu-board" id="fuBoard"></div>';
 
-    function cardHtml(e) {
-      const cmts = cmtsOf(e.id);
-      return '<div class="qr-card" style="border-right:4px solid ' + flagColor(e.severity) + '">' +
-        '<div class="card-h-row">' +
-          '<h3 style="margin:0"><span class="sev-dot ' + sevClass(e.severity) + '"></span> ' +
-            esc(nameOf(e.student_id)) + ' <span class="tl-note" style="font-weight:400">· ' + esc(clsOf(e.student_id)) + '</span></h3>' +
-          '<button class="btn-ghost sm" data-resolve="' + e.id + '"><i class="bi bi-check2-circle"></i> סגירה עם סיכום</button>' +
-        '</div>' +
+    function card(e) {
+      const s = st(e), cm = cmtsOf(e.id), over = isOverdue(e);
+      const canEdit = !window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(e) || e.assignee === me;
+      const summary = s === 'closed' ? (cm.slice().reverse().find(c => /^סיכום סגירה:/.test(c.note || '')) || {}).note : null;
+      return '<div class="fu-card" style="border-inline-start-color:' + flagColor(e.severity) + '">' +
+        '<div class="fu-c-head"><b>' + esc(nameOf(e.student_id)) + '</b><span class="tl-note">' + esc(clsOf(e.student_id)) + '</span></div>' +
+        '<div class="fu-c-type">' + typeLabel(ts, e, '') + ' <span class="sev-dot ' + sevClass(e.severity) + '" title="חומרה: ' + esc(e.severity || '') + '"></span> <span class="tl-note">' + esc(e.severity || '') + '</span></div>' +
+        (e.note ? '<div class="tl-note nt fu-c-note">' + esc(e.note) + '</div>' : '') +
         '<div class="fu-age">' +
-          '<span class="chip off"><i class="bi bi-hourglass-split"></i> ' + (daysSince(e.event_date) ? 'פתוח ' + ageTxt(daysSince(e.event_date)) : 'נפתח היום') + '</span>' +
-          (cmts.length ? '<span class="chip off"><i class="bi bi-chat-left-text"></i> עדכון אחרון ' + (daysSince(lastTouch(e)) ? 'לפני ' + ageTxt(daysSince(lastTouch(e))) : 'היום') + '</span>'
-                       : '<span class="chip off"><i class="bi bi-chat-left"></i> בלי עדכונים</span>') +
-          (isStale(e) ? '<span class="chip warn"><i class="bi bi-moon"></i> שקט כבר ' + ageTxt(daysSince(lastTouch(e))) + ' — לעדכן, לקבוע תזכורת או לסגור</span>' : '') +
+          (e.assignee ? '<span class="chip off"><i class="bi bi-person-check"></i> ' + esc(window.Author ? window.Author.name(e.assignee) : '') + '</span>' : '') +
+          (s === 'closed' ? '' : '<span class="chip off"><i class="bi bi-hourglass-split"></i> ' + (daysSince(e.event_date) ? 'פתוח ' + ageTxt(daysSince(e.event_date)) : 'נפתח היום') + '</span>') +
+          (cm.length ? '<span class="chip off"><i class="bi bi-chat-left-text"></i> ' + cm.length + '</span>' : '') +
+          (isStale(e) && s !== 'closed' ? '<span class="chip warn"><i class="bi bi-moon"></i> שקט ' + ageTxt(daysSince(lastTouch(e))) + '</span>' : '') +
         '</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:.85rem">' +
-          '<span style="color:var(--muted)"><i class="bi bi-alarm"></i> תזכורת:</span>' +
-          '<input class="inp mb0" data-duedate="' + e.id + '" type="date" max="2099-12-31" value="' + esc(e.due_date || '') + '" style="width:auto;padding:4px 8px">' +
-          (isOverdue(e) ? '<span style="color:var(--danger);font-weight:700"><i class="bi bi-exclamation-triangle-fill"></i> באיחור</span>' : '') +
-        '</div>' +
-        '<div class="tl-item" style="margin:8px 0 10px">' +
-          '<div class="tl-main">' + esc(catOf(e.category_id)) + (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
-          '<div class="tl-meta">דיווח מקורי · ' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
-            ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
-        '</div>' +
-        (cmts.length ? cmts.map(commentRowHtml).join('') : '<div class="tl-note" style="padding:2px 2px 8px">אין עדיין עדכוני מעקב</div>') +
-        '<div class="form-grid" style="margin-top:4px">' +
-          '<label class="fld"><span>תאריך</span><input class="inp mb0" id="fuDate-' + e.id + '" type="date" value="' + today() + '"></label>' +
-          '<label class="fld fld-wide"><span>הוספת עדכון</span><textarea class="inp mb0 ta-auto" id="fuNote-' + e.id + '" rows="2" placeholder="למשל: דיברתי עם ההורים, הם יודעים"></textarea></label>' +
-        '</div>' +
-        '<button class="btn-primary sm" data-addcmt="' + e.id + '"><i class="bi bi-plus-lg"></i> הוספת עדכון</button>' +
+        (s === 'closed'
+          ? (summary ? '<div class="fu-sum">"' + esc(summary.replace(/^סיכום סגירה:\s*/, '')) + '"</div>' : '')
+          : '<div class="fu-c-due"><i class="bi bi-alarm"></i> בדיקה: ' +
+              (canEdit ? '<input class="inp mb0" data-duedate="' + e.id + '" type="date" max="2099-12-31" value="' + esc(e.due_date || '') + '">'
+                       : esc(hebDate(e.due_date) || e.due_date || '—')) +
+              (over ? ' <b class="fu-over"><i class="bi bi-exclamation-triangle-fill"></i> באיחור</b>' : '') + '</div>' +
+            '<div class="fu-c-act">' +
+              (s === 'open' && canEdit ? '<button class="btn-ghost sm" data-prog="' + e.id + '"><i class="bi bi-play-circle"></i> בטיפול</button>' : '') +
+              '<button class="btn-ghost sm" data-cm="' + e.id + '"><i class="bi bi-chat-left-text"></i> עדכון</button>' +
+              (canEdit ? '<button class="btn-ghost sm" data-resolve="' + e.id + '"><i class="bi bi-check2-circle"></i> סגירה</button>' : '') +
+            '</div>') +
       '</div>';
     }
+    const voiceCard = v => '<div class="fu-card fu-voice">' +
+      '<div class="fu-c-head"><b><i class="bi bi-mic-fill"></i> ' + esc(v.teacher_name || 'טיוטה מהקו') + '</b><span class="tl-note">' +
+        esc(ageTxt(daysSince(v.created_at) || 0)) + '</span></div>' +
+      (v.report_text || v.transcript ? '<div class="tl-note nt fu-c-note">' + esc(v.report_text || v.transcript) + '</div>' : '') +
+      '<div class="fu-c-act"><a class="btn-ghost sm" href="#voicereports"><i class="bi bi-check2"></i> לאישור</a></div></div>';
 
     function draw() {
-      const overdueN = list.filter(isOverdue).length;
-      page.querySelector('#fuCount').textContent = list.length + ' במעקב' + (overdueN ? ' · ' + overdueN + ' באיחור' : '');
-      const staleN = list.filter(isStale).length;
+      const vis = list.filter(e => !mineOnly || e.assignee === me || e.created_by === me);
+      const col = (key, title, icon, items, html) => '<section class="fu-col fu-col-' + key + '"><h3><i class="bi ' + icon + '"></i> ' + title +
+        ' <span class="fu-n">' + items.length + '</span></h3>' + (items.length ? items.map(html).join('') : '<div class="tl-note fu-empty">אין</div>') + '</section>';
+      const open = vis.filter(e => st(e) === 'open').sort(byUrgency), prog = vis.filter(e => st(e) === 'in_progress').sort(byUrgency);
+      const closed = vis.filter(e => st(e) === 'closed').sort((a, b) => String(b.closed_at).localeCompare(String(a.closed_at)));
+      page.querySelector('#fuBoard').innerHTML =
+        col('open', 'פתוח', 'bi-flag', open, card) + col('prog', 'בטיפול', 'bi-play-circle', prog, card) +
+        (isAdmin() ? col('voice', 'ממתין לדיווח קולי', 'bi-mic', voice, voiceCard) : '') +
+        col('closed', 'נסגר השבוע', 'bi-check2-circle', closed, card);
+      const active = open.concat(prog), overdueN = active.filter(isOverdue).length, staleN = active.filter(isStale).length;
+      page.querySelector('#fuCount').textContent = active.length + ' פתוחים' + (overdueN ? ' · ' + overdueN + ' באיחור' : '') +
+        (mineOnly ? ' (שלי, מתוך ' + list.filter(e => st(e) !== 'closed').length + ')' : '');
       page.querySelector('#fuHint').innerHTML = staleN
-        ? '<div class="fu-hint"><i class="bi bi-moon"></i> ' + staleN + ' מתוך ' + list.length + ' מקרים לא זזו ' + STALE + ' יום ויותר. ' +
-          'כל אחד מהם: עדכון, תאריך תזכורת, או סגירה עם משפט סיכום.</div>' : '';
-      page.querySelector('#fuList').innerHTML = list.map(cardHtml).join('');
-      page.querySelector('#fuEmpty').hidden = list.length > 0;
-
-      page.querySelectorAll('[data-duedate]').forEach(inp => inp.addEventListener('change', async () => {
-        const ev = list.find(x => x.id == inp.dataset.duedate); if (!ev) return;
-        const r = await updEvent(ev.id, { due_date: inp.value || null });
-        if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
-        ev.due_date = inp.value || null;
-        list.sort(byUrgency);
-        draw(); window.UI.toast('התזכורת עודכנה');
-      }));
-      page.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', async () => {
-        const ev = list.find(x => x.id == b.dataset.resolve); if (!ev) return;
-        if (!(await resolveWithSummary(ev, nameOf(ev.student_id)))) return;
-        allCmts = await allComments();
-        list = list.filter(x => x.id !== ev.id); draw();
-      }));
-      page.querySelectorAll('[data-cmtdel]').forEach(b => b.addEventListener('click', async () => {
-        if (!(await window.UI.confirm('למחוק את העדכון?'))) return;
-        const r = await delComment(Number(b.dataset.cmtdel));
-        if (!r || r.ok === false) { window.UI.toast('המחיקה נכשלה', 'err'); return; }
-        const idx = allCmts.findIndex(c => c.id == b.dataset.cmtdel);
-        if (idx !== -1) allCmts.splice(idx, 1);
-        draw(); window.UI.toast('נמחק');
-      }));
-      page.querySelectorAll('[data-addcmt]').forEach(b => b.addEventListener('click', async () => {
-        const id = b.dataset.addcmt;
-        const noteEl = page.querySelector('#fuNote-' + id), dateEl = page.querySelector('#fuDate-' + id);
-        const note = noteEl.value.trim();
-        if (!note) { window.UI.toast('כתוב עדכון', 'err'); return; }
-        const r = await addComment(Number(id), { comment_date: dateEl.value || today(), note });
-        if (!r || r.ok === false) { window.UI.toast('השמירה נכשלה', 'err'); return; }
-        allCmts.push((r.data && r.data[0]) || { id: Date.now(), event_id: Number(id), comment_date: dateEl.value || today(), note });
-        draw(); window.UI.toast('העדכון נוסף');
-      }));
+        ? '<div class="fu-hint"><i class="bi bi-moon"></i> ' + staleN + ' מקרים לא זזו ' + STALE + ' יום ויותר. לכל אחד: עדכון, תאריך בדיקה או סגירה עם משפט סיכום.</div>' : '';
     }
+    page.querySelector('#fuMine').addEventListener('change', ev => { mineOnly = ev.target.checked; draw(); });
+    page.querySelector('#fuBoard').addEventListener('click', async ev => {
+      const nt = ev.target.closest('.nt'); if (nt) { nt.classList.toggle('full'); return; }
+      const b = ev.target.closest('[data-prog],[data-cm],[data-resolve]'); if (!b) return;
+      const e = list.find(x => x.id == (b.dataset.prog || b.dataset.cm || b.dataset.resolve)); if (!e) return;
+      if (b.dataset.prog) {
+        const r = await updEvent(e.id, { status: 'in_progress' });
+        if (!r || r.ok === false) { window.UI.toast(friendlyErr(r && r.error), 'err'); return; }
+        e.status = 'in_progress'; draw(); window.UI.toast('סומן "בטיפול"');
+      } else if (b.dataset.cm) {
+        openComments(e, { title: nameOf(e.student_id), onChange: async () => { allCmts = await allComments(); draw(); } });
+      } else if (await resolveWithSummary(e, nameOf(e.student_id))) {
+        allCmts = await allComments(); draw();
+      }
+    });
+    page.querySelector('#fuBoard').addEventListener('change', async ev => {
+      const inp = ev.target.closest('[data-duedate]'); if (!inp) return;
+      const e = list.find(x => x.id == inp.dataset.duedate); if (!e) return;
+      const r = await updEvent(e.id, { due_date: inp.value || null });
+      if (!r || r.ok === false) { window.UI.toast(friendlyErr(r && r.error), 'err'); return; }
+      e.due_date = inp.value || null; draw(); window.UI.toast('תאריך הבדיקה עודכן');
+    });
     draw();
   }
 
@@ -719,7 +889,10 @@
     const stale = () => widgetSeq.get(container) !== seq;
     const [evs, voice] = await Promise.all([events(), voiceAlertHtml()]);
     if (stale()) return;
-    const list = evs.filter(e => e.followup).sort(byDueDate);
+    // הבית מציג רק מה ששלך (אחראי או רושם); מנהל ומפקח רואים הכול
+    const me = window.currentUser && window.currentUser.id;
+    const allOpen = evs.filter(e => e.followup);
+    const list = (canSeeStats() ? allOpen : allOpen.filter(e => e.assignee === me || e.created_by === me)).sort(byDueDate);
     if (window.Author) await window.Author.load();
     if (stale()) return;
     if (!list.length) {
@@ -739,7 +912,7 @@
           '<span class="chip" style="' + (overdueN
             ? 'background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)'
             : 'background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)') + '">' +
-            list.length + (overdueN ? ' · ' + overdueN + ' באיחור' : '') + '</span></div>' +
+            list.length + (overdueN ? ' · ' + overdueN + ' באיחור' : '') + (list.length < allOpen.length ? ' (מתוך ' + allOpen.length + ')' : '') + '</span></div>' +
         list.map(e => {
           const over = isOverdue(e);
           return '<div class="fu-widget-item" style="border-right:3px solid ' + flagColor(e.severity) + '">' +
@@ -756,7 +929,7 @@
             '</div>' +
           '</div>';
         }).join('') +
-        '<div style="text-align:center;margin-top:8px"><a href="#followup" class="btn-ghost sm">כל הרשימה ←</a></div>' +
+        '<div style="text-align:center;margin-top:8px"><a href="#followup" class="btn-ghost sm">ללוח המעקב ←</a></div>' +
       '</div>';
     container.querySelectorAll('[data-wcmt]').forEach(b => b.addEventListener('click', () => {
       const ev = list.find(x => x.id == b.dataset.wcmt); if (!ev) return;

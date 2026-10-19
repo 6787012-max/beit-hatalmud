@@ -17,11 +17,6 @@
     // מגיעים — כלומר מי שהתחלף רואה לרגע מסכים שאינם שלו.
     host.innerHTML = '<div class="page-loading"><span class="spin">' +
       '<i class="bi bi-arrow-repeat"></i></span><div>טוען…</div></div>';
-    const cats = await window.store.list('categories');
-    if (seq !== runSeq) return;
-    const catOpts = cats.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
-    const pickHtml = await window.cv3Picker.html('th');
-    if (seq !== runSeq) return;
     const u = window.currentUser || {};
     const isMechanech = u.role === 'מחנך';
     // כפתורי הפעולה נגזרים מההרשאות בפועל, ולא מרשימה קשיחה.
@@ -38,44 +33,19 @@
       esc(m.id === 'behavior' ? 'מעקב מלא' : m.id === 'students' ? 'התלמידים שלי' : m.label) +
       '</span></button>';
     host.innerHTML =
-      '<div class="teacher-card"><h3><i class="bi bi-lightning-charge"></i> רישום מהיר לתלמיד</h3>' +
-        '<div class="qr-grid" style="grid-template-columns:repeat(3,1fr) auto">' +
-          pickHtml +
-          '<select class="inp mb0" id="thCat"><option value="">בחר קטגוריה…</option>' + catOpts + '</select>' +
-          '<input class="inp mb0" id="thDate" type="date" value="' + today() + '" title="תאריך">' +
-          '<input class="inp mb0" id="thTime" type="time" title="שעה">' +
-          '<textarea class="inp mb0 fld-wide ta-auto" id="thNote" rows="3" placeholder="הערה (רשות) — אפשר כמה שורות" style="grid-column:1/-2"></textarea>' +
-          '<label style="display:flex;align-items:center;gap:5px;font-size:.85rem;color:var(--muted);white-space:nowrap;cursor:pointer"><input type="checkbox" id="thFollow"> מעקב — דורש טיפול המשך</label>' +
-          (window.cv3Behavior ? window.cv3Behavior.quickExtrasHtml('th') : '') +
-          '<button class="btn-primary qs-save" id="thSave"><i class="bi bi-check-lg"></i> שמור רישום</button>' +
-        '</div><div id="thMsg" class="count-line" style="margin-top:8px;min-height:1.2em"></div></div>' +
+      // טופס גרסה 2 (behavior.js → quickForm): מי (אפשר כמה) → מה קרה → כמה חמור → צריך המשך?
+      '<div class="teacher-card"><h3><i class="bi bi-lightning-charge"></i> דיווח מהיר</h3><div id="thForm"></div></div>' +
       '<div id="thFollowupWidget"></div>' +
       '<div class="teacher-actions">' + allowed.map(goBtn).join('') + '</div>';
     if (seq !== runSeq) return;
     if (window.cv3Behavior) window.cv3Behavior.renderFollowupWidget(host.querySelector('#thFollowupWidget'));
-    const pick = window.cv3Picker.wire(host, 'th');
     host.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => window.showPage(b.dataset.go)));
-    const qx = window.cv3Behavior ? window.cv3Behavior.wireQuickExtras(host, 'th', host.querySelector('#thFollow')) : null;
-    host.querySelector('#thSave').addEventListener('click', async ev => {
-      const btn = ev.currentTarget;
-      const sid = pick.value();
-      if (!sid) { window.UI.toast('בחר תלמיד', 'err'); return; }
-      const cat = host.querySelector('#thCat').value;
-      const followup = host.querySelector('#thFollow').checked;
-      const row = Object.assign({ student_id: Number(sid), category_id: cat ? Number(cat) : null, event_date: host.querySelector('#thDate').value || today(), event_time: host.querySelector('#thTime').value, note: host.querySelector('#thNote').value.trim(), followup }, qx ? qx.read() : {});
-      // שמירה כפולה: הכפתור ננעל עד תשובה, ודיווח זהה תוך 2 דקות מבקש אישור
-      const r = window.cv3Behavior ? await window.cv3Behavior.saveQuick(btn, row) : await window.store.add('behavior_events', row);
-      if (!r) return;
-      if (r.ok) {
-        host.querySelector('#thNote').value = ''; host.querySelector('#thTime').value = '';
-        host.querySelector('#thFollow').checked = false;
-        if (qx) qx.reset();
-        pick.reset();
-        host.querySelector('#thMsg').textContent = '✓ הרישום נשמר בהצלחה';
-        window.UI.toast('נשמר');
-        // דיווח חדש שסומן "מעקב" צריך להופיע בחלונית מיד, לא רק בכניסה הבאה למסך.
-        if (row.followup && window.cv3Behavior) window.cv3Behavior.renderFollowupWidget(host.querySelector('#thFollowupWidget'));
-      } else { window.UI.toast('שגיאה', 'err'); }
+    if (window.cv3Behavior) await window.cv3Behavior.quickForm(host.querySelector('#thForm'), 'th', {
+      // מקרה שנפתח צריך להופיע בחלונית מיד, לא רק בכניסה הבאה למסך
+      onSaved: rows => {
+        if (rows.some(r => r.followup || r.status === 'open') && seq === runSeq)
+          window.cv3Behavior.renderFollowupWidget(host.querySelector('#thFollowupWidget'));
+      },
     });
   };
 })();

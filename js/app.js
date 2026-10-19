@@ -12,7 +12,7 @@
     { id: 'behavior',      label: 'מעקב',             icon: 'bi-clipboard-check', group: G1, color: '#c0392b' },
     // ריכוז כל הדיווחים שסומנו "במעקב" בכל הכיתות — לשונית נפרדת כדי שלא
     // יאבדו בתוך רשימת כל הדיווחים (בקשת יוסף, 03/09/2026).
-    { id: 'followup',      label: 'מעקב דחוף',        icon: 'bi-flag-fill',       group: G1, color: '#a4161a' },
+    { id: 'followup',      label: 'לוח המעקב',        icon: 'bi-flag-fill',       group: G1, color: '#a4161a' },
     { id: 'attendance',    label: 'נוכחות',           icon: 'bi-calendar-check',  group: G1, color: '#1f8a5b' },
     { id: 'tests',         label: 'מבחנים',           icon: 'bi-card-checklist',  group: G1, color: '#d68910' },
     { id: 'readassess',    label: 'מעקב קריאה',       icon: 'bi-book-half',       group: G1, color: '#7d3c98' },
@@ -173,6 +173,7 @@
       rows = rows.slice(0, 6);
       const cmtCounts = window.cv3Behavior ? window.cv3Behavior.commentCounts(allCmts) : {};
       const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
+      if (window.cv3Behavior) await window.cv3Behavior.types();
       const catOf = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
       // דגל צבוע לפי חומרה (לא שדה חדש) — אותה מוסכמה כמו js/behavior.js
@@ -185,7 +186,7 @@
         return '<div class="tl-item hr-item" data-ev="' + e.id + '"><span class="sev-dot ' + sevc(e.severity) + '"></span>' +
         '<div class="tl-main">' +
           '<div class="hr-head"><strong>' + _esc(nameOf(e.student_id)) + '</strong>' +
-            (catOf(e.category_id) ? ' · ' + _esc(catOf(e.category_id)) : '') +
+            ((window.cv3Behavior && window.cv3Behavior.typeName(e)) || catOf(e.category_id) ? ' · ' + _esc((window.cv3Behavior && window.cv3Behavior.typeName(e)) || catOf(e.category_id)) : '') +
             (e.followup ? ' <span class="chip warn" style="color:' + flagColor(e.severity) + '"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
           (e.note ? '<div class="tl-note hr-note" data-note>' + _esc(e.note) + '</div>' : '') +
         '</div>' +

@@ -185,7 +185,7 @@
     if (studentId) {
       await window.db.insert('behavior_events', {
         student_id: Number(studentId), note: text,
-        event_date: new Date().toISOString().slice(0, 10), created_by: uid
+        event_date: new Date().toISOString().slice(0, 10), created_by: uid, source: 'phone'
       });
     }
     window.UI.toast('הדיווח אושר' + (studentId ? ' ונכנס לתיק התלמיד' : ''), 'ok');

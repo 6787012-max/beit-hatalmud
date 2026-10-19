@@ -984,3 +984,53 @@ body.dark .lb-prev{background:#0a1219}
 }
 /* בורר התלמיד בטלפון: ב-flex-direction:column ה-flex-basis (150/240px) הפך לגובה, והבורר תפס חצי מסך */
 @media (max-width:600px){ .stu-pick>.pk-class, .stu-pick>.pk-combo{flex:0 0 auto} }
+/* ===== מעקב התנהגות — גרסה 2 (19/10/2026) ===== */
+/* טופס הדיווח: מי → מה קרה → כמה חמור → צריך המשך? */
+.qf{display:flex; flex-direction:column; gap:9px}
+.qf-step{font-size:.84rem; font-weight:800; color:var(--primary-dark); display:flex; align-items:center; gap:7px; margin-top:2px}
+.qf-step b{display:inline-grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--primary); color:#fff; font-size:.72rem}
+.qf-step small{font-weight:400; color:var(--muted)}
+.qf .stu-pick{grid-column:auto}
+.qf-chips{display:flex; flex-wrap:wrap; gap:6px}
+.qf-chips:empty{display:none}
+.qf-chip{display:inline-flex; align-items:center; gap:4px; background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary-dark); border-radius:999px; padding:3px 6px 3px 11px; font-weight:700; font-size:.86rem}
+.qf-chip button{border:0; background:none; font-size:1.05rem; line-height:1; cursor:pointer; color:inherit; padding:0 4px}
+.qf-all{align-self:flex-start}
+.qf-types{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:6px}
+.qf-type{display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 4px; border:1px solid var(--line); border-radius:12px; background:var(--card); font:inherit; font-size:.84rem; font-weight:700; cursor:pointer; color:inherit}
+.qf-type span{font-size:1.35rem; line-height:1.1}
+.qf-type.on{border-color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,transparent); box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 35%,transparent)}
+.qf-type.ty-positive{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+.qf-type.ty-positive.on{background:color-mix(in srgb,var(--ok) 15%,transparent); border-color:var(--ok); box-shadow:0 0 0 2px color-mix(in srgb,var(--ok) 35%,transparent)}
+.qf-when{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
+.qf-when .inp{width:auto}
+.qf-when .heb-date{font-size:.76rem; color:var(--muted)}
+.qf-asg{display:flex; align-items:center; gap:8px; font-size:.84rem; font-weight:700}
+.qf-asg[hidden], .qf-sevrow[hidden], .qf-all[hidden]{display:none}
+.qf .qs-save{align-self:flex-start; min-width:150px; justify-content:center}
+/* סוג ומצב ברשימות */
+.ty{font-weight:700}
+.ty-positive{color:var(--ok)}
+.ty-none{color:var(--muted); font-style:italic; font-weight:400}
+.chip.st-open{background:color-mix(in srgb,var(--danger) 13%,transparent); color:var(--danger)}
+.chip.st-in_progress{background:color-mix(in srgb,var(--accent) 18%,transparent); color:#8a5a00}
+.chip.st-closed{background:color-mix(in srgb,var(--ok) 14%,transparent); color:var(--ok)}
+/* לוח המעקב */
+.fu-mine{display:inline-flex; align-items:center; gap:5px; font-size:.85rem; cursor:pointer}
+.fu-board{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; align-items:start}
+.fu-col{background:color-mix(in srgb,var(--muted) 7%,transparent); border-radius:14px; padding:10px}
+.fu-col h3{font-size:.95rem; margin:2px 4px 10px; display:flex; align-items:center; gap:6px; color:var(--primary-dark)}
+.fu-n{margin-inline-start:auto; background:var(--card); border-radius:999px; padding:1px 9px; font-size:.8rem}
+.fu-card{background:var(--card); border:1px solid var(--line); border-inline-start:4px solid var(--accent); border-radius:11px; padding:10px 12px; margin-bottom:8px; box-shadow:var(--shadow); font-size:.88rem}
+.fu-c-head{display:flex; justify-content:space-between; gap:8px; align-items:baseline}
+.fu-c-type{margin:3px 0; display:flex; align-items:center; gap:6px}
+.fu-c-note{display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer; margin:3px 0}
+.fu-c-note.full{display:block}
+.fu-c-due{display:flex; align-items:center; gap:6px; margin:6px 0 2px; font-size:.82rem; color:var(--muted)}
+.fu-c-due .inp{width:auto; padding:3px 6px}
+.fu-over{color:var(--danger)}
+.fu-c-act{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px}
+.fu-c-act .btn-ghost{padding:3px 9px; font-size:.78rem}
+.fu-sum{margin-top:6px; font-style:italic; color:var(--ok)}
+.fu-voice{border-inline-start-color:#8e44ad}
+.fu-empty{padding:4px 6px}

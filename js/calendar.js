@@ -53,6 +53,7 @@
       if (window.Auth && window.Auth.canAccess('behavior')) {
         try { beh = await s.list('behavior_events'); } catch (_) {}
         try { cats = await s.list('categories'); } catch (_) {}
+        try { if (window.cv3Behavior) await window.cv3Behavior.types(); } catch (_) {}
         try { studs = window.cv3Students ? await window.cv3Students.getStudents() : []; } catch (_) {}
       }
     }
@@ -91,7 +92,7 @@
     });
     (data.beh || []).forEach(b => {
       if (!b.event_date) return;
-      const cat = catOf(b.category_id);
+      const cat = (window.cv3Behavior && window.cv3Behavior.typeName(b)) || catOf(b.category_id);
       const text = nameOf(b.student_id) + (cat ? ' · ' + cat : '') + (b.followup ? ' 🚩' : '');
       push(b.event_date, { color: flagColor(b.severity), text, time: b.event_time || '', type: 'behavior', typeLbl: 'מעקב תלמיד', raw: b });
     });

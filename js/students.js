@@ -216,6 +216,7 @@
       const ph = (photoRows || [])[0];
       const bigPhoto = ph && ph.photo ? 'data:' + (ph.mime || 'image/jpeg') + ';base64,' + ph.photo : '';
       const canTla = !window.Auth || window.Auth.canAccess('tla');
+      if (window.cv3Behavior) await window.cv3Behavior.types();   // סוג אירוע (גרסה 2) לפני הקטגוריה הישנה
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
       const sevc = x => x === 'גבוהה' ? 'hi' : x === 'נמוכה' ? 'lo' : 'mid';
@@ -263,7 +264,7 @@
               const cn = behCmts.filter(c => c.event_id == e.id).length;
               return '<div class="det-item hr-item" data-ev="' + e.id + '">' +
               '<span class="sev-dot ' + sevc(e.severity) + '"></span>' +
-              '<span class="di-main"><div class="hr-head"><strong>' + esc(catName(e.category_id) || 'דיווח') + '</strong>' +
+              '<span class="di-main"><div class="hr-head"><strong>' + esc((window.cv3Behavior && window.cv3Behavior.typeName(e)) || catName(e.category_id) || 'דיווח') + '</strong>' +
               (e.followup ? ' <span class="chip warn"><i class="bi bi-flag-fill"></i> במעקב</span>' : '') + '</div>' +
               (e.note ? '<div class="tl-note hr-note" data-note>' + esc(e.note) + '</div>' : '') + '</span>' +
               '<span class="di-meta">' + esc(hebDate(e.event_date) || '') +
