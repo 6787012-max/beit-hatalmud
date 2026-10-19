@@ -1034,3 +1034,34 @@ body.dark .lb-prev{background:#0a1219}
 .fu-sum{margin-top:6px; font-style:italic; color:var(--ok)}
 .fu-voice{border-inline-start-color:#8e44ad}
 .fu-empty{padding:4px 6px}
+/* ===== מעקב התנהגות — שלב 3: כרטיס דפוסים, סיכום שבועי, התראות ===== */
+.pc-link{cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
+.pc h4{margin:14px 0 6px; font-size:.9rem; color:var(--primary-dark)}
+.pc-alert{background:color-mix(in srgb,var(--danger) 12%,transparent); color:var(--danger); border-radius:10px; padding:8px 12px; font-weight:700; margin-bottom:6px}
+.pc-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:8px}
+.pc-kpi{background:color-mix(in srgb,var(--muted) 8%,transparent); border-radius:12px; padding:9px 10px; display:flex; flex-direction:column; gap:2px}
+.pc-kpi b{font-size:1.35rem; color:var(--primary-dark)}
+.pc-kpi span{font-size:.8rem; color:var(--muted); font-weight:700}
+.pc-kpi small{font-size:.74rem; color:var(--muted)}
+.pc-kpi small a{color:inherit}
+.pc-kpi.pos b{color:var(--ok)} .pc-kpi.cor b{color:var(--danger)}
+.pc-ratio{display:flex; height:26px; border-radius:8px; overflow:hidden; font-size:.78rem; font-weight:800}
+.pc-ratio span{display:flex; align-items:center; justify-content:center; color:#fff; min-width:0}
+.pc-ratio .pos{background:var(--ok)} .pc-ratio .cor{background:var(--danger)}
+.pc-small{font-size:.78rem; margin-top:4px}
+.pc-weeks{display:grid; grid-template-columns:repeat(8,1fr); gap:6px; align-items:end}
+.pc-w{display:flex; flex-direction:column; align-items:center; gap:3px}
+.pc-bar{height:80px; width:100%; max-width:34px; display:flex; flex-direction:column-reverse; background:color-mix(in srgb,var(--muted) 8%,transparent); border-radius:6px; overflow:hidden}
+.pc-bar i{display:block; width:100%}
+.pc-bar .cor{background:var(--danger)} .pc-bar .oth{background:var(--accent)} .pc-bar .pos{background:var(--ok)}
+.pc-w small{font-size:.66rem; color:var(--muted); white-space:nowrap}
+.pc-up{color:var(--danger); font-weight:700} .pc-down{color:var(--ok); font-weight:700}
+.pc-tags{display:flex; flex-wrap:wrap; gap:6px}
+.ws summary{cursor:pointer; font-weight:800; color:var(--primary-dark); display:flex; align-items:center; gap:8px; margin-bottom:10px}
+.ws-who{margin-top:10px; font-size:.86rem}
+.ws-att{margin-top:10px; background:color-mix(in srgb,var(--accent) 10%,transparent); border-radius:12px; padding:9px 12px; font-size:.86rem}
+.ws-att ul{margin:6px 0 0; padding-inline-start:18px}
+.nt-card{border-inline-start:4px solid var(--danger)}
+.nt-item{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--line); font-size:.86rem}
+.nt-act{display:flex; gap:4px; flex:none}
+@media (max-width:560px){ .pc-weeks{gap:3px} .pc-w small{display:none} }

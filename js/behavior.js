@@ -187,6 +187,162 @@
     return { reset };
   }
 
+  // ── שלב 3 (19/10/2026): כרטיס דפוסים, סיכום שבועי והתראות ─────────────
+  // במקום רשימה ארוכה של הערות: תמונה אחת שעונה על "כמה, מה, איפה, מתי ומי".
+  // הכול מחושב בדפדפן מהדיווחים שהמשתמש ממילא רשאי לראות (RLS), כולל איחורים
+  // מהנוכחות. ההתראות עצמן נוצרות בשרת (migration_behavior_rules.sql).
+  const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+  const isoDaysAgo = n => addDays(-n);
+  const weekStart = off => { const d = new Date(); d.setDate(d.getDate() - d.getDay() - 7 * (off || 0)); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const dirOf = (ts, e) => ((ts.find(t => t.id == e.type_id) || {}).direction) || 'neutral';
+  const topOf = (arr, key) => { const m = {}; arr.forEach(x => { const k = key(x); if (k) m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+  const bucket = t => { const h = parseInt(String(t || '').slice(0, 2), 10); return isNaN(h) ? '' : h < 12 ? 'בוקר' : h < 16 ? 'צהריים' : 'אחר הצהריים / ערב'; };
+  async function rulesList() {
+    let r = [];
+    try { r = await window.store.list('behavior_rules'); } catch (_) {}
+    return (r && r.length ? r : [{ name: '3 דיווחי לתיקון בשבועיים', scope: 'corrective', threshold: 3, window_days: 14, active: true }]).filter(x => x.active !== false);
+  }
+  // כמה מהכללים התלמיד עובר כרגע (לתצוגה בלבד; ההתראה עצמה נשלחת מהשרת)
+  function ruleHits(rules, ts, evs, att) {
+    return rules.filter(r => {
+      const from = isoDaysAgo(r.window_days);
+      const n = r.scope === 'late' ? att.filter(a => a.status === 'late' && a.date > from).length
+        : evs.filter(e => e.event_date > from && (r.scope === 'type' ? e.type_id == r.type_id : dirOf(ts, e) === 'corrective')).length;
+      return n >= r.threshold;
+    });
+  }
+
+  async function patternCard(sid) {
+    const [studs, cls, ts, rules, all] = await Promise.all([students(), classes(), types(), rulesList(), events()]);
+    let att = [];
+    try { att = await window.store.byStudent('attendance', sid); } catch (_) {}
+    if (window.Author) await window.Author.load();
+    const s = studs.find(x => x.id == sid) || {};
+    const c = cls.find(x => x.id == s.class_id);
+    const evs = all.filter(e => e.student_id == sid);
+    const m30 = isoDaysAgo(30), last30 = evs.filter(e => e.event_date > m30);
+    const pos = last30.filter(e => dirOf(ts, e) === 'positive').length, cor = last30.filter(e => dirOf(ts, e) === 'corrective').length;
+    const late30 = att.filter(a => a.status === 'late' && a.date > m30).length, abs30 = att.filter(a => a.status === 'absent' && a.date > m30).length;
+    const weeks = Array.from({ length: 8 }, (_, i) => {
+      const a = weekStart(7 - i), b = weekStart(6 - i);
+      const inW = e => e.event_date >= a && (i === 7 || e.event_date < b);
+      return { label: (hebDate(a) || a).split(' ').slice(0, 2).join(' '), cor: evs.filter(e => inW(e) && dirOf(ts, e) === 'corrective').length,
+        pos: evs.filter(e => inW(e) && dirOf(ts, e) === 'positive').length, oth: evs.filter(e => inW(e) && dirOf(ts, e) === 'neutral').length };
+    });
+    const max = Math.max(1, ...weeks.map(w => w.cor + w.pos + w.oth));
+    const recent = evs.filter(e => e.event_date > isoDaysAgo(14)).length, before = evs.filter(e => e.event_date > isoDaysAgo(28) && e.event_date <= isoDaysAgo(14)).length;
+    const trend = recent > before + 1 ? '<span class="pc-up">↑ עלייה בשבועיים האחרונים (' + recent + ' מול ' + before + ')</span>'
+      : recent + 1 < before ? '<span class="pc-down">↓ ירידה בשבועיים האחרונים (' + recent + ' מול ' + before + ')</span>' : 'יציב בשבועיים האחרונים';
+    const hits = ruleHits(rules, ts, evs, att);
+    const topTypes = topOf(evs, e => { const t = ts.find(x => x.id == e.type_id); return t ? t.icon + ' ' + t.name : ''; }).slice(0, 4);
+    const topPlace = topOf(evs, e => e.place)[0], topDay = topOf(evs, e => { const d = new Date(e.event_date); return isNaN(d) ? '' : DAY_NAMES[d.getDay()]; })[0];
+    const topTime = topOf(evs, e => bucket(e.event_time))[0];
+    const open = evs.filter(e => ['open', 'in_progress'].includes(e.status || (e.followup ? 'open' : 'log')));
+    const kpi = (n, l, cls2) => '<div class="pc-kpi' + (cls2 ? ' ' + cls2 : '') + '"><b>' + n + '</b><span>' + l + '</span></div>';
+    window.UI.modal({
+      title: 'כרטיס דפוסים — ' + esc(s.name || '') + (c ? ' · ' + esc(c.name) : ''), cancelLabel: 'סגירה',
+      bodyHTML: '<div class="pc">' +
+        hits.map(r => '<div class="pc-alert"><i class="bi bi-exclamation-triangle-fill"></i> עובר את הכלל "' + esc(r.name) + '"</div>').join('') +
+        '<div class="pc-kpis">' + kpi(last30.length, 'דיווחים בחודש') + kpi('⭐ ' + pos, 'חיוביים', 'pos') + kpi(cor, 'לתיקון', cor ? 'cor' : '') +
+          kpi(late30, 'איחורים בנוכחות') + kpi(abs30, 'היעדרויות') + '</div>' +
+        '<h4>חיובי מול לתיקון (חודש אחרון)</h4>' +
+        (pos + cor ? '<div class="pc-ratio"><span class="pos" style="flex:' + pos + '">' + (pos ? '⭐ ' + pos : '') + '</span><span class="cor" style="flex:' + cor + '">' + (cor ? cor + ' לתיקון' : '') + '</span></div>'
+          : '<div class="tl-note">אין דיווחים חיוביים או מתקנים בחודש האחרון</div>') +
+        '<div class="tl-note pc-small">היעד המקובל: 4 חיוביים על כל הערה מתקנת</div>' +
+        '<h4>דיווחים בכל שבוע</h4><div class="pc-weeks">' + weeks.map(w =>
+          '<div class="pc-w" title="' + esc(w.label) + ': ' + (w.cor + w.pos + w.oth) + '"><div class="pc-bar">' +
+            '<i class="cor" style="height:' + (w.cor / max * 100) + '%"></i><i class="oth" style="height:' + (w.oth / max * 100) + '%"></i><i class="pos" style="height:' + (w.pos / max * 100) + '%"></i>' +
+          '</div><small>' + esc(w.label) + '</small></div>').join('') + '</div>' +
+        '<div class="tl-note pc-small">' + trend + '</div>' +
+        '<h4>מה, איפה ומתי</h4><div class="pc-tags">' +
+          (topTypes.map(([k, n]) => '<span class="chip off">' + esc(k) + ' ' + n + '</span>').join('') || '<span class="tl-note">אין עדיין</span>') +
+          (topPlace ? '<span class="chip off">📍 בעיקר ב' + esc(topPlace[0]) + '</span>' : '') +
+          (topDay ? '<span class="chip off">📅 בעיקר ביום ' + esc(topDay[0]) + '</span>' : '') +
+          (topTime ? '<span class="chip off">🕘 בעיקר ב' + esc(topTime[0]) + '</span>' : '') + '</div>' +
+        (open.length ? '<h4>מקרה פתוח</h4>' + open.map(e => '<div class="tl-item"><div class="tl-main">' + typeLabel(ts, e, '') + ' ' + statusChip(e) +
+            (e.assignee ? ' · ' + esc(window.Author ? window.Author.name(e.assignee) : '') : '') + '</div><div class="tl-meta">' +
+            (daysSince(e.event_date) ? 'פתוח ' + ageTxt(daysSince(e.event_date)) : 'נפתח היום') + '</div></div>').join('') : '') +
+        '<h4>אחרונים</h4>' + (evs.slice().sort((a, b) => String(b.event_date).localeCompare(String(a.event_date))).slice(0, 5).map(e =>
+          '<div class="tl-item"><div class="tl-main">' + typeLabel(ts, e, '') + (e.note ? ' <span class="tl-note nt">— ' + esc(e.note) + '</span>' : '') + '</div>' +
+          '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + '</div></div>').join('') || '<div class="tl-note">אין דיווחים</div>') +
+      '</div>',
+    });
+  }
+
+  // סיכום שבועי (מנהל ומפקח) — "ככה נראה הסיכום כשהמערכת מתפקדת"
+  async function weeklySummaryHtml() {
+    if (!canSeeStats()) return '';
+    const [evs, studs, cls, ts, rules] = await Promise.all([events(), students(), classes(), types(), rulesList()]);
+    if (window.Author) await window.Author.load();
+    let att = [];
+    try { att = await window.store.list('attendance'); } catch (_) {}
+    const w0 = weekStart(0), w1 = weekStart(1);
+    const thisW = evs.filter(e => e.event_date >= w0), prevW = evs.filter(e => e.event_date >= w1 && e.event_date < w0);
+    const posPct = thisW.length ? Math.round(thisW.filter(e => dirOf(ts, e) === 'positive').length / thisW.length * 100) : 0;
+    const active = evs.filter(e => ['open', 'in_progress'].includes(e.status || (e.followup ? 'open' : 'log')));
+    const overdue = active.filter(e => e.due_date && e.due_date < today()).length;
+    const byStu = sid => evs.filter(e => e.student_id == sid);
+    const rising = studs.filter(s => { const v = byStu(s.id); const a = v.filter(e => e.event_date > isoDaysAgo(14)).length, b = v.filter(e => e.event_date > isoDaysAgo(28) && e.event_date <= isoDaysAgo(14)).length; return a >= 2 && a > b + 1; });
+    const overRule = studs.filter(s => ruleHits(rules, ts, byStu(s.id), att.filter(a => a.student_id == s.id)).length);
+    const quiet = {};
+    studs.forEach(s => { if (!byStu(s.id).some(e => e.event_date > isoDaysAgo(30))) { const c = cls.find(x => x.id == s.class_id); const k = c ? c.name : 'ללא שיעור'; quiet[k] = (quiet[k] || 0) + 1; } });
+    const staff = (window.Author ? window.Author.all() : []).filter(p => p.active && ['מחנך', 'מלמד'].includes(p.role));
+    const silent = staff.filter(p => !evs.some(e => e.created_by === p.id && e.event_date > isoDaysAgo(14)));
+    let voiceN = 0;
+    if (isAdmin() && !DEMO && window.db && !window.db.DEMO) {
+      try { const r = await window.db.list('voice_reports', { eq: { status: 'draft' } }); voiceN = ((r && r.data) || []).length; } catch (_) {}
+    }
+    const who = topOf(thisW, e => window.Author ? window.Author.name(e.created_by) : '').slice(0, 6);
+    const stuLinks = arr => arr.slice(0, 6).map(s => '<a href="#" data-pc="' + s.id + '">' + esc(s.name) + '</a>').join(', ') + (arr.length > 6 ? ' ועוד ' + (arr.length - 6) : '');
+    const att2 = [
+      overRule.length ? overRule.length + ' תלמידים עוברים כלל התראה: ' + stuLinks(overRule) : '',
+      voiceN ? voiceN + ' דיווחים קוליים ממתינים לאישור.' : '',
+      overdue ? overdue + ' מקרים פתוחים עברו את תאריך הבדיקה.' : '',
+      Object.keys(quiet).length ? 'לא הוזכרו כבר חודש: ' + Object.entries(quiet).map(([k, n]) => esc(k) + ' ' + n).join(' · ') : '',
+      silent.length ? silent.length + ' אנשי צוות לא דיווחו שבועיים: ' + silent.map(p => esc(p.name)).join(', ') : '',
+    ].filter(Boolean);
+    const kpi = (n, l, sub) => '<div class="pc-kpi"><b>' + n + '</b><span>' + l + '</span>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
+    // פתוח בראשון-שני (תחילת השבוע); בשאר הימים מקופל כדי לא לדחוף את הטופס למטה
+    return '<details class="qr-card ws"' + ([0, 1].includes(new Date().getDay()) ? ' open' : '') + '><summary><i class="bi bi-calendar-week"></i> הסיכום השבועי <span class="tl-note">מיום ראשון ' + esc(hebDate(w0) || w0) + '</span></summary>' +
+      '<div class="pc-kpis">' + kpi(thisW.length, 'דיווחים השבוע', 'שבוע קודם: ' + prevW.length) + kpi(posPct + '%', '⭐ נקודות אור') +
+        kpi(active.length, 'מקרים פתוחים', overdue ? overdue + ' באיחור' : '') + kpi(rising.length, 'במגמת עלייה', rising.length ? stuLinks(rising) : '') + '</div>' +
+      (who.length ? '<div class="ws-who"><b>מי דיווח השבוע:</b> ' + who.map(([n, k]) => esc(n) + ' ' + k).join(' · ') + '</div>' : '') +
+      (att2.length ? '<div class="ws-att"><b><i class="bi bi-exclamation-circle"></i> דורש תשומת לב</b><ul>' + att2.map(x => '<li>' + x + '</li>').join('') + '</ul></div>' : '') +
+    '</details>';
+  }
+
+  // התראות אישיות (מהשרת) — בראש החלונית בבית
+  async function notificationsHtml() {
+    if (DEMO || !window.db || window.db.DEMO) return '';
+    try {
+      const r = await window.db.list('notifications', { order: 'created_at', asc: false });
+      const d = ((r && r.ok && r.data) || []).filter(n => !n.read_at).slice(0, 8);
+      if (!d.length) return '';
+      const studs = await students();
+      const nm = id => (studs.find(s => s.id == id) || {}).name || '';
+      return '<div class="qr-card nt-card"><div class="card-h-row"><h3 style="margin:0"><i class="bi bi-bell-fill" style="color:var(--danger)"></i> התראות</h3>' +
+        '<button class="btn-ghost sm" data-nread="all">סימון הכול כנקרא</button></div>' +
+        d.map(n => '<div class="nt-item"><div><b>' + esc(nm(n.student_id)) + '</b> — ' + esc(n.title) + (n.body ? ' <span class="tl-note">(' + esc(n.body) + ')</span>' : '') + '</div>' +
+          '<div class="nt-act">' + (n.student_id ? '<button class="btn-ghost sm" data-pc="' + n.student_id + '">כרטיס דפוסים</button>' : '') +
+          '<button class="mini" data-nread="' + n.id + '" title="נקרא"><i class="bi bi-check2"></i></button></div></div>').join('') + '</div>';
+    } catch (_) { return ''; }
+  }
+  // לחיצות משותפות: כרטיס דפוסים + סימון התראה כנקראה
+  function wireSmart(root, onChange) {
+    root._smartCb = onChange;                  // מרונדר שוב ושוב — מאזין אחד בלבד
+    if (root._smartWired) return;
+    root._smartWired = true;
+    root.addEventListener('click', async ev => {
+      const pc = ev.target.closest('[data-pc]');
+      if (pc) { ev.preventDefault(); patternCard(Number(pc.dataset.pc)); return; }
+      const nr = ev.target.closest('[data-nread]');
+      if (nr) {
+        try { await window.sb.rpc('notification_read', { p_id: nr.dataset.nread === 'all' ? null : Number(nr.dataset.nread) }); } catch (_) {}
+        if (root._smartCb) root._smartCb();
+      }
+    });
+  }
+
   // ── חסימת שמירה כפולה ─────────────────────────────────────────────────
   // תלמיד אחד קיבל 5 דיווחים זהים — לחיצות חוזרות על "שמור" בזמן שהשרת עוד
   // לא ענה. שתי שכבות: הכפתור נעול עד שהשמירה מסתיימת, ודיווח זהה (אותו תלמיד,
@@ -535,7 +691,7 @@
     open: openEventForm, remove: removeEvent, comments: openComments, toggleFollowup: toggleFollowup,
     renderFollowupWidget: (container, opts) => renderFollowupWidget(container, opts),
     commentCounts: commentCounts,
-    quickForm: quickForm, saveQuick: saveQuick, types: types, typeLabel: typeLabel, statusChip: statusChip, typeName: typeName,
+    patternCard: patternCard, quickForm: quickForm, saveQuick: saveQuick, types: types, typeLabel: typeLabel, statusChip: statusChip, typeName: typeName,
   };
 
   async function renderBehavior(page) {
@@ -562,7 +718,7 @@
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>מעקב תלמידים</h2>' +
       '<div class="head-actions">' + (isAdmin() ? '<button class="btn-ghost sm" id="behBin"><i class="bi bi-trash3"></i> סל מחזור</button>' : '') +
         '<button class="btn-ghost sm" id="behCsv"><i class="bi bi-download"></i> ייצוא דוח CSV</button></div></div>' +
-      (await voiceAlertHtml()) +
+      (await voiceAlertHtml()) + (await weeklySummaryHtml()) +
       // בטלפון: הרשימה קודם, והטופס נפתח מכפתור קבוע בתחתית (beh-fab).
       '<div class="qr-card beh-quick" id="behQuick"><h3><i class="bi bi-lightning-charge"></i> דיווח חדש' +
         '<button type="button" class="mini beh-quick-x" id="behQuickX" title="סגירה"><i class="bi bi-x-lg"></i></button></h3>' +
@@ -587,6 +743,7 @@
       '<div id="evEmpty" class="empty-state" hidden><i class="bi bi-clipboard-check"></i><div>אין דיווחים עדיין — השתמש בדיווח המהיר למעלה</div></div>';
 
     const fpick = window.cv3Picker.wire(page, 'f', () => draw());
+    wireSmart(page);
     let list = evs;
     const filtered = () => {
       const f = fpick.value(), fc = page.querySelector('#fCat').value, fs = page.querySelector('#fStatus').value;
@@ -611,7 +768,7 @@
     const itemHtml = e => {
       const cn = cmtCounts[e.id] || 0;
       return '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
-      '<div class="tl-main"><strong>' + esc(nameOf(e.student_id)) + '</strong> · ' + typeLabel(ts, e, catOf(e.category_id)) +
+      '<div class="tl-main"><strong class="pc-link" data-pc="' + e.student_id + '" title="כרטיס דפוסים">' + esc(nameOf(e.student_id)) + '</strong> · ' + typeLabel(ts, e, catOf(e.category_id)) +
       ' ' + statusChip(e) +
       (e.assignee && ['open', 'in_progress'].includes(e.status) ? ' <span class="chip off"><i class="bi bi-person-check"></i> למעקב של ' + esc(authorName(e.assignee)) + '</span>' : '') +
       (e.group_id ? ' <span class="chip off" title="דיווח משותף לכמה תלמידים"><i class="bi bi-people"></i> קבוצתי</span>' : '') +
@@ -797,7 +954,7 @@
       const canEdit = !window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(e) || e.assignee === me;
       const summary = s === 'closed' ? (cm.slice().reverse().find(c => /^סיכום סגירה:/.test(c.note || '')) || {}).note : null;
       return '<div class="fu-card" style="border-inline-start-color:' + flagColor(e.severity) + '">' +
-        '<div class="fu-c-head"><b>' + esc(nameOf(e.student_id)) + '</b><span class="tl-note">' + esc(clsOf(e.student_id)) + '</span></div>' +
+        '<div class="fu-c-head"><b class="pc-link" data-pc="' + e.student_id + '" title="כרטיס דפוסים">' + esc(nameOf(e.student_id)) + '</b><span class="tl-note">' + esc(clsOf(e.student_id)) + '</span></div>' +
         '<div class="fu-c-type">' + typeLabel(ts, e, '') + ' <span class="sev-dot ' + sevClass(e.severity) + '" title="חומרה: ' + esc(e.severity || '') + '"></span> <span class="tl-note">' + esc(e.severity || '') + '</span></div>' +
         (e.note ? '<div class="tl-note nt fu-c-note">' + esc(e.note) + '</div>' : '') +
         '<div class="fu-age">' +
@@ -842,6 +999,7 @@
         ? '<div class="fu-hint"><i class="bi bi-moon"></i> ' + staleN + ' מקרים לא זזו ' + STALE + ' יום ויותר. לכל אחד: עדכון, תאריך בדיקה או סגירה עם משפט סיכום.</div>' : '';
     }
     page.querySelector('#fuMine').addEventListener('change', ev => { mineOnly = ev.target.checked; draw(); });
+    wireSmart(page);
     page.querySelector('#fuBoard').addEventListener('click', async ev => {
       const nt = ev.target.closest('.nt'); if (nt) { nt.classList.toggle('full'); return; }
       const b = ev.target.closest('[data-prog],[data-cm],[data-resolve]'); if (!b) return;
@@ -887,7 +1045,11 @@
     const seq = (widgetSeq.get(container) || 0) + 1;
     widgetSeq.set(container, seq);
     const stale = () => widgetSeq.get(container) !== seq;
-    const [evs, voice] = await Promise.all([events(), voiceAlertHtml()]);
+    const [evs, voice0, notif] = await Promise.all([events(), voiceAlertHtml(), notificationsHtml()]);
+    // ביום ראשון: קישור לסיכום השבועי (מנהל ומפקח)
+    const voice = notif + voice0 + (canSeeStats() && new Date().getDay() === 0
+      ? '<a class="voice-alert ws-link" href="#behavior"><i class="bi bi-calendar-week"></i><span><b>הסיכום השבועי מוכן</b><small>במסך המעקב</small></span><span class="va-go">לסיכום ←</span></a>' : '');
+    wireSmart(container, () => renderFollowupWidget(container, opts));
     if (stale()) return;
     // הבית מציג רק מה ששלך (אחראי או רושם); מנהל ומפקח רואים הכול
     const me = window.currentUser && window.currentUser.id;

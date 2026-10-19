@@ -257,6 +257,7 @@
       };
       const behSec = '<div class="det-sec"><h4><i class="bi bi-clipboard-check"></i> התנהגות ומעקב ' +
         '<span class="det-badge">' + beh.length + '</span>' +
+        (beh.length ? '<button class="btn-ghost sm" id="behPattern" style="margin-inline-start:auto"><i class="bi bi-graph-up"></i> כרטיס דפוסים</button>' : '') +
         (canEditBeh ? '<button class="btn-ghost sm" id="behAdd" style="margin-inline-start:auto"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' : '') +
         '</h4>' +
         (beh.length
@@ -462,6 +463,8 @@
       // רענון הכרטיס אחרי שינוי בדיווחים — פותחים אותו מחדש עם הנתונים המעודכנים
       const reopen = () => { try { m.close(); } catch (_) {} openDetail(s); };
       const behAdd = m.el.querySelector('#behAdd');
+      const pcBtn = m.el.querySelector('#behPattern');
+      if (pcBtn && window.cv3Behavior) pcBtn.addEventListener('click', () => window.cv3Behavior.patternCard(s.id));
       if (behAdd) behAdd.addEventListener('click', () => {
         if (window.cv3Behavior) window.cv3Behavior.open(null, { studentId: s.id, onSaved: reopen });
       });
