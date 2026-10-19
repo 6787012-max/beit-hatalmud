@@ -980,7 +980,7 @@ body.dark .lb-prev{background:#0a1219}
   #timeline .tl-item{flex-wrap:wrap}
   #timeline .tl-main{flex:1 1 100%}
   #timeline .nt{display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer}
-  #timeline .nt.full{display:inline; -webkit-line-clamp:unset}
+  #timeline .nt.full{display:block; -webkit-line-clamp:unset}
 }
 /* בורר התלמיד בטלפון: ב-flex-direction:column ה-flex-basis (150/240px) הפך לגובה, והבורר תפס חצי מסך */
 @media (max-width:600px){ .stu-pick>.pk-class, .stu-pick>.pk-combo{flex:0 0 auto} }
@@ -1013,7 +1013,7 @@ body.dark .lb-prev{background:#0a1219}
 .ty-positive{color:var(--ok)}
 .ty-none{color:var(--muted); font-style:italic; font-weight:400}
 .chip.st-open{background:color-mix(in srgb,var(--danger) 13%,transparent); color:var(--danger)}
-.chip.st-in_progress{background:color-mix(in srgb,var(--accent) 18%,transparent); color:#8a5a00}
+.chip.st-in_progress{background:color-mix(in srgb,var(--accent) 18%,transparent); color:color-mix(in srgb,var(--accent) 70%,var(--ink))}
 .chip.st-closed{background:color-mix(in srgb,var(--ok) 14%,transparent); color:var(--ok)}
 /* לוח המעקב */
 .fu-mine{display:inline-flex; align-items:center; gap:5px; font-size:.85rem; cursor:pointer}
@@ -1065,3 +1065,110 @@ body.dark .lb-prev{background:#0a1219}
 .nt-item{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--line); font-size:.86rem}
 .nt-act{display:flex; gap:4px; flex:none}
 @media (max-width:560px){ .pc-weeks{gap:3px} .pc-w small{display:none} }
+/* ===== מעקב התנהגות — שכבת עיצוב (19/10/2026, "עיצוב יותר יפה") =====
+   כרטיסים עם פס חומרה, תגיות סוג צבעוניות לפי כיוון, טופס בשלבים ברורים, לוח עם כותרות צבעוניות.
+   צבע לעולם לא לבד — תמיד עם אייקון ומילה. כל הצבעים דרך משתנים, כדי שמצב כהה יעבוד. */
+:root{ --heading:var(--primary-dark); --lift:0 2px 4px rgba(16,40,56,.07), 0 12px 30px rgba(16,40,56,.11) }
+body.dark{ --heading:#cfe6ef; --lift:0 2px 4px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.4) }
+.qf-step, .fu-col h3, .pc h4, .ws summary, .beh-quick h3, .teacher-card h3{color:var(--heading)}
+
+/* — תגית סוג — */
+.bi-top .ty, .fu-c-type .ty, .pc .ty, #trashList .ty{display:inline-flex; align-items:center; gap:4px; padding:2px 10px; border-radius:999px; font-size:.78rem; font-weight:700;
+  background:color-mix(in srgb,var(--muted) 12%,transparent); color:var(--ink)}
+.bi-top .ty-corrective, .fu-c-type .ty-corrective, .pc .ty-corrective{background:color-mix(in srgb,var(--danger) 11%,transparent); color:color-mix(in srgb,var(--danger) 78%,var(--ink))}
+.bi-top .ty-positive, .fu-c-type .ty-positive, .pc .ty-positive{background:color-mix(in srgb,var(--ok) 15%,transparent); color:color-mix(in srgb,var(--ok) 85%,var(--ink))}
+.bi-top .ty-neutral, .fu-c-type .ty-neutral, .pc .ty-neutral{background:color-mix(in srgb,var(--primary-light) 14%,transparent); color:color-mix(in srgb,var(--primary-light) 70%,var(--ink))}
+.bi-top .ty-none{background:transparent; padding:2px 4px}
+
+/* — כרטיס דיווח ברשימה — */
+.beh-item{align-items:stretch; gap:10px; padding:12px 14px; border-radius:14px; border-inline-start:5px solid var(--accent); transition:box-shadow .15s}
+.beh-item:hover{box-shadow:var(--lift)}
+.beh-item.sev-hi{border-inline-start-color:var(--danger)}
+.beh-item.sev-lo{border-inline-start-color:var(--ok)}
+.beh-item.dir-positive{border-inline-start-color:var(--ok); background:color-mix(in srgb,var(--ok) 6%,var(--card))}
+.beh-item.dir-neutral.sev-mid{border-inline-start-color:var(--primary-light)}
+.bi-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:5px}
+.bi-top{display:flex; flex-wrap:wrap; align-items:center; gap:6px}
+.bi-top strong{font-size:1rem; font-weight:800; color:var(--ink); margin-inline-end:2px}
+.bi-top .chip{font-size:.72rem}
+.bi-note{color:var(--ink); font-size:.92rem; line-height:1.6; white-space:pre-line; cursor:pointer;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.bi-note.full{display:block}
+.bi-meta{display:flex; flex-wrap:wrap; gap:3px 14px; font-size:.76rem; color:var(--muted)}
+.bi-meta .bi{opacity:.75}
+.bi-sev{display:inline-flex; align-items:center; gap:4px; font-weight:700}
+.bi-acts{display:flex; align-items:flex-start; gap:2px; flex:none; opacity:.5; transition:opacity .15s}
+.beh-item:hover .bi-acts, .beh-item:focus-within .bi-acts{opacity:1}
+@media (hover:none){ .bi-acts{opacity:1} }
+.mini.has-n{width:auto; padding:0 7px; gap:3px; display:inline-flex; align-items:center}
+.mini.has-n b{font-size:.74rem}
+.group-title{display:flex; align-items:center; gap:6px; padding-bottom:4px; border-bottom:2px solid var(--line)}
+
+/* — טופס הדיווח — */
+.beh-quick{padding:0; overflow:hidden}
+.beh-quick > h3{margin:0; padding:13px 18px; background:linear-gradient(135deg, color-mix(in srgb,var(--primary) 10%,var(--card)), var(--card) 70%); border-bottom:1px solid var(--line)}
+#behQuickForm{padding:14px 18px 18px}
+.qf{gap:11px}
+.qf-step{font-size:.88rem; margin-top:4px}
+.qf-step b{width:22px; height:22px; background:linear-gradient(135deg,var(--primary),var(--primary-light)); box-shadow:0 2px 6px color-mix(in srgb,var(--primary) 35%,transparent)}
+.qf-types{grid-template-columns:repeat(auto-fill,minmax(102px,1fr)); gap:8px}
+.qf-type{position:relative; min-height:76px; justify-content:center; border-radius:14px; transition:transform .12s, box-shadow .12s, border-color .12s}
+.qf-type:hover{transform:translateY(-1px); box-shadow:var(--lift)}
+.qf-type span{font-size:1.55rem}
+.qf-type.ty-corrective{background:color-mix(in srgb,var(--danger) 4%,var(--card))}
+.qf-type.ty-positive{background:color-mix(in srgb,var(--ok) 8%,var(--card))}
+.qf-type.ty-neutral{background:color-mix(in srgb,var(--primary-light) 5%,var(--card))}
+.qf-type.on::after{content:"\2713"; position:absolute; top:5px; inset-inline-end:7px; width:18px; height:18px; border-radius:50%;
+  background:var(--primary); color:#fff; font-size:.7rem; display:grid; place-items:center}
+.qf-type.ty-positive.on::after{background:var(--ok)}
+.qf .seg-b{padding:7px 14px; font-weight:600}
+.qf [data-qf="sev"] .seg-b.on[data-v="גבוהה"]{border-color:var(--danger); background:color-mix(in srgb,var(--danger) 12%,transparent); color:color-mix(in srgb,var(--danger) 80%,var(--ink))}
+.qf [data-qf="sev"] .seg-b.on[data-v="נמוכה"]{border-color:var(--ok); background:color-mix(in srgb,var(--ok) 12%,transparent); color:color-mix(in srgb,var(--ok) 85%,var(--ink))}
+.qf [data-qf="fu"] .seg-b.on:not([data-v="0"]){border-color:var(--danger); background:color-mix(in srgb,var(--danger) 10%,transparent); color:color-mix(in srgb,var(--danger) 80%,var(--ink))}
+.qf textarea{min-height:64px}
+.qf-chip{box-shadow:0 1px 3px rgba(16,40,56,.12)}
+.qf .qs-save{padding:12px 30px; font-size:1rem; border-radius:12px; background:linear-gradient(135deg,var(--primary),var(--primary-light)); box-shadow:0 6px 16px color-mix(in srgb,var(--primary) 30%,transparent)}
+
+/* — לוח המעקב — */
+.fu-col{background:color-mix(in srgb,var(--primary) 4%,var(--bg)); border:1px solid var(--line); border-top:4px solid var(--muted); padding:12px}
+.fu-col-open{border-top-color:var(--danger)} .fu-col-prog{border-top-color:var(--accent)}
+.fu-col-voice{border-top-color:#8e44ad} .fu-col-closed{border-top-color:var(--ok)}
+.fu-col h3 .bi{font-size:1.05rem}
+.fu-col-open h3 .bi{color:var(--danger)} .fu-col-prog h3 .bi{color:var(--accent)} .fu-col-voice h3 .bi{color:#8e44ad} .fu-col-closed h3 .bi{color:var(--ok)}
+.fu-n{font-weight:800; box-shadow:0 1px 2px rgba(16,40,56,.1)}
+.fu-card{border-radius:12px; transition:box-shadow .15s, transform .15s}
+.fu-card:hover{box-shadow:var(--lift); transform:translateY(-1px)}
+.fu-c-head b{font-size:.98rem}
+.fu-c-note{color:var(--ink)}
+.fu-sum{background:color-mix(in srgb,var(--ok) 8%,transparent); border-radius:8px; padding:6px 9px; font-style:normal}
+
+/* — כרטיס דפוסים וסיכום שבועי — */
+.pc-kpi{background:var(--card); border:1px solid var(--line); box-shadow:0 1px 2px rgba(16,40,56,.05); border-top:3px solid var(--primary-light)}
+.pc-kpi.pos{border-top-color:var(--ok); background:color-mix(in srgb,var(--ok) 5%,var(--card))}
+.pc-kpi.cor{border-top-color:var(--danger); background:color-mix(in srgb,var(--danger) 5%,var(--card))}
+.pc-kpi b{font-size:1.5rem; line-height:1.2}
+.pc-ratio{height:30px; border-radius:999px; box-shadow:inset 0 0 0 1px var(--line)}
+.pc-bar{height:90px; border-radius:8px; background:repeating-linear-gradient(to top, color-mix(in srgb,var(--muted) 10%,transparent) 0 1px, transparent 1px 22px)}
+.pc-alert{display:flex; align-items:center; gap:8px; border:1px solid color-mix(in srgb,var(--danger) 30%,transparent)}
+.ws{padding:14px 18px}
+.ws summary{font-size:1rem; list-style:none}
+.ws summary::-webkit-details-marker{display:none}
+.ws summary::after{content:"\25BE"; margin-inline-start:auto; color:var(--muted); transition:transform .15s}
+.ws:not([open]) summary{margin-bottom:0}
+.ws:not([open]) summary::after{transform:rotate(90deg)}
+.ws-att li{margin:3px 0}
+.nt-card{background:linear-gradient(135deg, color-mix(in srgb,var(--danger) 6%,var(--card)), var(--card) 60%)}
+.voice-alert:hover{box-shadow:var(--lift)}
+
+@media (max-width:560px){
+  .beh-item{flex-direction:column; gap:6px}
+  .bi-acts{justify-content:flex-end; opacity:1; border-top:1px dashed var(--line); padding-top:4px}
+  .qf-types{grid-template-columns:repeat(3,1fr)}
+  .qf-type{min-height:68px; font-size:.78rem}
+  #behQuickForm{padding:12px}
+}
+/* תיקוני מצב כהה: primary-dark כהה מדי כטקסט על רקע כהה */
+.seg-b.on, .qf-chip{color:var(--heading)}
+.qf-asg span{white-space:nowrap}
+.qf-asg select{flex:1}
+.pc-link{text-decoration-color:color-mix(in srgb,var(--muted) 60%,transparent)}

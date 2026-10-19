@@ -765,29 +765,37 @@
         '<span class="di-meta">' + esc(hebDate(c.comment_date) || c.comment_date || '') +
         ' · ' + (window.Author ? window.Author.cell(c.created_by) : '') + '</span></div>').join('') + '</div>';
     };
+    // כרטיס דיווח (עיצוב 19/10/2026): פס צבע לפי חומרה, שורה עליונה = מי + מה + מצב,
+    // ההערה בשורה משלה (מקוצרת לשתי שורות), ושורת פרטים קטנה. נקודת אור מקבלת רקע ירוק עדין.
     const itemHtml = e => {
       const cn = cmtCounts[e.id] || 0;
-      return '<div class="tl-item"><span class="sev-dot ' + sevClass(e.severity) + '"></span>' +
-      '<div class="tl-main"><strong class="pc-link" data-pc="' + e.student_id + '" title="כרטיס דפוסים">' + esc(nameOf(e.student_id)) + '</strong> · ' + typeLabel(ts, e, catOf(e.category_id)) +
-      ' ' + statusChip(e) +
-      (e.assignee && ['open', 'in_progress'].includes(e.status) ? ' <span class="chip off"><i class="bi bi-person-check"></i> למעקב של ' + esc(authorName(e.assignee)) + '</span>' : '') +
-      (e.group_id ? ' <span class="chip off" title="דיווח משותף לכמה תלמידים"><i class="bi bi-people"></i> קבוצתי</span>' : '') +
-      (e.due_date ? ' <span class="chip" style="' + (isOverdue(e)
-          ? 'background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)'
-          : 'background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)') + '">' +
-        '<i class="bi bi-calendar' + (isOverdue(e) ? '-x' : '-event') + '"></i> ' + esc(hebDate(e.due_date) || e.due_date) +
-        (isOverdue(e) ? ' · באיחור' : '') + '</span>' : '') +
-      (e.note ? ' <span class="tl-note nt" title="לחיצה מציגה הכול">— ' + esc(e.note) + '</span>' : '') + '</div>' +
-      '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
-        ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
-      '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"' + (e.followup ? ' style="color:' + flagColor(e.severity) + '"' : '') + '><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
-      '<button class="mini" data-cmt="' + e.id + '" title="עדכוני מעקב"' + (cn ? ' style="width:auto;padding:0 8px"' : '') + '><i class="bi bi-chat-left-text"></i>' + (cn ? ' ' + cn : '') + '</button>' +
-      // מלמד רואה את כל הדיווחים על התלמידים שלו אבל מתקן רק את שלו — ולכן
-      // הכפתורים נגזרים מהרשומה, לא מהמסך.
-      ((!window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(e))
-        ? '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
-          '<button class="mini danger" data-del="' + e.id + '" title="מחיקה"><i class="bi bi-trash"></i></button>'
-        : '') + '</div>' + cmtSub(e);
+      const dir = (typeOf(e) || {}).direction || 'none';
+      const over = isOverdue(e);
+      const canEdit = !window.Auth || !window.Auth.canEditRow || window.Auth.canEditRow(e);
+      return '<div class="tl-item beh-item dir-' + dir + ' sev-' + sevClass(e.severity) + '">' +
+        '<div class="bi-main">' +
+          '<div class="bi-top"><strong class="pc-link" data-pc="' + e.student_id + '" title="כרטיס דפוסים">' + esc(nameOf(e.student_id)) + '</strong>' +
+            typeLabel(ts, e, catOf(e.category_id)) + statusChip(e) +
+            (e.assignee && ['open', 'in_progress'].includes(e.status) ? '<span class="chip off"><i class="bi bi-person-check"></i> ' + esc(authorName(e.assignee)) + '</span>' : '') +
+            (e.due_date && ['open', 'in_progress'].includes(e.status) ? '<span class="chip ' + (over ? 'st-open' : 'off') + '"><i class="bi bi-alarm"></i> ' +
+              esc(hebDate(e.due_date) || e.due_date) + (over ? ' · באיחור' : '') + '</span>' : '') +
+            (e.group_id ? '<span class="chip off" title="דיווח משותף לכמה תלמידים"><i class="bi bi-people"></i> קבוצתי</span>' : '') +
+          '</div>' +
+          (e.note ? '<div class="bi-note nt" title="לחיצה מציגה הכול">' + esc(e.note) + '</div>' : '') +
+          '<div class="bi-meta"><span><i class="bi bi-calendar3"></i> ' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') + '</span>' +
+            '<span><i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</span>' +
+            (e.place ? '<span><i class="bi bi-geo-alt"></i> ' + esc(e.place) + '</span>' : '') +
+            (e.severity && e.severity !== 'רגילה' && dir !== 'positive' ? '<span class="bi-sev"><span class="sev-dot ' + sevClass(e.severity) + '"></span> ' + esc(e.severity) + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="bi-acts">' +
+          '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'סגירת המעקב' : 'פתיחת מעקב') + '"' + (e.followup ? ' style="color:' + flagColor(e.severity) + '"' : '') + '><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
+          '<button class="mini' + (cn ? ' has-n' : '') + '" data-cmt="' + e.id + '" title="עדכוני מעקב"><i class="bi bi-chat-left-text"></i>' + (cn ? '<b>' + cn + '</b>' : '') + '</button>' +
+          // מלמד רואה את כל הדיווחים על התלמידים שלו אבל מתקן רק את שלו — הכפתורים נגזרים מהרשומה
+          (canEdit ? '<button class="mini" data-edit="' + e.id + '" title="עריכה"><i class="bi bi-pencil"></i></button>' +
+            '<button class="mini danger" data-del="' + e.id + '" title="לסל המחזור"><i class="bi bi-trash"></i></button>' : '') +
+        '</div>' +
+      '</div>' + cmtSub(e);
     };
     const groupKey = (e, g) => g === 'student' ? nameOf(e.student_id) : g === 'class' ? clsOf(e.student_id)
       : g === 'by' ? (window.Author ? window.Author.name(e.created_by) : 'לא ידוע')
