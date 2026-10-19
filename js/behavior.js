@@ -24,6 +24,108 @@
     const ad = a.due_date || '9999-99-99', bd = b.due_date || '9999-99-99';
     return ad < bd ? -1 : ad > bd ? 1 : 0;
   };
+  const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const ageTxt = n => n === 1 ? 'יום אחד' : n === 2 ? 'יומיים' : n + ' ימים';
+  const daysSince = iso => { if (!iso) return null; const t = Date.parse(String(iso).slice(0, 10)); return isNaN(t) ? null : Math.max(0, Math.round((Date.parse(today()) - t) / 86400000)); };
+
+  // ── שלב 1 (19/10/2026): חומרה ותזכורת בתוך הטופס המהיר ─────────────────
+  // 80% מהדיווחים נשמרו בלי חומרה ובלי תזכורת, כי השדות היו רק בטופס העריכה.
+  // לכן הדגלים יצאו כמעט תמיד צהובים והתזכורת שקופצת מעצמה לא קפצה אף פעם.
+  // אותו רכיב משמש את מסך המעקב ואת דף הבית של המורה (teacher.js).
+  // צבע לעולם לא לבד: לכל חומרה גם אייקון וגם מילה.
+  const SEVS = [['נמוכה', 'lo', 'bi-arrow-down-circle'], ['רגילה', 'mid', 'bi-dash-circle'], ['גבוהה', 'hi', 'bi-exclamation-triangle']];
+  const REMINDERS = [[0, 'בלי'], [1, 'מחר'], [3, 'בעוד 3 ימים'], [7, 'בעוד שבוע']];
+  function quickExtrasHtml(p) {
+    return '<div class="qx" id="' + p + 'Qx">' +
+      '<div class="qx-row"><span class="qx-lbl">חומרה</span><div class="seg" data-qx="sev">' +
+        SEVS.map(s => '<button type="button" class="seg-b' + (s[0] === 'רגילה' ? ' on' : '') + '" data-v="' + s[0] + '" aria-pressed="' + (s[0] === 'רגילה') + '">' +
+          '<i class="bi ' + s[2] + ' sev-ic ' + s[1] + '"></i> ' + s[0] + '</button>').join('') + '</div></div>' +
+      '<div class="qx-row"><span class="qx-lbl"><i class="bi bi-alarm"></i> תזכורת</span><div class="seg" data-qx="due">' +
+        REMINDERS.map(r => '<button type="button" class="seg-b' + (r[0] === 0 ? ' on' : '') + '" data-v="' + r[0] + '" aria-pressed="' + (r[0] === 0) + '">' + r[1] + '</button>').join('') + '</div></div>' +
+    '</div>';
+  }
+  // followCb: תיבת "מעקב" של הטופס — תזכורת בלי מעקב לא קופצת, ולכן בחירת
+  // תזכורת מסמנת גם מעקב.
+  function wireQuickExtras(root, p, followCb) {
+    const box = root.querySelector('#' + p + 'Qx');
+    box.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', ev => {
+      const b = ev.target.closest('.seg-b'); if (!b) return;
+      seg.querySelectorAll('.seg-b').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); });
+      if (seg.dataset.qx === 'due' && b.dataset.v !== '0' && followCb) followCb.checked = true;
+    }));
+    const val = k => { const b = box.querySelector('[data-qx="' + k + '"] .seg-b.on'); return b ? b.dataset.v : null; };
+    return {
+      read() { const n = Number(val('due') || 0); return { severity: val('sev') || 'רגילה', due_date: n ? addDays(n) : null }; },
+      reset() {
+        box.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('.seg-b').forEach((x, i) => {
+          const on = seg.dataset.qx === 'sev' ? x.dataset.v === 'רגילה' : i === 0;
+          x.classList.toggle('on', on); x.setAttribute('aria-pressed', on);
+        }));
+      },
+    };
+  }
+
+  // ── חסימת שמירה כפולה ─────────────────────────────────────────────────
+  // תלמיד אחד קיבל 5 דיווחים זהים — לחיצות חוזרות על "שמור" בזמן שהשרת עוד
+  // לא ענה. שתי שכבות: הכפתור נעול עד שהשמירה מסתיימת, ודיווח זהה (אותו תלמיד,
+  // תאריך, קטגוריה והערה) בתוך 2 דקות מבקש אישור מפורש.
+  let lastQuick = null;
+  async function saveQuick(btn, row) {
+    if (btn.disabled) return null;
+    const key = [row.student_id, row.event_date, row.category_id || '', (row.note || '').trim()].join('|');
+    if (lastQuick && lastQuick.key === key && Date.now() - lastQuick.at < 120000 &&
+        !(await window.UI.confirm('דיווח זהה בדיוק נשמר לפני רגע. לשמור אותו שוב?'))) return null;
+    const html = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> שומר…';
+    try {
+      const r = await window.store.add('behavior_events', row);
+      if (r && r.ok) lastQuick = { key, at: Date.now() };
+      return r;
+    } finally { btn.disabled = false; btn.innerHTML = html; }
+  }
+
+  // ── סגירת מקרה עם סיכום ───────────────────────────────────────────────
+  // "טופל" בלי מילה השאיר מקרים בלי סוף לסיפור. הסיכום נשמר כעדכון מעקב
+  // אחרון (behavior_comments), כך שאין צורך בעמודה חדשה.
+  function resolveWithSummary(ev, studentName) {
+    return new Promise(resolve => {
+      let done = false;
+      window.UI.modal({
+        title: 'סגירת מקרה — ' + esc(studentName),
+        saveLabel: 'סגירה ושמירת הסיכום',
+        bodyHTML: '<div class="form-grid"><label class="fld fld-wide"><span>איך זה נגמר? *</span>' +
+          '<textarea class="inp mb0 ta-auto" id="rs_note" rows="3" placeholder="למשל: דובר עם האבא, השתפר מאז / הועבר לתוכנית אישית"></textarea></label></div>',
+        onSave: async (mel) => {
+          const note = mel.querySelector('#rs_note').value.trim();
+          if (!note) { window.UI.toast('כתוב משפט סיכום קצר', 'err'); return false; }
+          const c = await addComment(ev.id, { comment_date: today(), note: 'סיכום סגירה: ' + note });
+          if (!c || c.ok === false) { window.UI.toast('שמירת הסיכום נכשלה', 'err'); return false; }
+          const r = await updEvent(ev.id, { followup: false });
+          if (!r || r.ok === false) { window.UI.toast('הסיכום נשמר, אבל ההסרה מהמעקב נכשלה', 'err'); return false; }
+          ev.followup = false; done = true;
+          window.UI.toast('המקרה נסגר'); return true;
+        },
+        onClose: () => resolve(done),
+      });
+    });
+  }
+
+  // ── התראה על דיווחים קוליים ממתינים (מנהל) ─────────────────────────────
+  // דיווח מהקו נשמר כטיוטה וממתין לאישור במסך "דיווחים קוליים", ששום דבר לא
+  // הפנה אליו: טיוטה אחת חיכתה 32 יום, והמלמד בטוח שהדיווח נכנס.
+  async function voiceAlertHtml() {
+    if (!isAdmin() || DEMO || !window.db || window.db.DEMO) return '';
+    try {
+      const r = await window.db.list('voice_reports', { eq: { status: 'draft' }, order: 'created_at', asc: true });
+      const d = (r && r.ok && r.data) || [];
+      if (!d.length) return '';
+      const age = daysSince(d[0].created_at);
+      return '<a class="voice-alert" href="#voicereports"><i class="bi bi-mic-fill"></i>' +
+        '<span><b>' + d.length + ' דיווח' + (d.length > 1 ? 'ים קוליים ממתינים' : ' קולי ממתין') + ' לאישור</b>' +
+        (age ? '<small>הוותיק ביותר ממתין ' + ageTxt(age) + '</small>' : '') + '</span>' +
+        '<span class="va-go">לאישור ←</span></a>';
+    } catch (_) { return ''; }
+  }
 
   // "קפיצה" יזומה לרב שצריך לטפל (בקשת יוסף 06/09/2026): קודם התזכורת רק
   // הופיעה באדום כשמישהו *כבר* נכנס למסך הזה. עכשיו קופצת מעצמה כשנכנסים
@@ -227,6 +329,7 @@
     open: openEventForm, remove: removeEvent, comments: openComments, toggleFollowup: toggleFollowup,
     renderFollowupWidget: (container, opts) => renderFollowupWidget(container, opts),
     commentCounts: commentCounts,
+    quickExtrasHtml: quickExtrasHtml, wireQuickExtras: wireQuickExtras, saveQuick: saveQuick,
   };
 
   async function renderBehavior(page) {
@@ -252,7 +355,10 @@
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button><h2>מעקב תלמידים</h2>' +
       '<div class="head-actions"><button class="btn-ghost sm" id="behCsv"><i class="bi bi-download"></i> ייצוא דוח CSV</button></div></div>' +
-      '<div class="qr-card"><h3><i class="bi bi-lightning-charge"></i> רישום חדש</h3>' +
+      (await voiceAlertHtml()) +
+      // בטלפון: הרשימה קודם, והטופס נפתח מכפתור קבוע בתחתית (beh-fab).
+      '<div class="qr-card beh-quick" id="behQuick"><h3><i class="bi bi-lightning-charge"></i> רישום חדש' +
+        '<button type="button" class="mini beh-quick-x" id="behQuickX" title="סגירה"><i class="bi bi-x-lg"></i></button></h3>' +
         '<div class="qr-grid" style="grid-template-columns:repeat(3,1fr) auto">' +
           pickAdd +
           '<div style="display:flex;gap:6px"><select class="inp mb0" id="qCat" style="flex:1"><option value="">קטגוריה…</option>' + catOpts + '</select>' +
@@ -262,8 +368,10 @@
           '<input class="inp mb0" id="qTime" type="time" title="שעה">' +
           '<textarea class="inp mb0 fld-wide ta-auto" id="qNote" rows="3" placeholder="הערה — אפשר לכתוב כמה שורות" style="grid-column:1/-2"></textarea>' +
           '<label style="display:flex;align-items:center;gap:5px;font-size:.82rem;color:var(--muted);white-space:nowrap;cursor:pointer"><input type="checkbox" id="qFollow"> מעקב</label>' +
-          '<button class="btn-primary sm" id="qSave"><i class="bi bi-plus-lg"></i> רישום</button>' +
+          quickExtrasHtml('q') +
+          '<button class="btn-primary sm qs-save" id="qSave"><i class="bi bi-plus-lg"></i> רישום</button>' +
         '</div></div>' +
+      '<button type="button" class="beh-fab" id="behFab"><i class="bi bi-plus-lg"></i> דיווח חדש</button>' +
       // "מי דיווח" — מי שרשם את הדיווח. הרשימה נבנית מהדיווחים עצמם ולא
       // מטבלת המשתמשים, כדי שיופיעו גם מי שכבר לא פעיל וגם "לא ידוע"
       // (רשומות מלפני שהמערכת התחילה לתעד מי רשם).
@@ -333,7 +441,7 @@
           : 'background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)') + '">' +
         '<i class="bi bi-calendar' + (isOverdue(e) ? '-x' : '-event') + '"></i> ' + esc(hebDate(e.due_date) || e.due_date) +
         (isOverdue(e) ? ' · באיחור' : '') + '</span>' : '') +
-      (e.note ? ' <span class="tl-note">— ' + esc(e.note) + '</span>' : '') + '</div>' +
+      (e.note ? ' <span class="tl-note nt" title="לחיצה מציגה הכול">— ' + esc(e.note) + '</span>' : '') + '</div>' +
       '<div class="tl-meta">' + esc(hebDate(e.event_date) || e.event_date) + (e.event_time ? ' · ' + esc(e.event_time) : '') +
         ' · <i class="bi bi-person-badge"></i> ' + (window.Author ? window.Author.cell(e.created_by) : '') + '</div>' +
       '<button class="mini" data-follow="' + e.id + '" title="' + (e.followup ? 'הסרה מהמעקב' : 'סימון למעקב') + '"' + (e.followup ? ' style="color:' + flagColor(e.severity) + '"' : '') + '><i class="bi ' + (e.followup ? 'bi-flag-fill' : 'bi-flag') + '"></i></button>' +
@@ -439,6 +547,10 @@
     // התלמיד, כדי שלא יהיו שני מסלולים שונים לאותו נתון.
     function editEvent(ev) { openEventForm(ev, { onSaved: () => draw() }); }
 
+    // הערה ארוכה מקוצרת לשתי שורות (בטלפון); לחיצה פותחת/סוגרת.
+    page.querySelector('#timeline').addEventListener('click', ev => {
+      const n = ev.target.closest('.nt'); if (n) n.classList.toggle('full');
+    });
     page.querySelector('#fCat').addEventListener('change', draw);
     const fByEl = page.querySelector('#fBy'); if (fByEl) fByEl.addEventListener('change', draw);
     page.querySelector('#fGroup').addEventListener('change', draw);
@@ -452,13 +564,20 @@
       const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'behavior_report.csv'; a.click();
     });
-    page.querySelector('#qSave').addEventListener('click', async () => {
+    const qx = wireQuickExtras(page, 'q', page.querySelector('#qFollow'));
+    const quickCard = page.querySelector('#behQuick');
+    const openQuick = on => { quickCard.classList.toggle('open', on); if (on) quickCard.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+    page.querySelector('#behFab').addEventListener('click', () => openQuick(true));
+    page.querySelector('#behQuickX').addEventListener('click', () => openQuick(false));
+    page.querySelector('#qSave').addEventListener('click', async ev => {
       const sid = pick.value(), cid = page.querySelector('#qCat').value;
       if (!sid) { window.UI.toast('בחר תלמיד', 'err'); return; }
-      const row = { student_id: Number(sid), category_id: cid ? Number(cid) : null, event_date: page.querySelector('#qDate').value || today(), event_time: page.querySelector('#qTime').value, note: page.querySelector('#qNote').value.trim(), followup: page.querySelector('#qFollow').checked };
-      const r = await addEvent(row); if (!r.ok) { window.UI.toast('שגיאה', 'err'); return; }
+      const row = Object.assign({ student_id: Number(sid), category_id: cid ? Number(cid) : null, event_date: page.querySelector('#qDate').value || today(), event_time: page.querySelector('#qTime').value, note: page.querySelector('#qNote').value.trim(), followup: page.querySelector('#qFollow').checked }, qx.read());
+      const r = await saveQuick(ev.currentTarget, row); if (!r) return;
+      if (!r.ok) { window.UI.toast('שגיאה', 'err'); return; }
       list = [(r.data && r.data[0]) || row].concat(list);
       page.querySelector('#qNote').value = ''; page.querySelector('#qTime').value = ''; page.querySelector('#qCat').selectedIndex = 0; page.querySelector('#qFollow').checked = false;
+      qx.reset(); openQuick(false);
       draw(); window.UI.toast('דווח בהצלחה');
     });
     draw();
@@ -472,7 +591,8 @@
   // מיידי, כדי לראות את כל הסיפור (התקרית → שיחת הורים → הפניה לאבחון...)
   // במקום אחד בלי לפתוח כל דיווח בנפרד.
   async function renderFollowup(page) {
-    const [studs, cs, evs, cls, allCmts] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
+    const [studs, cs, evs, cls, allCmts0] = await Promise.all([students(), cats(), events(), classes(), allComments()]);
+    let allCmts = allCmts0;
     if (window.Author) await window.Author.load();
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
@@ -480,12 +600,20 @@
     const cmtsOf = id => allCmts.filter(c => c.event_id == id)
       .sort((a, b) => String(a.comment_date || '').localeCompare(String(b.comment_date || '')) || (a.id - b.id));
     // ממוין לפי דחיפות — מי שבאיחור או קרוב לתזכורת קודם; ללא תזכורת נדחק לסוף.
-    let list = evs.filter(e => e.followup).sort(byDueDate);
+    // בתוך אותו תאריך יעד (וגם בלי תאריך) — הוותיק קודם, כדי שמקרים שנשכחו לא ייקברו בסוף.
+    const byUrgency = (a, b) => byDueDate(a, b) || String(a.event_date || '').localeCompare(String(b.event_date || ''));
+    let list = evs.filter(e => e.followup).sort(byUrgency);
+    // "פתוח N ימים" — מתאריך הדיווח (אין עמודה של "מתי סומן"); "שקט" — מהעדכון האחרון.
+    const STALE = 21;
+    const lastTouch = e => { const c = cmtsOf(e.id); return c.length ? c[c.length - 1].comment_date : e.event_date; };
+    const isStale = e => !isOverdue(e) && !(e.due_date && e.due_date >= today()) && (daysSince(lastTouch(e)) || 0) >= STALE;
 
     page.innerHTML =
       '<div class="page-head"><button class="back" onclick="showPage(\'home\')">→ חזרה לתפריט</button>' +
         '<h2><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h2>' +
       '<div class="head-actions"><span class="count-line" id="fuCount"></span></div></div>' +
+      (await voiceAlertHtml()) +
+      '<div id="fuHint"></div>' +
       '<div id="fuList"></div>' +
       '<div id="fuEmpty" class="empty-state" hidden><i class="bi bi-emoji-smile"></i><div>אין כרגע דיווחים במעקב — כל הפתוח טופל</div></div>';
 
@@ -495,7 +623,13 @@
         '<div class="card-h-row">' +
           '<h3 style="margin:0"><span class="sev-dot ' + sevClass(e.severity) + '"></span> ' +
             esc(nameOf(e.student_id)) + ' <span class="tl-note" style="font-weight:400">· ' + esc(clsOf(e.student_id)) + '</span></h3>' +
-          '<button class="btn-ghost sm" data-resolve="' + e.id + '"><i class="bi bi-check2-circle"></i> טופל — הסרה מהמעקב</button>' +
+          '<button class="btn-ghost sm" data-resolve="' + e.id + '"><i class="bi bi-check2-circle"></i> סגירה עם סיכום</button>' +
+        '</div>' +
+        '<div class="fu-age">' +
+          '<span class="chip off"><i class="bi bi-hourglass-split"></i> ' + (daysSince(e.event_date) ? 'פתוח ' + ageTxt(daysSince(e.event_date)) : 'נפתח היום') + '</span>' +
+          (cmts.length ? '<span class="chip off"><i class="bi bi-chat-left-text"></i> עדכון אחרון ' + (daysSince(lastTouch(e)) ? 'לפני ' + ageTxt(daysSince(lastTouch(e))) : 'היום') + '</span>'
+                       : '<span class="chip off"><i class="bi bi-chat-left"></i> בלי עדכונים</span>') +
+          (isStale(e) ? '<span class="chip warn"><i class="bi bi-moon"></i> שקט כבר ' + ageTxt(daysSince(lastTouch(e))) + ' — לעדכן, לקבוע תזכורת או לסגור</span>' : '') +
         '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:.85rem">' +
           '<span style="color:var(--muted)"><i class="bi bi-alarm"></i> תזכורת:</span>' +
@@ -519,6 +653,10 @@
     function draw() {
       const overdueN = list.filter(isOverdue).length;
       page.querySelector('#fuCount').textContent = list.length + ' במעקב' + (overdueN ? ' · ' + overdueN + ' באיחור' : '');
+      const staleN = list.filter(isStale).length;
+      page.querySelector('#fuHint').innerHTML = staleN
+        ? '<div class="fu-hint"><i class="bi bi-moon"></i> ' + staleN + ' מתוך ' + list.length + ' מקרים לא זזו ' + STALE + ' יום ויותר. ' +
+          'כל אחד מהם: עדכון, תאריך תזכורת, או סגירה עם משפט סיכום.</div>' : '';
       page.querySelector('#fuList').innerHTML = list.map(cardHtml).join('');
       page.querySelector('#fuEmpty').hidden = list.length > 0;
 
@@ -527,15 +665,14 @@
         const r = await updEvent(ev.id, { due_date: inp.value || null });
         if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
         ev.due_date = inp.value || null;
-        list.sort(byDueDate);
+        list.sort(byUrgency);
         draw(); window.UI.toast('התזכורת עודכנה');
       }));
       page.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', async () => {
         const ev = list.find(x => x.id == b.dataset.resolve); if (!ev) return;
-        if (!(await window.UI.confirm('להסיר את "' + esc(nameOf(ev.student_id)) + '" מרשימת המעקב?'))) return;
-        const r = await updEvent(ev.id, { followup: false });
-        if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
-        list = list.filter(x => x.id !== ev.id); draw(); window.UI.toast('הוסר מהמעקב');
+        if (!(await resolveWithSummary(ev, nameOf(ev.student_id)))) return;
+        allCmts = await allComments();
+        list = list.filter(x => x.id !== ev.id); draw();
       }));
       page.querySelectorAll('[data-cmtdel]').forEach(b => b.addEventListener('click', async () => {
         if (!(await window.UI.confirm('למחוק את העדכון?'))) return;
@@ -580,13 +717,13 @@
     const seq = (widgetSeq.get(container) || 0) + 1;
     widgetSeq.set(container, seq);
     const stale = () => widgetSeq.get(container) !== seq;
-    const evs = await events();
+    const [evs, voice] = await Promise.all([events(), voiceAlertHtml()]);
     if (stale()) return;
     const list = evs.filter(e => e.followup).sort(byDueDate);
     if (window.Author) await window.Author.load();
     if (stale()) return;
     if (!list.length) {
-      container.innerHTML =
+      container.innerHTML = voice +
         '<div class="qr-card"><h3 style="margin:0 0 6px"><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h3>' +
         '<div class="tl-note" style="padding:4px 2px"><i class="bi bi-emoji-smile"></i> אין כרגע דיווחים במעקב</div></div>';
       return;
@@ -596,7 +733,7 @@
     const nameOf = id => { const s = studs.find(x => x.id == id); return s ? s.name : '—'; };
     const catOf = id => { const c = cs.find(x => x.id == id); return c ? c.name : ''; };
     const overdueN = list.filter(isOverdue).length;
-    container.innerHTML =
+    container.innerHTML = voice +
       '<div class="qr-card">' +
         '<div class="card-h-row"><h3 style="margin:0"><i class="bi bi-flag-fill" style="color:var(--danger)"></i> מעקב דחוף</h3>' +
           '<span class="chip" style="' + (overdueN
@@ -615,7 +752,7 @@
               esc(hebDate(e.event_date) || e.event_date) + (relDay(e.event_date) ? ' · ' + esc(relDay(e.event_date)) : '') + '</div>' : '') +
             '<div style="display:flex;gap:4px;margin-top:5px">' +
               '<button class="btn-ghost sm" data-wcmt="' + e.id + '" style="padding:2px 8px;font-size:.76rem"><i class="bi bi-chat-left-text"></i> תגובה</button>' +
-              '<button class="btn-ghost sm" data-wres="' + e.id + '" style="padding:2px 8px;font-size:.76rem"><i class="bi bi-check2-circle"></i> טופל</button>' +
+              '<button class="btn-ghost sm" data-wres="' + e.id + '" style="padding:2px 8px;font-size:.76rem"><i class="bi bi-check2-circle"></i> סגירה</button>' +
             '</div>' +
           '</div>';
         }).join('') +
@@ -630,12 +767,9 @@
     }));
     container.querySelectorAll('[data-wres]').forEach(b => b.addEventListener('click', async () => {
       const ev = list.find(x => x.id == b.dataset.wres); if (!ev) return;
-      if (!(await window.UI.confirm('להסיר את "' + esc(nameOf(ev.student_id)) + '" מרשימת המעקב?'))) return;
-      const r = await updEvent(ev.id, { followup: false });
-      if (!r || r.ok === false) { window.UI.toast('העדכון נכשל', 'err'); return; }
+      if (!(await resolveWithSummary(ev, nameOf(ev.student_id)))) return;
       renderFollowupWidget(container, opts);
       if (opts.onChange) opts.onChange();
-      window.UI.toast('הוסר מהמעקב');
     }));
   }
 
