@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>מסך לובי — מכינה בית התלמוד</title>
+<script>var SHOW_ELECTIONS = false;   // בחירות במכינה: כבוי (08/11/2026, יוסף). להחזרה: true — לא למחוק את הקוד</script>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link href="../vendor/heebo.css" rel="stylesheet">
 <link rel="stylesheet" href="../vendor/bootstrap-icons.css">
@@ -289,30 +290,110 @@ footer{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,
 #brand{display:flex;align-items:center;gap:8px}
 #brand img{height:26px;opacity:.95}
 
-/* ── מסרים מהשיח (07/11/2026) ── */
-/* 07/11/2026 לילה: הוגדל (כותרת ~115px, גוף ~67px ב-1920x1080) + אנימציה בעלת עלות נמוכה (transform/opacity בלבד) */
-#slSiach .sb-orb{position:fixed;border-radius:50%;background:var(--gold);opacity:.13;pointer-events:none;animation:sbOrb 16s ease-in-out infinite alternate}
-#slSiach .sb-orb.a{width:40vh;height:40vh;top:-10vh;inset-inline-end:-8vh}
-#slSiach .sb-orb.b{width:26vh;height:26vh;bottom:-6vh;inset-inline-start:3vw;animation-duration:20s;animation-delay:-5s}
-#slSiach .sb-orb.c{width:13vh;height:13vh;top:14vh;inset-inline-start:12vw;background:#fff;opacity:.07;animation-duration:11s;animation-delay:-3s}
-@keyframes sbOrb{from{transform:translate(0,0) scale(1)}to{transform:translate(-3vw,4vh) scale(1.12)}}
-#slSiach .sb-ico{font-size:calc(clamp(2.4rem,4vw,4rem)*var(--s,1));color:var(--gold-lt);display:block;animation:sbBob 2.8s ease-in-out infinite}
-@keyframes sbBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.4vh)}}
-#slSiach .sl-kicker{font-size:calc(clamp(1.2rem,1.8vw,1.8rem)*var(--s,1));display:inline-block;padding:.2em .9em;border-radius:99px;background:rgba(227,185,107,.16);color:var(--gold-lt);opacity:1;animation:sbIn .6s .1s cubic-bezier(.2,1,.3,1) both}
-#slSiach .sq{position:relative;width:min(1500px,94%);padding:3vh 3.4vw 3vh 3vw;border-radius:26px;background:linear-gradient(90deg,rgba(224,169,59,.22),rgba(255,255,255,.05));border:2px solid rgba(227,185,107,.45);box-shadow:0 1.5vh 4vh rgba(0,0,0,.35);animation:sbPop .9s cubic-bezier(.2,1.25,.4,1) both}
-#slSiach .sq::before{content:"";position:absolute;inset-inline-end:-1.1vw;top:14%;bottom:14%;width:.7vw;min-width:6px;border-radius:99px;background:var(--gold-lt);transform-origin:50% 0;animation:sbBar .7s .25s cubic-bezier(.2,.9,.3,1) both}
-@keyframes sbPop{from{opacity:0;transform:translateY(5vh) scale(.94)}to{opacity:1;transform:none}}
-@keyframes sbBar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-@keyframes sbIn{from{opacity:0;transform:translateX(3vw)}to{opacity:1;transform:none}}
-#slSiach .sq b{display:block;font-size:calc(clamp(2.4rem,5.2vw,5.6rem)*var(--s,1));font-weight:900;line-height:1.15;color:#fff;animation:sbIn .7s .15s cubic-bezier(.2,1,.3,1) both}
-#slSiach .sq small{display:block;font-size:calc(clamp(1.6rem,2.6vw,2.9rem)*var(--s,1));color:var(--gold-lt);margin-top:.4em;line-height:1.35;animation:sbIn .7s .4s cubic-bezier(.2,1,.3,1) both}
-/* שאלה לשולחן השבת: כרטיס גדול עם הבהוב עדין של המסגרת */
-#slSiach .sq.q{border-color:var(--gold-lt);animation:sbPop .9s cubic-bezier(.2,1.25,.4,1) both,sbGlow 2.4s 1s ease-in-out infinite}
-#slSiach .sq.q b{font-size:calc(clamp(2.6rem,6vw,6.5rem)*var(--s,1));color:var(--gold-lt)}
-@keyframes sbGlow{0%,100%{box-shadow:0 0 0 rgba(227,185,107,0)}50%{box-shadow:0 0 4vh rgba(227,185,107,.45)}}
-/* 07/11/2026: מילות מפתח בשיח — הבהוב עדין + סימון זהב מתחת למילה (צורות בלבד, בלי דמויות) */
-#slSiach .kw{display:inline-block;padding:0 .14em;margin:0 -.02em;border-radius:.25em;color:#fff;background:linear-gradient(transparent 52%,rgba(227,185,107,.7) 52%);animation:sbKw 2.4s ease-in-out infinite}
-@keyframes sbKw{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+/* ── מסרים מהשיח (v4, 08/11/2026): מסך מלא, איור אובייקט לכל מסר, פיסות, טון. רק transform/opacity; blur רק על #siText ── */
+/* גדלים ב-1920x1080: כותרת/מילת מפתח 180px, גוף 100px, שאלה 120px (רצפה: 150 / 85 / 110) */
+#slSiach{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0;
+  background:radial-gradient(ellipse at 50% 38%,#17323C 0%,#0B1418 72%)}
+#slSiach>*{animation:none}   /* הכלל הכללי .slide.on>* (rise) לא נוגע בשקופית הזאת */
+#slSiach:not(.on) *{animation-play-state:paused}   /* שקופית מוסתרת: אפס תנועה */
+#slSiach .si-ring{position:absolute;width:76vh;height:76vh;border-radius:50%;border:2px solid rgba(227,185,107,.16);top:12vh;inset-inline-start:12vw;animation:siSpin 70s linear infinite}
+@keyframes siSpin{to{transform:rotate(360deg)}}
+#slSiach .si-glow{position:absolute;display:none;width:90vh;height:90vh;border-radius:50%;background:radial-gradient(circle,rgba(227,185,107,.2),transparent 66%);top:5vh;inset-inline-start:50%;margin-inline-start:-45vh;animation:siBreathe 10s ease-in-out infinite}
+@keyframes siBreathe{0%,100%{opacity:.55}50%{opacity:1}}
+#slSiach .si-shape{position:absolute;display:none;width:34vh;height:34vh;border:2px solid rgba(255,255,255,.1);top:9vh;inset-inline-end:7vw;transform:rotate(20deg)}
+@keyframes siSlant{from{transform:translateX(-3vw) rotate(20deg)}to{transform:translateX(3vw) rotate(38deg)}}
+#slSiach .si-lines{position:absolute;inset:-25%;display:none;background:repeating-linear-gradient(115deg,rgba(227,185,107,.09) 0 2px,transparent 2px 70px);animation:siLines 18s linear infinite}
+@keyframes siLines{to{transform:translate(-12vh,6vh)}}
+#slSiach .si-dots{position:absolute;inset:0;display:none}
+#slSiach .si-dots i{position:absolute;bottom:-3vh;width:.9vh;height:.9vh;border-radius:50%;background:var(--gold-lt);opacity:0;animation:siRise 11s linear infinite}
+#slSiach .si-dots i:nth-child(1){inset-inline-start:14%;animation-delay:0s}
+#slSiach .si-dots i:nth-child(2){inset-inline-start:30%;animation-delay:-3s;width:1.3vh;height:1.3vh}
+#slSiach .si-dots i:nth-child(3){inset-inline-start:48%;animation-delay:-6s}
+#slSiach .si-dots i:nth-child(4){inset-inline-start:64%;animation-delay:-2s;width:1.1vh;height:1.1vh}
+#slSiach .si-dots i:nth-child(5){inset-inline-start:80%;animation-delay:-8s}
+#slSiach .si-dots i:nth-child(6){inset-inline-start:91%;animation-delay:-5s;width:.7vh;height:.7vh}
+@keyframes siRise{0%{transform:translateY(0);opacity:0}10%{opacity:.6}90%{opacity:.25}100%{transform:translateY(-108vh);opacity:0}}
+#slSiach.tone-solemn .si-glow{display:block}
+#slSiach.tone-uplifting .si-dots{display:block}
+#slSiach.tone-challenging .si-shape{display:block;animation:siSlant 14s ease-in-out infinite alternate}
+#slSiach.tone-challenging .si-lines{display:block}
+
+/* איור האובייקט: מאחורי הטקסט, קווי זהב בשקיפות נמוכה (לא פוגע בקריאות) */
+/* hook/kw/tag: איור גדול וחלש מאחורי הטקסט (שקיפות עד 0.12, בלי קווים חזקים מעל האותיות) */
+#slSiach #siArt{position:absolute;left:50%;top:50%;width:84vh;height:84vh;transform:translate(-50%,-50%);opacity:.12;overflow:visible;pointer-events:none;transition:none}
+/* body/q: עמודה שמאל (שליש), טקסט בשני השלישים הימניים (RTL). האיור ~44% מגובה המסך */
+#slSiach.lay-col #siArt{left:15vw;top:50%;width:46vh;height:46vh;opacity:.92}
+#slSiach.lay-col .si-stage{justify-content:flex-start;padding:0 4vw 7vh 36vw}
+#slSiach.lay-col #siText{text-align:start;width:100%}
+#slSiach #siArt .ic{fill:none;stroke:var(--gold-lt);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;animation:siFloat 7s ease-in-out infinite}
+#slSiach #siArt .pl{fill:url(#siGl);stroke:none;transform-box:fill-box;transform-origin:center;animation:siBreathe 10s ease-in-out infinite}
+#slSiach #siArt .dr{stroke-dasharray:1;stroke-dashoffset:1;animation:siDraw 1.4s ease-out forwards}
+#slSiach #siArt .dr.fk{animation:siDraw 1.2s ease-out forwards,siFlick 1.7s ease-in-out 1.2s infinite;transform-box:fill-box;transform-origin:50% 100%}
+#slSiach #siArt .dr.rg{animation:siDraw 1.2s ease-out forwards,siConv 3.6s ease-in-out 1.2s infinite;transform-box:fill-box;transform-origin:center}
+#slSiach #siArt .dr.rg.r2{animation:siDraw 1.2s ease-out forwards,siConv 3.6s ease-in-out -1.2s infinite;transform-box:fill-box;transform-origin:center}
+#slSiach #siArt .dr.rg.r3{animation:siDraw 1.2s ease-out forwards,siConv 3.6s ease-in-out -2.4s infinite;transform-box:fill-box;transform-origin:center}
+#slSiach #siArt .dr.fl{animation:siDraw 1.2s ease-out forwards,siFloat 6s ease-in-out 1.2s infinite}
+#slSiach #siArt .dr.tw{animation:siDraw 1.4s ease-out forwards,siTwinkle 3s ease-in-out 1.4s infinite;transform-box:fill-box;transform-origin:center}
+#slSiach #siArt .gr{transform-box:fill-box;transform-origin:50% 100%;transform:scaleY(0);animation:siGrow 1.8s ease-out forwards}
+#slSiach #siArt .gx{transform-box:fill-box;transform-origin:0 50%;transform:scaleX(0);animation:siGrowX 1.4s ease-out forwards}
+#slSiach #siArt .gr.d1,#slSiach #siArt .gx.d1{animation-delay:.8s}
+#slSiach #siArt .gr.d2,#slSiach #siArt .gx.d2{animation-delay:1.3s}
+#slSiach #siArt .gr.d3,#slSiach #siArt .gx.d3{animation-delay:1.8s}
+#slSiach #siArt .rp{transform-box:fill-box;transform-origin:center;animation:siRip 2.8s ease-out infinite}
+#slSiach #siArt .rp.d1{animation-delay:-1.4s}
+#slSiach #siArt .sw{transform-box:view-box;transform-origin:200px 160px;animation:siSwing 4.5s ease-in-out infinite}
+#slSiach #siArt .nd{transform-box:view-box;transform-origin:200px 200px;animation:siSwing 3s ease-in-out infinite}
+#slSiach #siArt .spin{transform-box:view-box;transform-origin:200px 200px;animation:siSpin 20s linear infinite}
+@keyframes siDraw{to{stroke-dashoffset:0}}
+@keyframes siFlick{0%,100%{transform:scale(1,1)}50%{transform:scale(.92,1.06)}}
+@keyframes siGrow{to{transform:scaleY(1)}}
+@keyframes siGrowX{to{transform:scaleX(1)}}
+@keyframes siConv{0%{transform:scale(1.35);opacity:0}25%{opacity:1}100%{transform:scale(.7);opacity:0}}
+@keyframes siSwing{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes siRip{0%{transform:scale(.4);opacity:.7}100%{transform:scale(1.7);opacity:0}}
+@keyframes siFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes siTwinkle{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+#slSiach .si-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 3vw 7vh;box-sizing:border-box}
+#slSiach #siText{position:relative;font-weight:900;line-height:1.2;color:#fff;text-align:center;text-shadow:0 .4vh 2.4vh rgba(0,0,0,.35);animation:siBlurIn .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes siBlurIn{from{opacity:0;filter:blur(12px);transform:translateY(2.4vh)}to{opacity:1;filter:blur(0);transform:none}}
+#slSiach.bt-hook #siText{font-size:min(210px,10.9vw);line-height:1.1;width:100%}
+#slSiach.bt-kw #siText{font-size:min(250px,13vw);line-height:1.08;color:var(--gold-lt);width:100%}
+#slSiach.bt-body #siText{font-size:clamp(100px,6.8vw,130px);font-weight:800;line-height:1.32;color:#f3e6c8}   /* קצר = עד 130px, אבל לא פחות מ-100px */
+#slSiach.bt-q #siText{font-size:min(120px,6.2vw);font-weight:900;line-height:1.22;color:var(--gold-lt)}
+#slSiach.bt-tag #siText{opacity:0;animation:none}
+#slSiach #siText .w{display:inline-block;animation-delay:var(--d,0s);animation-fill-mode:both;animation-duration:1s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+/* שלושה טונים = שלוש שפות תנועה (אותו פריסה) */
+#slSiach.tone-solemn #siText .w{animation-name:siFade;animation-duration:1.2s;animation-timing-function:ease-out}
+#slSiach.tone-uplifting #siText .w{animation-name:siPop;animation-duration:.8s;animation-timing-function:cubic-bezier(.2,1.25,.4,1)}
+#slSiach.tone-challenging #siText .w{animation-name:siSlide;animation-duration:.45s;animation-timing-function:cubic-bezier(.2,.9,.3,1)}
+#slSiach.tone-challenging.bt-kw #siText .w{animation-name:siSlam;animation-duration:.5s;animation-timing-function:cubic-bezier(.2,1.4,.4,1)}
+@keyframes siFade{from{opacity:0;transform:translateY(2.4vh)}to{opacity:1;transform:none}}
+@keyframes siPop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes siSlide{from{opacity:0;transform:translateX(7vw)}to{opacity:1;transform:none}}
+@keyframes siSlam{from{opacity:0;transform:scale(1.45)}to{opacity:1;transform:none}}
+/* מילת מפתח: סימון מרקר (רצועת זהב שנמשכת מאחורי המילה, transform בלבד) */
+#slSiach .kwi{position:relative;display:inline-block;z-index:0;color:#fff}
+#slSiach .kwi::before{content:"";position:absolute;inset:.04em -.14em .02em;border-radius:.18em;z-index:-1;
+  background:rgba(227,185,107,.5);transform:scaleX(0);transform-origin:100% 50%;animation:siSwipe .6s .8s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes siSwipe{to{transform:scaleX(1)}}
+/* solemn: הדגשה רכה — הילה זהובה שמתעמעמת פנימה */
+#slSiach.tone-solemn .kwi::before{background:radial-gradient(ellipse at center,rgba(227,185,107,.42),rgba(227,185,107,0) 72%);transform:none;opacity:0;animation:siGlow 1.8s .9s ease-out forwards;inset:-.2em -.3em}
+@keyframes siGlow{to{opacity:1}}
+/* uplifting/challenging: קפיצה קצרה אחת של המילה */
+#slSiach.tone-uplifting .kwi,#slSiach.tone-challenging .kwi{animation:siPop2 .5s .9s both}
+@keyframes siPop2{0%{transform:scale(1)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
+/* כרטיס התג: beat מלא במרכז המסך, נכנס בהסחה מהצד; מופיע פעם אחת בתחילת כל מסר */
+#slSiach #siTag{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;padding-bottom:7vh;box-sizing:border-box;pointer-events:none}
+#slSiach #siTagTxt{display:inline-block;padding:4vh 4.5vw;border-radius:2.4vh;max-width:86vw;
+  background:linear-gradient(90deg,rgba(224,169,59,.96),rgba(227,185,107,.78));color:#0B1418;font-size:min(104px,5.4vw);font-weight:900;line-height:1.2;text-align:center;
+  box-shadow:0 1.5vh 4vh rgba(0,0,0,.35)}
+#slSiach.bt-tag #siTag{opacity:1}
+#slSiach.bt-tag #siTagTxt{animation:siSweep 1.6s cubic-bezier(.6,0,.2,1) both}
+#slSiach.tone-solemn.bt-tag #siTagTxt{background:rgba(227,185,107,.85);animation-name:siSweepSoft;animation-duration:2.2s}
+#slSiach.tone-challenging.bt-tag #siTagTxt{animation-duration:.9s}
+@keyframes siSweep{0%{transform:translateX(-30%) skewY(-3deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
+@keyframes siSweepSoft{0%{transform:translateX(-8%);opacity:0}40%{opacity:1}100%{transform:none;opacity:1}}
 #sbCard{position:absolute;inset:0;bottom:var(--pbH);z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4vh;text-align:center;padding:4vw;
   background:radial-gradient(ellipse at 50% 40%,#17323C 0%,#0B1418 72%);opacity:0;pointer-events:none;transition:opacity .6s}
 #sbCard.on{opacity:1}
@@ -492,7 +573,7 @@ body.prog-on #bxClock{display:none}
 </head>
 <body>
 <script>/* בוחרים לצמוח: כשמסך הבחירות פעיל (סקר/ספירה/מנצחות) הלובי עובר אליו, ובמצב המתנה חוזר */
-(function(){var U='http://192.168.1.105:8585';function chk(){fetch(U+'/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){if(s&&s.lobby_campaign){location.href=U+'/campaign?lobby=1'}else if(s&&s.mode&&s.mode!=='wait'){location.href=U+'/?from=lobby'}}).catch(function(){})}chk();setInterval(chk,10000)})();
+(function(){if(!SHOW_ELECTIONS)return;var U='http://192.168.1.105:8585';function chk(){fetch(U+'/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){if(s&&s.lobby_campaign){location.href=U+'/campaign?lobby=1'}else if(s&&s.mode&&s.mode!=='wait'){location.href=U+'/?from=lobby'}}).catch(function(){})}chk();setInterval(chk,10000)})();
 </script>
 <div id="bg"></div>
 
@@ -576,12 +657,6 @@ body.prog-on #bxClock{display:none}
         <div class="sl-title">סרטונים חדשים השבוע</div>
         <div class="fr" id="slFreshList"></div>
       </div>
-      <div class="slide" id="slSiach">
-        <div class="sb-orb a"></div><div class="sb-orb b"></div><div class="sb-orb c"></div>
-        <i class="bi bi-chat-quote-fill sb-ico"></i>
-        <div class="sl-kicker" id="slSiachKick">מהשיח</div>
-        <div class="sq"><b id="slSiachHead"></b><small id="slSiachBody"></small></div>
-      </div>
       <div class="slide" id="slBech"></div>
     </div>
     <div id="bech"><div class="bx-head"><img src="/bech/emblem.svg" alt=""><div><b>בוחרים לצמוח</b><span id="bxDate">הבחירות במכינה</span></div>
@@ -595,6 +670,13 @@ body.prog-on #bxClock{display:none}
   </footer>
 </div>
 <div id="draw"></div>
+<div class="slide" id="slSiach">
+  <div class="si-ring"></div><div class="si-glow"></div><div class="si-shape"></div><div class="si-lines"></div>
+  <div class="si-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <svg id="siArt" viewBox="0 0 400 400" aria-hidden="true"></svg>
+  <div id="siTag"><span id="siTagTxt"></span></div>
+  <div class="si-stage"><div id="siText"></div></div>
+</div>
 <button id="fsBtn" title="מסך מלא (F)"><i class="bi bi-arrows-fullscreen"></i></button>
 <div id="hint"></div>
 
@@ -944,7 +1026,7 @@ function tick() {
   bechShow((!allow && curSlide === 'bechirot') || (PROG.on && PROG.bech) || /[?&]bech=1/.test(location.search), now);
   if (PIN) {   // בדיקה בלבד: השקופית נעולה על "מהשיח"; מציירים אותה פעם אחת אחרי שהמסרים נטענו
     $('ov').className = 'on';
-    if (curSlide !== 'siach' || !$('slSiachHead').textContent) { curSlide = 'siach'; showSlide('siach', now); }
+    if (curSlide !== 'siach' || !SIACH.pinned) { curSlide = 'siach'; showSlide('siach', now); }
   } else if (!allow) {
     paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total, st.gap);
     rotate(now, inLesson, left);
@@ -1039,7 +1121,7 @@ var BECH_SNAP = { voted:32, of:36,
   green:{1:9,2:2,3:3,4:2,5:4,6:7,7:5,8:2,9:1,10:11,11:1,12:4,13:5,14:5,15:3,16:3,17:5,18:5,19:5,20:8},
   classes:[{n:"שיעור א'",v:10,of:10},{n:"שיעור ב'",v:8,of:12},{n:"שיעור ג'",v:14,of:14}] };
 var BECH = { data:null, scene:0, since:0, shown:false };
-function bechActive(now) { return LOCAL !== null && isoOf(now || new Date()) <= BECH_UNTIL; }
+function bechActive(now) { return SHOW_ELECTIONS && LOCAL !== null && isoOf(now || new Date()) <= BECH_UNTIL; }
 async function bechLoad() {
   if (LOCAL === null) return;
   try {
@@ -1127,6 +1209,7 @@ function bechPaint() {
   $('bxDots').innerHTML = S.map(function (_, k) { return '<i' + (k === i ? ' class="on"' : '') + '></i>'; }).join('');
 }
 function bechShow(on, now) {
+  if (!SHOW_ELECTIONS) on = false;
   var el = $('bech'); if (!el) return;
   if (!on) { if (BECH.shown) { BECH.shown = false; el.classList.remove('on'); BECH.scene++; } return; }
   var t = Date.now();
@@ -1165,6 +1248,7 @@ function drawT0(now) {
   var d = new Date(now); d.setHours(DRAW_T0[0], DRAW_T0[1], 0, 0); return d.getTime();
 }
 function drawState(now) {
+  if (!SHOW_ELECTIONS) return null;
   var t0 = drawT0(now); if (t0 == null) return null;
   var t = now.getTime(), end = DRAW_TEST ? t0 + 160000 : new Date(now).setHours(DRAW_END[0], DRAW_END[1], 0, 0);
   if (t < t0 || t >= end) return null;
@@ -1197,6 +1281,7 @@ function drawBoom() {
   el.classList.remove('flash', 'shake'); void el.offsetWidth; el.classList.add('flash', 'shake');
   setTimeout(function () { el.classList.remove('flash', 'shake'); }, 700);
   var cols = ['#ffd21a', '#e3b96b', '#2fbf6f', '#ffffff', '#ff9f43'];
+  el.querySelectorAll('.dw-cf').forEach(function (n) { n.remove(); });   // לא מצטברים צמתים בין הפעלות
   for (var k = 0; k < 70; k++) { var c = document.createElement('i'); c.className = 'dw-cf';
     c.style.left = (Math.random() * 100) + 'cqw'; c.style.background = cols[k % cols.length];
     c.style.animationDuration = (1.8 + Math.random() * 1.6) + 's'; c.style.animationDelay = (Math.random() * .3) + 's';
@@ -1272,45 +1357,184 @@ function drawTick(now) {
   }
   DRAW.phase = st.phase;
 }
-// ── מסרים מהשיח של הרב וינברג: נמשכים מהשרת (/api/siach), מוצגים בסבב השקופיות ובין סרטוני ההפסקה ──
-// בדיקת לובי בלבד: ?slide=siach&siachday=YYYY-MM-DD&siachi=N נועל את השקופית של רשומה אחת (בלי סבב, בלי המתנה)
+// ── מסרים מהשיח (v4, 08/11/2026) ──
+// סדר לכל מסר: תג אחד בתחילה ← הוק ← פיסות גוף ← מילת מפתח לבד ← שאלה (אחרונה).
+// שדות v4: hook, beats[], keyword, question, tone, icon. בלי hook: הצורה הישנה (points[head, body, keywords]).
+// טון (solemn | uplifting | challenging) קובע את התנועה. אייקון = איור של אובייקט בלבד (בלי אנשים), מונפש ב-CSS.
+// כיבוי: "hidden": true ברשומה או "enabled": false בקובץ. רשומה מעל 2 ימים לא מוצגת.
+// בדיקת לובי בלבד: ?slide=siach&siachday=YYYY-MM-DD&siachi=N מציג פיסה N בלבד (בלי טיימרים) ומפרסם window.__SIACH_BEATS.
 var PIN = (function () { try { var q = new URLSearchParams(location.search); return q.get('slide') === 'siach' ? { day: q.get('siachday') || '', i: Number(q.get('siachi')) || 0 } : null; } catch (e) { return null; } })();
-var SIACH = { items:[], i:0, at:0 };
+var SIACH = { items:[], i:0, pinned:false, timer:null, dur:0, enabled:true };
+var SB = { timer:null, at:-1 };                 // נשמר לתאימות עם כרטיס ההפסקה הישן
+var SIACH_CHUNK = 85, SIACH_MAX_AGE_DAYS = 2, SIACH_KICK = 'מתוך השיח של הרב וינברג';
+var SIACH_TONES = ['solemn', 'uplifting', 'challenging'];
+var SI_ICONS = ['candle', 'target', 'book', 'mountain', 'path', 'sprout', 'flame', 'scale', 'key', 'compass', 'star', 'drop', 'bridge', 'ladder', 'shield', 'lamp', 'clock', 'seed'];
+var SI_DEFAULT_ICON = { solemn:'candle', uplifting:'sprout', challenging:'target' };
+// איורי האובייקטים: קבוצה לכל אייקון, מוצגת אחת בכל פעם (display). אין אנשים, צלליות או ידיים.
+var SI_GROUPS = {};
+var SI_ART_DEF = '<defs><radialGradient id="siGl"><stop offset="0" stop-color="#E3B96B" stop-opacity=".55"/><stop offset="1" stop-color="#E3B96B" stop-opacity="0"/></radialGradient></defs>';
+var SI_ART = [
+  ['candle', '<circle class="pl" cx="200" cy="190" r="170"/><path class="dr" pathLength="1" d="M150 340H250V170H150Z"/><path class="dr" pathLength="1" d="M150 215C170 225 180 205 200 215C220 225 230 205 250 215"/><path class="dr" pathLength="1" d="M200 170V150"/><path class="dr fk" pathLength="1" d="M200 150C170 120 176 80 200 40C224 80 230 120 200 150Z"/><path class="dr fk" pathLength="1" d="M200 140C186 118 190 96 200 80C210 96 214 118 200 140Z"/><path class="dr" pathLength="1" d="M120 342H280"/>'],
+  ['target', '<circle class="dr rg" pathLength="1" cx="200" cy="200" r="150"/><circle class="dr rg r2" pathLength="1" cx="200" cy="200" r="100"/><circle class="dr rg r3" pathLength="1" cx="200" cy="200" r="50"/><path class="dr" pathLength="1" d="M330 70L200 200"/><path class="dr" pathLength="1" d="M316 70H330V84"/>'],
+  ['book', '<path class="dr" pathLength="1" d="M200 140C160 118 110 116 70 128V300C110 288 160 290 200 312C240 290 290 288 330 300V128C290 116 240 118 200 140Z"/><path class="dr" pathLength="1" d="M200 140V312"/>'],
+  ['mountain', '<path class="dr" pathLength="1" d="M50 320L170 160L230 240L262 200L350 320Z"/><circle class="dr fl" pathLength="1" cx="300" cy="110" r="34"/>'],
+  ['path', '<path class="dr" pathLength="1" d="M70 340C150 260 250 300 200 220S250 120 330 80"/><circle class="rp" cx="330" cy="80" r="14"/><circle class="rp d1" cx="70" cy="340" r="10"/>'],
+  ['sprout', '<path class="dr" pathLength="1" d="M120 330H280"/><path class="gr d1" d="M200 330V200"/><path class="gr d2" d="M200 250C170 250 150 230 150 200C185 200 200 220 200 250Z"/><path class="gr d3" d="M200 230C230 230 250 210 250 180C215 180 200 200 200 230Z"/>'],
+  ['flame', '<path class="dr fk" pathLength="1" d="M200 90C250 150 290 190 290 250C290 310 250 340 200 340C150 340 110 310 110 250C110 200 150 170 170 130C180 170 190 180 200 190C210 150 200 120 200 90Z"/><path class="dr fk" pathLength="1" d="M200 300C220 280 230 260 225 240C240 255 245 270 240 285C235 300 220 310 200 300Z"/>'],
+  ['scale', '<g class="sw"><path class="dr" pathLength="1" d="M110 160H290"/><path class="dr" pathLength="1" d="M200 160V320"/><path class="dr" pathLength="1" d="M90 230Q120 265 150 230"/><path class="dr" pathLength="1" d="M250 230Q280 265 310 230"/></g><path class="dr" pathLength="1" d="M150 330H250"/>'],
+  ['key', '<circle class="dr" pathLength="1" cx="140" cy="200" r="60"/><path class="dr" pathLength="1" d="M200 200H330"/><path class="dr" pathLength="1" d="M290 200V240M320 200V230"/>'],
+  ['compass', '<circle class="dr" pathLength="1" cx="200" cy="200" r="150"/><g class="nd"><path class="dr" pathLength="1" d="M200 110L230 200L200 290L170 200Z"/></g>'],
+  ['star', '<path class="dr tw" pathLength="1" d="M200 80L232 160L320 165L252 218L276 304L200 256L124 304L148 218L80 165L168 160Z"/>'],
+  ['drop', '<path class="dr" pathLength="1" d="M200 90C250 170 290 210 290 260A90 90 0 0 1 110 260C110 210 150 170 200 90Z"/><ellipse class="rp" cx="200" cy="350" rx="90" ry="14"/><ellipse class="rp d1" cx="200" cy="350" rx="90" ry="14"/>'],
+  ['bridge', '<path class="dr" pathLength="1" d="M50 280Q200 90 350 280"/><path class="dr" pathLength="1" d="M50 280H350"/><path class="gr d1" d="M120 280V230"/><path class="gr d2" d="M200 280V190"/><path class="gr d3" d="M280 280V230"/>'],
+  ['ladder', '<path class="dr" pathLength="1" d="M160 70V340M240 70V340"/><path class="gx d1" d="M160 120H240"/><path class="gx d2" d="M160 190H240"/><path class="gx d3" d="M160 260H240"/>'],
+  ['shield', '<path class="dr" pathLength="1" d="M200 80L300 120V210C300 270 255 310 200 330C145 310 100 270 100 210V120Z"/><path class="dr" pathLength="1" d="M160 205L192 238L248 175"/>'],
+  ['lamp', '<circle class="dr" pathLength="1" cx="200" cy="170" r="70"/><path class="dr" pathLength="1" d="M170 240H230V290H170Z"/><path class="dr fk" pathLength="1" d="M200 60V30M110 110L85 85M290 110L315 85M120 190H90M280 190H310"/>'],
+  ['clock', '<circle class="dr" pathLength="1" cx="200" cy="200" r="150"/><g class="spin"><path class="dr" pathLength="1" d="M200 200V120M200 200L260 230"/></g>'],
+  ['seed', '<path class="dr" pathLength="1" d="M200 280C150 280 140 220 200 180C260 220 250 280 200 280Z"/><path class="gr d1" d="M200 180V110"/><path class="gr d2" d="M200 130C170 120 160 95 165 80C190 85 200 105 200 130Z"/><path class="gr d3" d="M200 120C230 110 240 85 235 70C210 75 200 95 200 120Z"/>']
+];
+(function siArtInit() {
+  var svg = $('siArt'); if (!svg) return;
+  svg.innerHTML = SI_ART_DEF + SI_ART.map(function (g) { return '<g class="ic" data-n="' + g[0] + '">' + g[1] + '</g>'; }).join('');
+  Array.prototype.forEach.call(svg.querySelectorAll('g.ic'), function (g) { SI_GROUPS[g.getAttribute('data-n')] = g; g.style.display = 'none'; });
+})();
+// מציג איור אחד: מכבים את כולם, מחכים לפריסה (כדי שהאנימציות יתחילו מחדש), ואז מדליקים את הנבחר
+function siShowIcon(name) {
+  var svg = $('siArt'); if (!svg) return;
+  for (var k in SI_GROUPS) SI_GROUPS[k].style.display = 'none';
+  void svg.getBoundingClientRect();
+  if (SI_GROUPS[name]) SI_GROUPS[name].style.display = '';
+}
 function siachPull() {
-  fetch('/api/siach', { cache:'no-store' }).then(function (r) { return r.json(); }).then(function (j) { SIACH.items = (j && j.items) || []; }).catch(function () {});
+  fetch('/api/siach', { cache:'no-store' }).then(function (r) { return r.json(); }).then(function (j) { SIACH.items = (j && j.items) || []; SIACH.enabled = !(j && j.enabled === false); }).catch(function () {});
 }
-function siachDayLabel(it, now) {
+function siachFresh(it, now) {
   var d = Math.round((new Date(isoOf(now)).getTime() - new Date(it.date).getTime()) / 86400000);
-  var when = d <= 0 ? 'היום' : (d === 1 ? 'אתמול' : 'לפני ' + d + ' ימים');
-  return 'מהשיח של הרב וינברג · ' + when + (it.session === 'צהריים' ? ' בצהריים' : ' בבוקר');
+  return d >= 0 && d <= SIACH_MAX_AGE_DAYS;
 }
+// הודעות לסבב: רשומה = הודעה אחת (v4 או ישנה), שאלת שולחן השבת תמיד אחרונה
 function siachPoints() {
   var now = new Date(), out = [];
+  if (!SIACH.enabled) return out;                 // מתג כיבוי ברמת הקובץ: "enabled": false
   SIACH.items.forEach(function (it) {
+    if (it.hidden || !siachFresh(it, now)) return;
     if (PIN && PIN.day && it.date !== PIN.day) return;
-    (it.points || []).forEach(function (p) { if (p && p.head) out.push({ kick:siachDayLabel(it, now), head:p.head, body:p.body || '', kw:p.keywords || [] }); });
-    if (it.question) out.push({ kick:siachDayLabel(it, now) + ' · לחשוב על זה', head:it.question, body:'', kw:[] });
+    var tone = SIACH_TONES.indexOf(it.tone) >= 0 ? it.tone : 'solemn';
+    var icon = SI_ICONS.indexOf(it.icon) >= 0 ? it.icon : SI_DEFAULT_ICON[tone];
+    var parts = [];
+    if (typeof it.hook === 'string' && it.hook.trim()) {                       // v4
+      parts.push({ hook:it.hook.trim(),
+        body:(Array.isArray(it.beats) ? it.beats : []).map(function (s) { return String(s || '').trim(); }).filter(Boolean),
+        kw:it.keyword ? [String(it.keyword).trim()] : [] });
+    } else {                                                                   // צורה ישנה: points[head, body, keywords]
+      (it.points || []).forEach(function (p) {
+        if (!p || !p.head) return;
+        parts.push({ hook:p.head, body:siachChunks(p.body || '', SIACH_CHUNK), kw:p.keywords || [] });
+      });
+    }
+    var q = String(it.question || '').trim();
+    if (!parts.length && !q) return;
+    out.push({ tone:tone, icon:icon, parts:parts, q:q });
   });
   return out;
 }
-function siachNext() { var a = siachPoints(); if (!a.length) return null; if (PIN) return a[PIN.i % a.length]; return a[(SIACH.i++) % a.length]; }
-// גוף המסר עם מילות המפתח מודגשות (הבהוב מדורג); רק טקסט מוגן (esc) נכנס ל-HTML
-function kwHtml(text, kws) {
-  var h = esc(text), n = 0, list = (kws || []).map(function (k) { return String(k || '').trim(); }).filter(function (k) { return k && text.indexOf(k) >= 0; });
-  list.forEach(function (k) {
-    var ek = esc(k);
-    if (list.some(function (o) { return o !== k && o.indexOf(k) >= 0; })) return;   // מילה שמוכלת במילה ארוכה יותר — מסומנת דרך הארוכה
-    h = h.split(ek).join('<span class="kw" style="animation-delay:-' + (n++ * 0.7).toFixed(1) + 's">' + ek + '</span>');
+// חיתוך גוף לפיסות (צורה ישנה): קודם לפי משפטים, אחר כך מילים; כל פיסה עד max תווים
+function siachChunks(text, max) {
+  var sents = String(text || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s+/), out = [], cur = '';
+  sents.forEach(function (s) {
+    if (!s) return;
+    if (s.length > max) {
+      if (cur) { out.push(cur); cur = ''; }
+      var piece = '';
+      s.split(' ').forEach(function (w) {
+        if (piece && (piece + ' ' + w).length > max) { out.push(piece); piece = w; } else { piece = piece ? piece + ' ' + w : w; }
+      });
+      cur = piece;
+    } else if (cur && (cur + ' ' + s).length > max) { out.push(cur); cur = s; }
+    else { cur = cur ? cur + ' ' + s : s; }
   });
-  return h;
+  if (cur) out.push(cur);
+  return out;
 }
-var SB = { timer:null, at:-1 };
-function siachBreakCard(done) {   // בין סרטוני ההפסקה: מסר אחד מהשיח, ~22 שניות
-  var sp = siachNext(); if (!sp) { done(); return; }
-  $('sbKick').textContent = sp.kick; $('sbHead').textContent = sp.head; $('sbBody').textContent = sp.body;
+function siFirstWords(s, n) { return String(s || '').trim().split(/\s+/).slice(0, n).join(' '); }
+function siachBeats(m) {
+  var B = [{ t:'tag', text:SIACH_KICK, tone:m.tone, icon:m.icon, kw:[] }];        // תג אחד, בתחילת המסר בלבד
+  m.parts.forEach(function (p) {
+    if (p.hook) B.push({ t:'hook', text:p.hook, tone:m.tone, icon:m.icon, kw:[] });
+    p.body.forEach(function (c) { B.push({ t:'body', text:c, tone:m.tone, icon:m.icon, kw:p.kw }); });
+    var k = (p.kw && p.kw[0] ? String(p.kw[0]).trim() : '') || siFirstWords(p.hook, 3);   // תמיד יש פיסת מילת מפתח
+    if (k) B.push({ t:'kw', text:k, tone:m.tone, icon:m.icon, kw:[] });
+  });
+  if (m.q) B.push({ t:'q', text:m.q, tone:m.tone, icon:m.icon, kw:[] });            // השאלה: תמיד אחרונה
+  return B;
+}
+// זמן החזקה = סיום הופעת המילים (SIACH_REVEAL) + זמן הקריאה של הסוג
+var SIACH_REVEAL = 2200;
+function siachHold(b) {
+  var read = { hook:4000, body:6500, kw:4000, q:9000 }[b.t] || 0;
+  return b.t === 'tag' ? 2000 : SIACH_REVEAL + read;
+}
+// מילים עם הדגשה: כל מילה נכנסת בהשהיה משלה (--d); מילות מפתח שבתוך הפיסה מסומנות
+function siWords(text, kws, base) {
+  var s = String(text || ''), ranges = [];
+  (kws || []).forEach(function (k) {
+    k = String(k || '').trim(); if (!k) return;
+    var i = s.indexOf(k); while (i >= 0) { ranges.push([i, i + k.length]); i = s.indexOf(k, i + k.length); }
+  });
+  var words = [], re = /\S+/g, m;
+  while ((m = re.exec(s))) words.push([m.index, m.index + m[0].length, m[0]]);
+  var step = Math.min(0.12, 0.9 / Math.max(1, words.length)), out = [];
+  words.forEach(function (w, n) {
+    var kw = ranges.some(function (r) { return w[0] < r[1] && w[1] > r[0]; });
+    out.push('<span class="w" style="--d:' + (base + n * step).toFixed(2) + 's">' + (kw ? '<span class="kwi">' + esc(w[2]) + '</span>' : esc(w[2])) + '</span>');
+  });
+  return out.join(' ');
+}
+function siachRender(b) {
+  var S = $('slSiach'); if (!S) return;
+  S.className = 'slide';                          // מאפס את כל האנימציות של הפיסה (תג, איור, טקסט)
+  void S.offsetWidth;
+  S.className = 'slide on tone-' + b.tone + ' bt-' + b.t + ((b.t === 'body' || b.t === 'q') ? ' lay-col' : '');   // גוף/שאלה: איור בעמודה שמאל, טקסט מימין
+  siShowIcon(b.icon);
+  $('siTagTxt').textContent = SIACH_KICK;
+  var T = $('siText');
+  var txt = b.t === 'tag' ? '' : b.text;
+  var kws = b.t === 'body' ? b.kw : (b.t === 'kw' ? [txt] : []);
+  T.style.animation = 'none'; void T.offsetWidth; T.style.animation = '';     // טשטוש -> חד, רק על אלמנט הטקסט
+  T.innerHTML = siWords(txt, kws, b.t === 'kw' ? 0.1 : 0.2);
+}
+function siachStop() { if (SIACH.timer) { clearTimeout(SIACH.timer); SIACH.timer = null; } }
+// מציג מסר אחד מהסבב (פיסה אחר פיסה). done נקרא בסיום — בשימוש הכרטיס בהפסקה
+function siachPlay(done) {
+  siachStop();
+  var msgs = siachPoints();
+  if (!msgs.length) { if (done) done(); return; }
+  if (PIN) { siachPinned(); return; }
+  var m = msgs[(SIACH.i++) % msgs.length], beats = siachBeats(m), k = 0;
+  SIACH.dur = beats.reduce(function (s, b) { return s + siachHold(b); }, 0);
+  (function step() {
+    if (k >= beats.length) { SIACH.timer = null; if (done) done(); return; }
+    var b = beats[k++]; siachRender(b);
+    SIACH.timer = setTimeout(step, siachHold(b));
+  })();
+}
+// בדיקה: פיסה אחת, סטטית אחרי האנימציה
+function siachPinned() {
+  var all = [];
+  siachPoints().forEach(function (m) { all = all.concat(siachBeats(m)); });
+  window.__SIACH_BEATS = all.map(function (b) { return { t:b.t, text:b.text, tone:b.tone, icon:b.icon }; });
+  var b = all[PIN.i % all.length]; if (!b) return;
+  siachRender(b); SIACH.pinned = true;
+}
+// מסתיר את השקופית ומרוקן את הטקסט (לא משאירים צמתי מילים אחרי היציאה)
+function siachHide() {
+  for (var k in SLIDE_EL) { var el = $(SLIDE_EL[k]); if (el) el.className = 'slide'; }
+  var T = $('siText'); if (T) T.innerHTML = '';
+}
+function siachBreakCard(done) {   // בין סרטוני ההפסקה: מסר אחד מהשיח בפיסות, בלי טיימר נפרד
+  if (!siachPoints().length) { done(); return; }
   try { active.pause(); } catch (e) {} active.classList.add('off');
-  $('sbCard').classList.add('on');
-  SB.timer = setTimeout(function () { SB.timer = null; $('sbCard').classList.remove('on'); done(); }, 22000);
+  siachPlay(function () { siachHide(); curSlide = null; done(); });
 }
 var SLIDE_EL = { clock:'slClock', birthdays:'slBirth', menu:'slMenu', agenda:'slAgenda', message:'slMsg', fresh:'slFresh', bechirot:'slBech', siach:'slSiach' };
 
@@ -1334,7 +1558,7 @@ function rotate(now, inLesson, left) {
   // הספירה האחרונה חשובה מכל שקופית אחרת — היא נשארת על המסך עד המעבר
   if (left != null && left <= CD_WARN) pool = ['clock'];
   if (!pool.length) pool = ['clock'];
-  var sec = curSlide === 'bechirot' ? BECH_SCENE_SEC * BECH_PER_TURN : Math.max(5, Number(d.slideSec) || 18);
+  var sec = curSlide === 'bechirot' ? BECH_SCENE_SEC * BECH_PER_TURN : (curSlide === 'siach' ? Math.max(8, SIACH.dur / 1000) : Math.max(5, Number(d.slideSec) || 18));
   var t = now.getTime();
   if (!slideSince) slideSince = t;
   if (pool.indexOf(curSlide) < 0 || (t - slideSince) / 1000 >= sec) {
@@ -1345,6 +1569,7 @@ function rotate(now, inLesson, left) {
   }
 }
 function showSlide(name, now) {
+  siachStop();
   for (var k in SLIDE_EL) { var el = $(SLIDE_EL[k]); if (el) el.className = 'slide' + (k === name ? ' on' : ''); }
   setTimeout(fitSlide, 30);      // אחרי שהתוכן החדש נכנס ל-DOM
   if (name === 'birthdays') {
@@ -1390,8 +1615,7 @@ function showSlide(name, now) {
         esc(inf.title) + (x.isNew ? '<span class="new">חדש</span>' : '') + '</b><small>' + esc(inf.kick.replace('הסרטון הבא · ', '')) + '</small></div></div>';
     }).join('');
   } else if (name === 'siach') {
-    var sp = siachNext();
-    if (sp) { $('slSiachKick').textContent = sp.kick; $('slSiachHead').textContent = sp.head; $('slSiachBody').innerHTML = kwHtml(sp.body || '', sp.kw); var sq = document.querySelector('#slSiach .sq'); if (sq) sq.classList.toggle('q', !sp.body); }
+    siachPlay();
   } else if (name === 'message') {
     var msgs = activeMessages();
     var pick = msgs.filter(function (m) { return m.level === 'high'; });
@@ -1642,6 +1866,9 @@ function progInfo(it) {
              sub:(p[0] ? 'פרשת ' + p[0] + ' · ' : '') + 'מהשיח שאחרי תפילת שחרית במכינה',
              exp:'נושא אחד מהשיח של הבוקר — להמשך המחשבה סביב שולחן השבת' };
   if (/^\d+$/.test(p[0])) p.shift();   // "NN - שם - הסבר" או "שם - הסבר"
+  if (it.rel.indexOf('מומנטס') >= 0)   // 07/11/2026: רגעים קצרים מהשיעור של ר' אלי (קבוצת #מומנטס של MDY) עם הסבר
+    return { kick:'הסרטון הבא · #מומנטס', title:p[0] || base, sub:'רגע קצר מתוך השיעור של ר׳ אלי סטפנסקי',
+             exp:'רגע מהשיעור עם הסבר קצר · עקבו אחרי הכתוביות' };
   return { kick:'הסרטון הבא · מושגים בגמרא', title:p[0] || base, sub:p.slice(1).join(' - '),
            exp:'מושג מן הגמרא בהמחשה, עם ר׳ אלי סטפנסקי · עקבו אחרי הכתוביות' };
 }
@@ -1704,6 +1931,8 @@ function tryUnmute() {
     return 'unknown';
   }
   function show() {
+    // מוסתר במסך מלא ובבדיקות (?test=1): זה סימון לצוות לפני מסך מלא, לא שגיאה
+    if (document.body.classList.contains('fs') || /[?&]test=1/.test(location.search)) { b.style.display = 'none'; return; }
     var p = pol(), act = !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
     if (p === 'allowed' || act) { b.style.background = '#1b7f3b'; b.textContent = '🔊 קול פעיל (' + p + ') ' + new Date().toTimeString().slice(0,5); b.style.display = ''; setTimeout(function () { b.style.display = 'none'; }, 600000); }
     else { b.style.background = '#a32020'; b.textContent = '🔇 קול חסום בדפדפן — לחצו כאן פעם אחת (' + p + ')'; b.style.display = ''; }
@@ -2029,6 +2258,13 @@ if (new URLSearchParams(location.search).get('fs') === '1' && !document.fullscre
   };
   document.addEventListener('click', once);
 }
+// בדיקה בלבד (08/11/2026): חשיפה לבודק הסבב headless; לא משנה התנהגות
+if (/[?&]test=1/.test(location.search)) window.__lobbyTest = { rotate: rotate, resetClock: function () { slideSince = -1e13; }, current: function () { return curSlide; },
+  hasContent: function (n) { return slideHasContent(n, new Date()); }, siachCount: function () { return siachPoints().length; }, siachItems: function () { return SIACH.items.length; },
+  slides: function () { return (cfg && cfg.display && cfg.display.slides) || null; },
+  // בדיקת מעבר בין מסרים (?test=1 בלבד): מציג פיסה j של מסר m בלי טיימרים, כדי לכפות מעבר מסוף מסר א' לתג של מסר ב'
+  siachBeat: function (m, j) { var ms = siachPoints(), b = ms[m] ? siachBeats(ms[m]) : []; if (!b[j]) return null; siachRender(b[j]); return b[j].t; },
+  siachMsgBeats: function () { return siachPoints().map(function (m) { return siachBeats(m).length; }); } };
 })();
 </script>
 </body>

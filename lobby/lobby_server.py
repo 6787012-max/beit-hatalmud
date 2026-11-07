@@ -57,7 +57,9 @@ def siach_payload(max_days=7, max_entries=4):
     """המסרים האחרונים מהשיח (עד 7 ימים, החדש קודם). קובץ חסר/פגום = רשימה ריקה."""
     try:
         with open(SIACH_FILE, 'r', encoding='utf-8') as f:
-            items = json.load(f).get('items', [])
+            doc = json.load(f)
+        items = doc.get('items', [])
+        enabled = doc.get('enabled', True) is not False   # מתג כיבוי: "enabled": false בקובץ מסתיר את כל המסרים
         today = datetime.date.today()
         keep = []
         for it in items:
@@ -65,12 +67,12 @@ def siach_payload(max_days=7, max_entries=4):
                 age = (today - datetime.date.fromisoformat(it['date'])).days
             except Exception:
                 continue
-            if 0 <= age <= max_days and it.get('points'):
+            if 0 <= age <= max_days and (it.get('points') or it.get('hook') or it.get('beats')):   # צורה ישנה או v4
                 keep.append(it)
         keep.sort(key=lambda x: (x['date'], 1 if x.get('session') == 'צהריים' else 0), reverse=True)
-        return {'items': keep[:max_entries]}
+        return {'items': keep[:max_entries], 'enabled': enabled}
     except Exception:
-        return {'items': []}
+        return {'items': [], 'enabled': True}
 
 def program_payload():
     """program_lists() + meta: לכל סרטון (המפתח = pool/rel, כמו ברשימות) mtime בשניות ו-plays/last מהמונה."""
