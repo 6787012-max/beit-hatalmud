@@ -12,20 +12,147 @@ lobby_server.py — שרת מקומי למסך הלובי של מכינת בית
 
 הרצה:  pythonw lobby_server.py      כתובת:  http://localhost:8484
 """
+import datetime
 import http.server
 import json
 import mimetypes
 import os
 import socketserver
+import sys
 import urllib.parse
+import threading
+import time
 
 PORT = 8484
+# מונה השמעות (23/10/2026): pool/rel -> {count, last}. נכתב אטומית (קובץ זמני ואז replace) תחת מנעול.
+COUNTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'play_counts.json')
+_COUNTS_LOCK = threading.Lock()
+
+
+def _load_counts():
+    try:
+        with open(COUNTS_PATH, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def record_play(pool, rel):
+    key = str(pool) + '/' + str(rel)
+    with _COUNTS_LOCK:
+        d = _load_counts()
+        e = d.get(key) if isinstance(d.get(key), dict) else {}
+        e = {'count': int(e.get('count', 0)) + 1, 'last': time.time()}
+        d[key] = e
+        tmp = COUNTS_PATH + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(d, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, COUNTS_PATH)
+    return e
+
+
+SIACH_FILE = 'D:/video-projects/siach-meorer/daily/lobby_siach.json'   # נכתב ע"י הצינור של שיח הבוקר/הצהריים (סיכום בעברית בלבד, בלי שמות)
+def siach_payload(max_days=7, max_entries=4):
+    """המסרים האחרונים מהשיח (עד 7 ימים, החדש קודם). קובץ חסר/פגום = רשימה ריקה."""
+    try:
+        with open(SIACH_FILE, 'r', encoding='utf-8') as f:
+            items = json.load(f).get('items', [])
+        today = datetime.date.today()
+        keep = []
+        for it in items:
+            try:
+                age = (today - datetime.date.fromisoformat(it['date'])).days
+            except Exception:
+                continue
+            if 0 <= age <= max_days and it.get('points'):
+                keep.append(it)
+        keep.sort(key=lambda x: (x['date'], 1 if x.get('session') == 'צהריים' else 0), reverse=True)
+        return {'items': keep[:max_entries]}
+    except Exception:
+        return {'items': []}
+
+def program_payload():
+    """program_lists() + meta: לכל סרטון (המפתח = pool/rel, כמו ברשימות) mtime בשניות ו-plays/last מהמונה."""
+    out = program_lists()
+    counts = _load_counts()
+    meta = {}
+    for pool, items in list(out.items()):
+        root = PROG_SRC.get(pool)
+        for rel in items:
+            sub = rel[len(pool) + 1:]
+            try:
+                mt = os.path.getmtime(os.path.join(root, sub.replace('/', os.sep)))
+            except Exception:
+                mt = 0
+            c = counts.get(rel) if isinstance(counts.get(rel), dict) else {}
+            meta[rel] = {'mtime': mt, 'plays': int(c.get('count', 0)), 'last': c.get('last', 0)}
+    out['meta'] = meta
+    return out
+
 VIDEO_EXTENSIONS = {'.mp4', '.webm', '.ogg', '.mov', '.mkv', '.avi', '.m4v'}
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SITE_DIR = os.path.dirname(SCRIPT_DIR)                      # שורש האתר (vendor/, img/, css/)
 CONFIG_PATH = os.path.join(SCRIPT_DIR, 'lobby_config.json')
 DEFAULT_VIDEO_DIR = r'Z:\סרטונים'
 STATIC_DIRS = ('vendor', 'img', 'css')
+BECH_DIR = r'C:\projects\mechina-bechirot'                 # בוחרים לצמוח — ר' /bech/ ב-do_GET
+# תוכנית ההפסקות (יוסף 18/10/2026): שיח מעורר ← 10 שניות הסבר ← מושג בגמרא עם ר' אלי סטפנסקי.
+# מקורות קבועים, נפרדים מבחירת התיקיות בפאנל — יש בהם רק חומר שהוכן למסך:
+#   siach    — קבצים שיושבים ישירות בתיקייה (את השבוע הקודם מעבירים לתת־תיקייה "ארכיון" והוא יוצא מהסבב)
+#   concepts — תיקיית הפרסום של סרטוני המושגים: סרטון אחד בכל תת־תיקייה "NN - שם"; מושג חדש נכנס לבד
+#   lashon / shabbat — סרטון הלכה יומי בתחילת ההפסקה הראשונה / השנייה של היום (קבצי "NN - שם.mp4" ישירות בתיקייה;
+#                      התיקייה יכולה להיות ריקה או חסרה — אז מדלגים בשקט). הבחירה לפי תאריך במסך (screen.html)
+PROG_SRC = {'siach': 'Z:/סרטונים/מסך הלובי - הפסקות/שיח מעורר',
+            'concepts': 'Z:/מושגים בגמרא - סרטונים',
+            'lashon': 'Z:/הלכה בלובי/שמירת הלשון - חפץ חיים',
+            'shabbat': 'Z:/הלכה בלובי/הלכות שבת',
+            'fried': 'Z:/הלכה בלובי/הלכה יומית - הרב פריד',   # fried — כנ"ל, בתחילת ההפסקה השלישית של היום
+            'boker': 'Y:/שיעורים בבוקר'}   # boker — שיח הבוקר של אתמול, בתחילת ארוחת הבוקר (09:25); ר' _boker_latest
+
+
+BOKER_FROM = '2026-11-01'   # first recording day whose film follows the no-human-figures rule
+
+
+def _boker_latest():
+    """שיח הבוקר (יוסף 01/11/2026): הסרטון של יום ההקלטה האחרון שלפני היום — "<date>/שיח הבוקר - <date>.mp4".
+    ביום ראשון זה של שישי. רשימה של פריט אחד לכל היותר; תיקייה חסרה/ריקה = רשימה ריקה.
+    BOKER_FROM: רק סרטים שנבנו בלי דמויות אדם (יוסף 01/11/2026: "לא לעשות דמויות בכלל") — הישנים לא עולים ללובי."""
+    root, today = PROG_SRC['boker'], time.strftime('%Y-%m-%d')
+    try:
+        days = sorted((d for d in os.listdir(root) if len(d) == 10 and BOKER_FROM <= d < today and os.path.isdir(os.path.join(root, d))), reverse=True)
+    except Exception:
+        return []
+    for d in days[:10]:
+        f = 'שיח הבוקר - ' + d + '.mp4'
+        if os.path.isfile(os.path.join(root, d, f)):
+            return ['boker/' + d + '/' + f]
+    return []
+
+
+def _videos_in(d):
+    try:
+        return sorted(f for f in os.listdir(d)
+                      if os.path.splitext(f)[1].lower() in VIDEO_EXTENSIONS and os.path.isfile(os.path.join(d, f)))
+    except Exception:
+        return []
+
+
+def program_lists():
+    out = {'siach': ['siach/' + f for f in _videos_in(PROG_SRC['siach'])], 'concepts': [],
+           'lashon': ['lashon/' + f for f in _videos_in(PROG_SRC['lashon'])],
+           'shabbat': ['shabbat/' + f for f in _videos_in(PROG_SRC['shabbat'])],
+           'fried': ['fried/' + f for f in _videos_in(PROG_SRC['fried'])],
+           'boker': _boker_latest()}
+    root = PROG_SRC['concepts']
+    try:
+        subs = sorted(x for x in os.listdir(root) if os.path.isdir(os.path.join(root, x)))
+    except Exception:
+        subs = []
+    for sub in subs:
+        # כל סרטון מוכן בכל תיקיית מושג (19/10: "כל הסרטונים שנהיו מוכנים") — לא רק הראשון
+        out['concepts'] += ['concepts/' + sub + '/' + v for v in _videos_in(os.path.join(root, sub))]
+    return out
 
 
 def load_config():
@@ -87,6 +214,19 @@ def inside(root, path):
                os.path.normcase(os.path.abspath(root))
     except Exception:
         return False
+
+
+
+def _brit_active():
+    """מסך הברית (brit_mode.html) מוגש במקום המסך הרגיל עד 'until' ב-brit_mode.json (יוסף 06/11/2026)."""
+    try:
+        meta = json.load(open(os.path.join(SCRIPT_DIR, 'brit_mode.json'), encoding='utf-8'))
+        f = os.path.join(SCRIPT_DIR, 'brit_mode.html')
+        if os.path.exists(f) and time.time() < float(meta.get('until', 0)):
+            return f
+    except Exception:
+        pass
+    return None
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -163,6 +303,42 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path.startswith('/video/'):
             self.serve_video(cfg['root'], path[len('/video/'):])
             return
+        if path == '/api/version':   # המסך טוען את עצמו מחדש כשהקובץ הזה משתנה (בלי לגשת למחשב הלובי)
+            self._json(200, {'v': str(os.path.getmtime(_brit_active() or os.path.join(SCRIPT_DIR, 'screen.html'))) + ('b' if _brit_active() else '')})
+            return
+        if path == '/api/program':
+            self._json(200, program_payload())
+            return
+        if path == '/api/siach':   # מסרים מהשיח של הרב וינברג (07/11/2026)
+            self._json(200, siach_payload())
+            return
+        # בוחרים לצמוח (28/10/2026): תוצאות + פוסטרים + תמונות, ישר מהדיסק של שרת הבחירות.
+        # התמונות לא נכנסות לריפו (הוא ציבורי) — הן מוגשות מכאן בלבד, ולכן גם כשהשרת ב-8585 כבוי.
+        if path == '/bech/state':
+            try:
+                with open(os.path.join(BECH_DIR, 'state.json'), 'r', encoding='utf-8') as f:
+                    st = json.load(f)
+                self._json(200, {k: st.get(k) for k in ('voted', 'of', 'yellow', 'green', 'classes', 'invalid')})
+            except Exception:
+                self._json(200, {})
+            return
+        if path.startswith('/bech/'):
+            parts = [p for p in path[len('/bech/'):].split('/') if p and p != '..']
+            ok = (parts == ['emblem.svg'] or
+                  (len(parts) == 2 and parts[0] in ('posters', 'photos') and parts[1].lower().endswith('.jpg')))
+            target = os.path.join(BECH_DIR, *parts) if ok else ''
+            if ok and inside(BECH_DIR, target):
+                self._file(target, cache='max-age=3600')
+            else:
+                self.send_error(404, 'Not found')
+            return
+        if path.startswith('/pvideo/'):
+            key, _, rest = path[len('/pvideo/'):].partition('/')
+            if key in PROG_SRC:
+                self.serve_video(PROG_SRC[key], rest)
+            else:
+                self.send_error(404, 'Not found')
+            return
 
         # נכסים סטטיים של האתר (הפונט, האייקונים והלוגו יושבים מחוץ לתיקיית lobby)
         parts = [p for p in path.strip('/').split('/') if p and p != '..']
@@ -175,13 +351,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         # כל השאר → מסך הלובי
-        self._file(os.path.join(SCRIPT_DIR, 'screen.html'), 'text/html; charset=utf-8')
+        self._file(_brit_active() or os.path.join(SCRIPT_DIR, 'screen.html'), 'text/html; charset=utf-8')
 
     # ── POST ─────────────────────────────────────────────────────────────
     def do_POST(self):
         path = urllib.parse.unquote(urllib.parse.urlparse(self.path).path)
         body = self._body()
         cfg = load_config()
+
+        if path == '/api/played':
+            pool, rel = body.get('pool'), body.get('rel')
+            if not isinstance(pool, str) or not isinstance(rel, str) or not pool or not rel:
+                self._json(400, {'ok': False, 'error': 'missing pool/rel'})
+                return
+            e = record_play(pool, rel)
+            self._json(200, {'ok': True, 'plays': e['count']})
+            return
 
         if path == '/api/setRoot':
             new_root = body.get('path')
@@ -263,6 +448,26 @@ class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 if __name__ == '__main__':
+    # מופעל גם ממשימה מתוזמנת כל 10 דקות (שומר-חיים). allow_reuse_address בחלונות מאפשר לשני תהליכים
+    # להאזין לאותו פורט — לכן אם השרת כבר עונה, יוצאים בשקט.
+    import socket
+    # ארגומנטים לבדיקות בלבד (ברירות המחדל = הפעלה רגילה): --port N --config FILE --counts FILE --progroot DIR
+    _a = sys.argv[1:]
+    for _i in range(0, len(_a) - 1, 2):
+        if _a[_i] == '--port':
+            PORT = int(_a[_i + 1])
+        elif _a[_i] == '--config':
+            CONFIG_PATH = _a[_i + 1]
+        elif _a[_i] == '--counts':
+            COUNTS_PATH = _a[_i + 1]
+        elif _a[_i] == '--progroot':
+            PROG_SRC = {k: _a[_i + 1] + '/' + k for k in PROG_SRC}
+    print('port=%d config=%s counts=%s' % (PORT, CONFIG_PATH, COUNTS_PATH))
+    _probe = socket.socket()
+    _probe.settimeout(1)
+    if _probe.connect_ex(('127.0.0.1', PORT)) == 0:
+        raise SystemExit(0)
+    _probe.close()
     cfg = load_config()
     print('מסך לובי — בית התלמוד')
     print('תיקיית סרטונים:', cfg['root'], '(קיימת)' if os.path.isdir(cfg['root']) else '(לא נמצאה!)')

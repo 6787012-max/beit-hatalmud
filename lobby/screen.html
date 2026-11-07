@@ -108,6 +108,50 @@ video.off{opacity:0}
   opacity:0;transition:opacity .25s}
 main:hover #vinfo{opacity:1}
 
+/* תוכנית ההפסקות (18/10/2026): שיח מעורר ← 10 שניות הסבר ← מושג בגמרא.
+   יוסף: "הסרטונים על מסך מלא, מעוצב יפה וגדול — אבל שיהיה עדיין השעון ועוד כמה זמן הפסקה".
+   כל המסך לסרטון; פס מידע בתחתית — מתחת לסרטון ולא עליו, כדי לא לכסות את הכתוביות שבתוכו. */
+:root{--pbH:clamp(84px,11.5vh,128px)}
+body.prog-on #stage{grid-template-columns:1fr;grid-template-rows:1fr;padding:0;gap:0}
+body.prog-on aside, body.prog-on footer{display:none}
+body.prog-on main{grid-column:1/-1;grid-row:1/-1;border:0;border-radius:0;box-shadow:none;
+  background:radial-gradient(ellipse at 50% 38%,#163240 0%,#0a161c 58%,#05090c 100%)}
+body.prog-on main video{inset:auto;left:50%;top:calc((100vh - var(--pbH) - min(100vh - var(--pbH) - 28px,(100vw - 40px)*9/16))/2);
+  transform:translateX(-50%);width:min(100vw - 40px,(100vh - var(--pbH) - 28px)*16/9);height:auto;aspect-ratio:16/9;
+  border-radius:16px;box-shadow:0 0 0 1px rgba(224,169,59,.35),0 26px 80px rgba(0,0,0,.75),0 0 120px rgba(224,169,59,.10)}
+body.prog-on #vinfo, body.prog-on #ov{display:none}
+body.prog-on #progCard{bottom:var(--pbH)}
+#progBadge{position:absolute;inset-inline:0;bottom:0;height:var(--pbH);z-index:6;display:none;align-items:center;gap:clamp(18px,2.4vw,46px);
+  padding:0 clamp(22px,2.6vw,52px);background:linear-gradient(to top,#04090c 0%,rgba(6,14,19,.97) 100%);
+  border-top:2px solid rgba(224,169,59,.55);box-shadow:0 -18px 50px rgba(0,0,0,.45);color:#fff;white-space:nowrap}
+body.prog-on #progBadge{display:flex}
+#pbClock{font-size:calc(var(--pbH)*.56);font-weight:800;line-height:1;letter-spacing:-2px;font-variant-numeric:tabular-nums}
+#pbClock .bl{animation:bl 1.1s infinite}
+#pbSep{width:2px;align-self:stretch;margin:calc(var(--pbH)*.2) 0;background:linear-gradient(transparent,rgba(224,169,59,.6),transparent)}
+#pbMid{flex:1;min-width:0;display:flex;flex-direction:column;gap:calc(var(--pbH)*.07)}
+#pbRow{display:flex;align-items:baseline;gap:18px}
+#pbTitle{font-size:calc(var(--pbH)*.24);font-weight:800;color:var(--gold-lt)}
+#pbLeft{font-size:calc(var(--pbH)*.24);font-weight:800;font-variant-numeric:tabular-nums;margin-inline-start:auto}
+#pbLeft.warn{color:#ffd98a}#pbLeft.last{color:#ff9f8d;animation:blink 1s infinite}
+#pbTrack{height:calc(var(--pbH)*.075);border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+#pbTrack i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--gold),var(--gold-lt));transition:width 1s linear}
+#pbNow{font-size:calc(var(--pbH)*.17);color:#c9d6da;overflow:hidden;text-overflow:ellipsis}
+#pbNow b{color:#fff;font-weight:700}
+#pbLogo{height:calc(var(--pbH)*.62);opacity:.95}
+@keyframes blink{50%{opacity:.35}}
+#progCard{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1.8vh;text-align:center;padding:4vw;background:radial-gradient(ellipse at 50% 40%,#17323C 0%,#0B1418 72%);
+  opacity:0;pointer-events:none;transition:opacity .6s}
+#progCard.on{opacity:1}
+#pcKick{font-size:clamp(1.3rem,2.4vw,2.3rem);font-weight:800;color:#0B1418;background:var(--gold);padding:.25em 1.1em;border-radius:99px}
+#pcTitle{font-size:clamp(3.2rem,8vw,8rem);font-weight:900;line-height:1.05;color:#fff}
+#pcSub{font-size:clamp(1.5rem,3.2vw,3rem);font-weight:700;color:var(--gold-lt)}
+#pcExp{font-size:clamp(1.2rem,2.3vw,2.1rem);color:#c9d6da;max-width:32ch}
+#pcRing{position:relative;width:clamp(130px,14vw,230px);height:clamp(130px,14vw,230px);margin-top:1vh}
+#pcRing svg{width:100%;height:100%;transform:rotate(-90deg)}
+#pcRing circle{fill:none;stroke-width:11}
+#pcNum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(3.2rem,6.5vw,6rem);font-weight:900;color:#fff}
+
 /* מסך שיעור / מנוחה */
 #ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;padding:30px;text-align:center;opacity:0;pointer-events:none;transition:opacity 1s;
@@ -199,9 +243,257 @@ body.fs #fsBtn{display:none}
 @media (max-height:860px){ #birthCard{display:none !important} }
 @media (max-height:740px){ #menuCard{display:none !important} #zmanim{display:none !important} }
 @media (max-height:640px){ #parasha{display:none !important} }
+
+/* ══ שדרוג עיצוב 28/10/2026 — רק שכבת מראה: אותם אלמנטים ואותה לוגיקה ══ */
+#bg{background:
+  radial-gradient(1100px 760px at 88% -12%,rgba(224,169,59,.24),transparent 62%),
+  radial-gradient(900px 700px at 6% 112%,rgba(0,96,130,.55),transparent 62%),
+  radial-gradient(700px 500px at 45% 55%,rgba(0,60,90,.35),transparent 70%),
+  linear-gradient(160deg,#00111b,#001a29 55%,#000f18)}
+#bg::before{content:"";position:absolute;inset:-20%;opacity:.5;
+  background:radial-gradient(circle at 30% 30%,rgba(227,185,107,.10),transparent 30%),
+             radial-gradient(circle at 70% 65%,rgba(62,160,200,.10),transparent 32%);
+  animation:drift 48s ease-in-out infinite alternate}
+@keyframes drift{from{transform:translate(-3%,-2%) rotate(0)}to{transform:translate(3%,2%) rotate(8deg)}}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.11);box-shadow:0 14px 40px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.07);
+  position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;inset-inline:18%;top:0;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,transparent,var(--gold-lt),transparent);opacity:.75}
+.card h3::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(227,185,107,.45),transparent);margin-inline-start:6px}
+#clock{background:linear-gradient(180deg,#fff 30%,#f3dcae 120%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:none;filter:drop-shadow(0 0 22px rgba(255,255,255,.18))}
+#clock .sc{color:#fff;-webkit-text-fill-color:#9fb3c0}
+/* במסך האמיתי בלובי התאריך וזמני היום יצאו זעירים — מגדילים (28/10) */
+#dHeb{font-size:calc(1.55rem*var(--side,1));font-weight:700}
+#dGreg{font-size:calc(1.08rem*var(--side,1))}
+#meta{font-size:calc(1.05rem*var(--side,1))}
+#zmanim{font-size:calc(1rem*var(--side,1))}
+#parasha{font-size:calc(1.15rem*var(--side,1))}
+main{border:1px solid rgba(227,185,107,.28);box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.4),0 0 60px rgba(224,169,59,.06)}
+#ov{background:
+  radial-gradient(ellipse at 50% 30%,rgba(224,169,59,.13),transparent 55%),
+  radial-gradient(ellipse at center,#00263d 0%,#00131e 78%)}
+#ov::before{content:"";position:absolute;left:50%;top:50%;width:160vmax;height:160vmax;transform:translate(-50%,-50%);
+  background:repeating-conic-gradient(from 0deg,rgba(255,255,255,.028) 0 6deg,transparent 6deg 18deg);
+  animation:spin 240s linear infinite;pointer-events:none;
+  -webkit-mask-image:radial-gradient(circle,#000 0,transparent 45%);mask-image:radial-gradient(circle,#000 0,transparent 45%)}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.sl-kicker{display:flex;align-items:center;gap:.8em;color:var(--gold-lt);font-weight:700;letter-spacing:.18em}
+.sl-kicker::before,.sl-kicker::after{content:"";width:3.2em;height:1px;background:linear-gradient(90deg,transparent,var(--gold-lt))}
+.sl-kicker::after{transform:scaleX(-1)}
+.slide.on>*{animation:rise .8s cubic-bezier(.2,.8,.2,1) both}
+.slide.on>*:nth-child(2){animation-delay:.08s}.slide.on>*:nth-child(3){animation-delay:.16s}.slide.on>*:nth-child(4){animation-delay:.24s}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+footer{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));border-color:rgba(227,185,107,.22)}
+#brand{display:flex;align-items:center;gap:8px}
+#brand img{height:26px;opacity:.95}
+
+/* ── מסרים מהשיח (07/11/2026) ── */
+/* 07/11/2026 לילה: הוגדל (כותרת ~115px, גוף ~67px ב-1920x1080) + אנימציה בעלת עלות נמוכה (transform/opacity בלבד) */
+#slSiach .sb-orb{position:fixed;border-radius:50%;background:var(--gold);opacity:.13;pointer-events:none;animation:sbOrb 16s ease-in-out infinite alternate}
+#slSiach .sb-orb.a{width:40vh;height:40vh;top:-10vh;inset-inline-end:-8vh}
+#slSiach .sb-orb.b{width:26vh;height:26vh;bottom:-6vh;inset-inline-start:3vw;animation-duration:20s;animation-delay:-5s}
+#slSiach .sb-orb.c{width:13vh;height:13vh;top:14vh;inset-inline-start:12vw;background:#fff;opacity:.07;animation-duration:11s;animation-delay:-3s}
+@keyframes sbOrb{from{transform:translate(0,0) scale(1)}to{transform:translate(-3vw,4vh) scale(1.12)}}
+#slSiach .sb-ico{font-size:calc(clamp(2.4rem,4vw,4rem)*var(--s,1));color:var(--gold-lt);display:block;animation:sbBob 2.8s ease-in-out infinite}
+@keyframes sbBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.4vh)}}
+#slSiach .sl-kicker{font-size:calc(clamp(1.2rem,1.8vw,1.8rem)*var(--s,1));display:inline-block;padding:.2em .9em;border-radius:99px;background:rgba(227,185,107,.16);color:var(--gold-lt);opacity:1;animation:sbIn .6s .1s cubic-bezier(.2,1,.3,1) both}
+#slSiach .sq{position:relative;width:min(1500px,94%);padding:3vh 3.4vw 3vh 3vw;border-radius:26px;background:linear-gradient(90deg,rgba(224,169,59,.22),rgba(255,255,255,.05));border:2px solid rgba(227,185,107,.45);box-shadow:0 1.5vh 4vh rgba(0,0,0,.35);animation:sbPop .9s cubic-bezier(.2,1.25,.4,1) both}
+#slSiach .sq::before{content:"";position:absolute;inset-inline-end:-1.1vw;top:14%;bottom:14%;width:.7vw;min-width:6px;border-radius:99px;background:var(--gold-lt);transform-origin:50% 0;animation:sbBar .7s .25s cubic-bezier(.2,.9,.3,1) both}
+@keyframes sbPop{from{opacity:0;transform:translateY(5vh) scale(.94)}to{opacity:1;transform:none}}
+@keyframes sbBar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes sbIn{from{opacity:0;transform:translateX(3vw)}to{opacity:1;transform:none}}
+#slSiach .sq b{display:block;font-size:calc(clamp(2.4rem,5.2vw,5.6rem)*var(--s,1));font-weight:900;line-height:1.15;color:#fff;animation:sbIn .7s .15s cubic-bezier(.2,1,.3,1) both}
+#slSiach .sq small{display:block;font-size:calc(clamp(1.6rem,2.6vw,2.9rem)*var(--s,1));color:var(--gold-lt);margin-top:.4em;line-height:1.35;animation:sbIn .7s .4s cubic-bezier(.2,1,.3,1) both}
+/* שאלה לשולחן השבת: כרטיס גדול עם הבהוב עדין של המסגרת */
+#slSiach .sq.q{border-color:var(--gold-lt);animation:sbPop .9s cubic-bezier(.2,1.25,.4,1) both,sbGlow 2.4s 1s ease-in-out infinite}
+#slSiach .sq.q b{font-size:calc(clamp(2.6rem,6vw,6.5rem)*var(--s,1));color:var(--gold-lt)}
+@keyframes sbGlow{0%,100%{box-shadow:0 0 0 rgba(227,185,107,0)}50%{box-shadow:0 0 4vh rgba(227,185,107,.45)}}
+/* 07/11/2026: מילות מפתח בשיח — הבהוב עדין + סימון זהב מתחת למילה (צורות בלבד, בלי דמויות) */
+#slSiach .kw{display:inline-block;padding:0 .14em;margin:0 -.02em;border-radius:.25em;color:#fff;background:linear-gradient(transparent 52%,rgba(227,185,107,.7) 52%);animation:sbKw 2.4s ease-in-out infinite}
+@keyframes sbKw{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+#sbCard{position:absolute;inset:0;bottom:var(--pbH);z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4vh;text-align:center;padding:4vw;
+  background:radial-gradient(ellipse at 50% 40%,#17323C 0%,#0B1418 72%);opacity:0;pointer-events:none;transition:opacity .6s}
+#sbCard.on{opacity:1}
+#sbKick{font-size:clamp(1.3rem,2.4vw,2.3rem);font-weight:800;color:#0B1418;background:var(--gold);padding:.25em 1.1em;border-radius:99px}
+#sbHead{font-size:clamp(3rem,7vw,7rem);font-weight:900;line-height:1.08;color:#fff;max-width:22ch}
+#sbBody{font-size:clamp(1.6rem,3.4vw,3.2rem);font-weight:700;color:var(--gold-lt);max-width:34ch;line-height:1.3}
+/* ── "חדש במסך ההפסקות" ── */
+#slFresh .fr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px;width:min(1100px,94%);margin-top:10px}
+#slFresh .fi{display:flex;align-items:center;gap:14px;text-align:start;padding:14px 18px;border-radius:16px;
+  background:linear-gradient(90deg,rgba(224,169,59,.16),rgba(255,255,255,.04));border:1px solid rgba(227,185,107,.25)}
+#slFresh .fi i{font-size:calc(clamp(1.4rem,2.6vw,2.3rem)*var(--s,1));color:var(--gold-lt)}
+#slFresh .fi b{display:block;font-size:calc(clamp(1.15rem,2.2vw,2rem)*var(--s,1));font-weight:800;line-height:1.15}
+#slFresh .fi small{display:block;font-size:calc(clamp(.8rem,1.3vw,1.15rem)*var(--s,1));color:var(--muted);margin-top:2px}
+#slFresh .new{font-size:.62em;font-weight:800;color:#0b1418;background:var(--gold-lt);border-radius:99px;padding:.1em .6em;margin-inline-start:.4em;vertical-align:middle}
+
+/* ── בוחרים לצמוח: שכבה משלו בתוך main (גם כשקופית בקרוסלה וגם כהפסקה קצרה בין סרטונים) ── */
+#bech{position:absolute;inset:0;z-index:5;container-type:size;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .7s;
+  background:radial-gradient(ellipse at 50% 18%,rgba(255,210,26,.16),transparent 55%),
+             radial-gradient(ellipse at 50% 120%,rgba(47,191,111,.18),transparent 55%),
+             linear-gradient(170deg,#0b4a68 0%,#022b3f 55%,#011a27 100%)}
+#bech.on{opacity:1}
+body.prog-on #bech{bottom:var(--pbH)}
+#bech::before{content:"";position:absolute;left:50%;top:-30%;width:220cqmax;height:220cqmax;transform:translateX(-50%);
+  background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.04) 0 5deg,transparent 5deg 15deg);
+  animation:bspin 200s linear infinite;pointer-events:none}
+@keyframes bspin{to{transform:translateX(-50%) rotate(360deg)}}
+.bx-head{position:absolute;top:2.6cqh;inset-inline:3cqw;display:flex;align-items:center;gap:1.4cqw;z-index:2}
+.bx-head img{height:9cqh}
+.bx-head b{display:block;font-size:4.4cqh;font-weight:900;line-height:1;color:#fff}
+.bx-head span{display:block;font-size:2.3cqh;color:#cfe6ef;margin-top:.5cqh}
+#bxDots{margin-inline-start:auto;display:flex;gap:.8cqh}
+#bxDots i{width:1.3cqh;height:1.3cqh;border-radius:50%;background:rgba(255,255,255,.25);transition:background .4s,transform .4s}
+#bxDots i.on{background:#ffd21a;transform:scale(1.35)}
+#bxClock{font-size:5cqh;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;margin-inline-start:2cqw}
+body.prog-on #bxClock{display:none}
+#bxScene{position:absolute;inset:15cqh 3cqw 4cqh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4cqh;text-align:center;z-index:1}
+#bxScene .k{font-size:3.6cqh;font-weight:800;letter-spacing:.12em;color:#ffd21a}
+#bxScene .H{font-size:11cqh;font-weight:900;line-height:1.05;color:#fff;text-shadow:0 .6cqh 2.4cqh rgba(0,0,0,.35)}
+#bxScene .T{font-size:4.4cqh;color:#d9ecf3;max-width:80cqw;line-height:1.35}
+#bxScene .T b{color:#fff}
+.bx-a{animation:bxin .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes bxin{from{opacity:0;transform:translateY(3cqh) scale(.97)}to{opacity:1;transform:none}}
+.bx-pills{display:flex;gap:2cqw;justify-content:center;flex-wrap:wrap}
+.bx-pill{min-width:24cqw;padding:3cqh 2cqw;border-radius:2.4cqh;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16)}
+.bx-pill b{display:block;font-size:12cqh;font-weight:900;line-height:1;color:#ffd21a;font-variant-numeric:tabular-nums}
+.bx-pill span{display:block;font-size:3.6cqh;color:#d9ecf3;margin-top:.8cqh}
+.bx-steps{display:flex;gap:1.4cqw;align-items:stretch;justify-content:center;width:100%}
+.bx-step{flex:1;max-width:19cqw;padding:4cqh 1.2cqw;border-radius:2.4cqh;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);position:relative}
+.bx-step em{font-style:normal;display:block;font-size:11cqh;line-height:1.1}
+.bx-step b{display:block;font-size:4.6cqh;font-weight:800;color:#fff;margin-top:1cqh}
+.bx-step small{display:block;font-size:3.1cqh;color:#cfe6ef;margin-top:.8cqh;line-height:1.3}
+.bx-step i{position:absolute;top:1.2cqh;inset-inline-start:1.2cqh;font-style:normal;font-size:2cqh;font-weight:900;color:#0b1418;background:#ffd21a;border-radius:50%;width:3.4cqh;height:3.4cqh;line-height:3.4cqh}
+.bx-pod{display:flex;align-items:flex-end;justify-content:center;gap:3cqw;flex:0 1 auto;min-height:0}
+.bx-pc{display:flex;flex-direction:column;align-items:center;gap:.8cqh;max-width:26cqw}
+.bx-pc img{height:37cqh;width:auto;aspect-ratio:1100/1557;object-fit:cover;border-radius:1.6cqh;box-shadow:0 1.6cqh 4cqh rgba(0,0,0,.5);border:.4cqh solid var(--c)}
+.bx-pc.r1 img{height:47cqh;box-shadow:0 0 5cqh color-mix(in srgb,var(--c) 55%,transparent),0 1.6cqh 4cqh rgba(0,0,0,.5)}
+.bx-pc.r3 img{height:33cqh}
+.bx-pc .rk{font-size:4.2cqh;line-height:1;margin-top:-2.6cqh}
+.bx-pc b{font-size:3.8cqh;font-weight:900;color:#fff;white-space:nowrap;line-height:1.1}
+.bx-pc b small{display:block;font-size:.72em;font-weight:600;color:#d9ecf3}
+.bx-pc span{font-size:3cqh;color:var(--c);font-weight:800}
+.bx-cols{display:flex;gap:3cqw;width:100%;justify-content:center}
+.bx-col{flex:1;max-width:44cqw;text-align:start}
+.bx-col h4{font-size:4.4cqh;font-weight:900;color:var(--c);margin-bottom:1.4cqh}
+.bx-row{display:flex;align-items:center;gap:1cqw;font-size:3.6cqh;color:#fff;margin:1.6cqh 0}
+.bx-row .n{width:4.8cqh;height:4.8cqh;border-radius:50%;background:rgba(255,255,255,.12);display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.bx-row .nm{width:17cqw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bx-row .tr{flex:1;height:3.2cqh;border-radius:2cqh;background:rgba(255,255,255,.1);overflow:hidden}
+.bx-row .tr i{display:block;height:100%;border-radius:2cqh;background:var(--c);transform-origin:right;animation:grow 1.2s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{transform:scaleX(0)}}
+.bx-row .v{width:5cqw;text-align:left;font-weight:800;font-variant-numeric:tabular-nums}
+.bx-cls{display:flex;gap:3cqw;justify-content:center}
+.bx-ring{width:32cqh;text-align:center}
+.bx-ring svg{width:32cqh;height:32cqh;transform:rotate(-90deg)}
+.bx-ring circle{fill:none;stroke-width:9}
+.bx-ring b{display:block;font-size:6cqh;font-weight:900;color:#fff;margin-top:-20.5cqh;height:16cqh}
+.bx-ring span{display:block;font-size:3.8cqh;color:#d9ecf3;margin-top:3cqh;font-weight:700}
+.bx-wall{display:grid;grid-template-columns:repeat(12,1fr);gap:.8cqw;width:92cqw}
+.bx-wall img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:1.2cqh;border:.3cqh solid rgba(255,255,255,.35);animation:bxin .7s both}
+.bx-env{display:flex;gap:3cqw;justify-content:center}
+.bx-envc{width:36cqw;padding:5cqh 2cqw;border-radius:2.6cqh;color:#13222b;text-align:center}
+.bx-envc b{display:block;font-size:6.6cqh;font-weight:900}
+.bx-envc span{display:block;font-size:3.8cqh;font-weight:700;margin-top:1cqh;line-height:1.35}
+
+/* ── הגרלת הנואמים 28/10 — על כל המסך, מעל הכול ── */
+#draw{position:fixed;inset:0;z-index:100;display:none;color:#fff;overflow:hidden;container-type:size;
+  background:radial-gradient(ellipse at 50% 15%,rgba(227,185,107,.22),transparent 55%),linear-gradient(170deg,#0b4a68 0%,#022b3f 55%,#011a27 100%)}
+#draw.on{display:block}
+#draw::before{content:"";position:absolute;left:50%;top:-40%;width:240cqmax;height:240cqmax;transform:translateX(-50%);
+  background:repeating-conic-gradient(rgba(255,255,255,.045) 0 5deg,transparent 5deg 15deg);animation:bspin 160s linear infinite}
+.dw-head{position:absolute;top:2.5cqh;inset-inline:3cqw;display:flex;align-items:center;gap:1.4cqw;z-index:2}
+.dw-head img{height:10cqh}.dw-head b{display:block;font-size:4.6cqh;font-weight:900;line-height:1}
+.dw-head span{display:block;font-size:2.8cqh;color:#e3b96b;font-weight:700;margin-top:.5cqh}
+#dwClock{margin-inline-start:auto;font-size:5.5cqh;font-weight:800;font-variant-numeric:tabular-nums}
+#dwCd,#dwMain{position:absolute;inset:14cqh 3cqw 3cqh;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:1}
+#draw.cd #dwCd{display:flex}#draw.draw #dwMain,#draw.sum #dwMain{display:flex}
+.dw-k{font-size:5cqh;font-weight:800;color:#e3b96b;letter-spacing:.1em}
+.dw-t{font-size:16cqh;font-weight:900;line-height:1;text-shadow:0 0 6cqh rgba(227,185,107,.45)}
+.dw-s{font-size:5.5cqh;font-weight:700;margin-top:1cqh}
+.dw-s2{font-size:3.4cqh;color:#cfe6ef;margin-top:2cqh}
+.dw-ring{position:relative;width:34cqh;height:34cqh;margin-top:3cqh}
+.dw-ring svg{width:100%;height:100%;transform:rotate(-90deg)}.dw-ring circle{fill:none;stroke-width:9}
+#dwArc{transition:stroke-dashoffset 1s linear}
+#dwNum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11cqh;font-weight:900;font-variant-numeric:tabular-nums}
+#draw.last #dwNum{color:#ffd21a;animation:blink 1s infinite}
+#dwNow{font-size:4.6cqh;font-weight:700;min-height:6cqh;margin-bottom:2.4cqh;color:#e3eef3}
+#dwNow b{color:#ffd21a}
+#draw.sum #dwNow{font-size:6cqh;font-weight:900;color:#e3b96b}
+.dw-grid{display:flex;gap:2.4cqw;width:100%;justify-content:center}
+.dw-col{flex:1;max-width:30cqw;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:3cqh;padding:2cqh 1.4cqw}
+.dw-col h3{font-size:5cqh;font-weight:900;margin-bottom:1.4cqh}
+.dw-card{border-radius:2.2cqh;padding:1.4cqh 1cqw;margin-top:1.4cqh;background:rgba(0,0,0,.22);border:.35cqh solid rgba(255,255,255,.15);transition:transform .4s,box-shadow .4s}
+.dw-card.y{--c:#ffd21a}.dw-card.g{--c:#2fbf6f}
+.dw-lab{font-size:2.6cqh;font-weight:800;color:var(--c)}
+.dw-slot{position:relative;height:11cqh;overflow:hidden;margin-top:.8cqh;border-radius:1.6cqh;background:rgba(255,255,255,.06)}
+.dw-strip{display:none;flex-direction:column}.dw-strip span{height:11cqh;line-height:11cqh;font-size:7cqh;font-weight:900;color:var(--c)}
+.dw-fin{display:none;flex-direction:column;align-items:center;justify-content:center;height:100%}
+.dw-fin b{font-size:6.4cqh;font-weight:900;line-height:1;color:var(--c)}.dw-fin small{font-size:2.6cqh;color:#fff;margin-top:.4cqh}
+.dw-q{display:flex;align-items:center;justify-content:center;height:100%;font-size:7cqh;font-weight:900;color:rgba(255,255,255,.25)}
+.dw-card.spin{border-color:var(--c);transform:scale(1.06);box-shadow:0 0 4cqh var(--c)}
+.dw-card.spin .dw-q{display:none}.dw-card.spin .dw-strip{display:flex;animation:dwroll .33s linear infinite}
+@keyframes dwroll{from{transform:translateY(0)}to{transform:translateY(-33cqh)}}
+.dw-card.lock{border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,rgba(0,0,0,.2))}
+.dw-card.lock .dw-q{display:none}.dw-card.lock .dw-fin{display:flex;animation:dwpop .7s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes dwpop{from{transform:scale(.3);opacity:0}to{transform:none;opacity:1}}
+#dwFoot{margin-top:2.6cqh;font-size:3.3cqh;font-weight:800;color:#e3b96b;opacity:0;transition:opacity .8s}
+#draw.sum #dwFoot{opacity:1}
+
+/* "תדגיש את זה בגדול" (יוסף 12:30): בזמן ההגרלה — זרקור ענק לחשיפה הנוכחית; בסוף — טבלה גדולה */
+#dwSpot{display:none;flex-direction:column;align-items:center;justify-content:center;width:86cqw;height:74cqh;border-radius:4cqh;
+  background:rgba(0,0,0,.25);border:.7cqh solid var(--c,#e3b96b);box-shadow:0 0 8cqh color-mix(in srgb,var(--c,#e3b96b) 45%,transparent)}
+#draw.draw #dwSpot{display:flex}#draw.draw .dw-grid,#draw.draw #dwNow{display:none}
+#dwSpot.y{--c:#ffd21a}#dwSpot.g{--c:#2fbf6f}
+.sp-cls{font-size:11cqh;font-weight:900;line-height:1}
+.sp-col{font-size:6cqh;font-weight:900;color:var(--c);margin-top:1.5cqh}
+.sp-who{font-size:4cqh;font-weight:700;color:#e3eef3;margin-top:.6cqh;min-height:4.5cqh}
+.sp-slot{height:24cqh;overflow:hidden;margin-top:1.5cqh;width:70cqw;display:flex;justify-content:center}
+.sp-strip{display:flex;flex-direction:column;animation:sproll .3s linear infinite}
+.sp-strip span{height:24cqh;line-height:24cqh;font-size:20cqh;font-weight:900;color:var(--c)}
+@keyframes sproll{to{transform:translateY(-72cqh)}}
+.sp-fin{display:flex;flex-direction:column;align-items:center;animation:dwpop .7s cubic-bezier(.2,1.6,.4,1) both}
+.sp-fin b{font-size:21cqh;font-weight:900;line-height:1.1;color:var(--c);text-shadow:0 0 5cqh color-mix(in srgb,var(--c) 60%,transparent)}
+.sp-fin small{font-size:6cqh;font-weight:800;color:#fff}
+.sp-n{font-size:3cqh;color:#cfe6ef;margin-top:1cqh}
+#draw.sum .dw-col h3{font-size:7cqh}
+#draw.sum .dw-lab{font-size:3.2cqh}
+#draw.sum .dw-slot{height:15cqh}
+#draw.sum .dw-fin b{font-size:11cqh}
+#draw.sum .dw-fin small{font-size:3.4cqh;font-weight:700}
+#draw.sum .dw-card{border-width:.6cqh}
+#draw.sum #dwNow{margin-bottom:1.4cqh}
+#draw.sum #dwFoot{font-size:2.9cqh;margin-top:1.6cqh}
+
+/* דרמה (12:31): פלאש לבן, רעידה, קונפטי בכל חשיפה; פתיח עם 6 המפלגות; טיימר עד 14:15 */
+#draw.flash::after{content:"";position:absolute;inset:0;background:#fff;z-index:9;animation:dwflash .6s ease-out forwards;pointer-events:none}
+@keyframes dwflash{from{opacity:.9}to{opacity:0}}
+#draw.shake #dwMain{animation:dwshake .5s}
+@keyframes dwshake{0%,100%{transform:none}20%{transform:translate(-1.2cqw,.6cqh)}40%{transform:translate(1cqw,-.8cqh)}60%{transform:translate(-.7cqw,.5cqh)}80%{transform:translate(.5cqw,-.3cqh)}}
+.dw-cf{position:absolute;top:-4cqh;width:1.2cqw;height:2.4cqh;z-index:8;border-radius:.3cqh;animation:dwfall linear forwards;pointer-events:none}
+@keyframes dwfall{to{transform:translateY(112cqh) rotate(720deg)}}
+.dw-chips{display:flex;gap:1.4cqw;justify-content:center;margin-top:1.6cqh}
+.dw-chips div{font-size:3.4cqh;font-weight:900;padding:.6cqh 1.4cqw;border-radius:99px;border:.4cqh solid var(--c);color:var(--c);background:rgba(0,0,0,.25)}
+#draw.cd .dw-ring{width:28cqh;height:28cqh;margin-top:1.6cqh}
+#draw.cd .dw-t{font-size:13cqh}
+#dwPrep,#dwGo{position:absolute;inset:14cqh 3cqw 3cqh;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:1}
+#draw.prep #dwPrep,#draw.go #dwGo{display:flex}
+.pr-t{font-size:7cqh;font-weight:900;color:#e3b96b}
+#prNum{font-size:26cqh;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;animation:dwpulse 1s ease-in-out infinite;margin:1cqh 0 2cqh}
+@keyframes dwpulse{50%{transform:scale(1.04);text-shadow:0 0 6cqh rgba(227,185,107,.6)}}
+.pr-tab{display:flex;gap:2cqw}
+.pr-tab div{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:2cqh;padding:1.2cqh 1.6cqw;font-size:3.4cqh;line-height:1.5}
+.pr-tab b{display:block;font-size:4cqh}
+.pr-tab .y{color:#ffd21a;font-weight:900}.pr-tab .g{color:#2fbf6f;font-weight:900}
+#dwGo b{font-size:17cqh;font-weight:900;line-height:1.05;animation:dwpulse 1s infinite}
+#dwGo span{font-size:5cqh;color:#e3b96b;font-weight:800;margin-top:2cqh}
 </style>
 </head>
 <body>
+<script>/* בוחרים לצמוח: כשמסך הבחירות פעיל (סקר/ספירה/מנצחות) הלובי עובר אליו, ובמצב המתנה חוזר */
+(function(){var U='http://192.168.1.105:8585';function chk(){fetch(U+'/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){if(s&&s.lobby_campaign){location.href=U+'/campaign?lobby=1'}else if(s&&s.mode&&s.mode!=='wait'){location.href=U+'/?from=lobby'}}).catch(function(){})}chk();setInterval(chk,10000)})();
+</script>
 <div id="bg"></div>
 
 <div id="stage">
@@ -241,6 +533,15 @@ body.fs #fsBtn{display:none}
     <video id="vA" muted playsinline preload="auto"></video>
     <video id="vB" class="off" muted playsinline preload="auto"></video>
     <div id="vinfo"><span id="vName"></span><span id="vCount"></span></div>
+    <div id="sbCard"><div id="sbKick"></div><div id="sbHead"></div><div id="sbBody"></div></div>
+    <div id="progCard"><div id="pcKick"></div><div id="pcTitle"></div><div id="pcSub"></div><div id="pcExp"></div>
+      <div id="pcRing"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" stroke="rgba(255,255,255,.15)"/>
+        <circle id="pcArc" cx="60" cy="60" r="54" stroke="#E0A93B" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="0" style="transition:stroke-dashoffset 1s linear"/></svg>
+        <div id="pcNum">10</div></div></div>
+    <div id="progBadge"><div id="pbClock"></div><div id="pbSep"></div>
+      <div id="pbMid"><div id="pbRow"><span id="pbTitle"></span><span id="pbLeft"></span><span id="muteHint" style="display:none;font-size:.8em;opacity:.9;margin-inline-start:10px;cursor:pointer">🔇 לחץ להפעלת קול</span></div>
+        <div id="pbTrack"><i id="pbBar"></i></div><div id="pbNow"></div></div>
+      <img id="pbLogo" src="img/logo.png" alt=""></div>
     <div id="ov" class="on">
       <div class="slide on" id="slClock">
         <div id="ovClock">--:--</div>
@@ -270,15 +571,30 @@ body.fs #fsBtn{display:none}
         <div class="sl-kicker">הודעה</div>
         <div class="msg" id="slMsgText"></div>
       </div>
+      <div class="slide" id="slFresh">
+        <div class="sl-kicker">חדש במסך ההפסקות</div>
+        <div class="sl-title">סרטונים חדשים השבוע</div>
+        <div class="fr" id="slFreshList"></div>
+      </div>
+      <div class="slide" id="slSiach">
+        <div class="sb-orb a"></div><div class="sb-orb b"></div><div class="sb-orb c"></div>
+        <i class="bi bi-chat-quote-fill sb-ico"></i>
+        <div class="sl-kicker" id="slSiachKick">מהשיח</div>
+        <div class="sq"><b id="slSiachHead"></b><small id="slSiachBody"></small></div>
+      </div>
+      <div class="slide" id="slBech"></div>
     </div>
+    <div id="bech"><div class="bx-head"><img src="/bech/emblem.svg" alt=""><div><b>בוחרים לצמוח</b><span id="bxDate">הבחירות במכינה</span></div>
+      <div id="bxDots"></div><div id="bxClock"></div></div><div id="bxScene"></div></div>
   </main>
 
   <footer>
-    <span id="brand"><i class="bi bi-mortarboard-fill"></i><span id="brandText">מכינה בית התלמוד</span></span>
+    <span id="brand"><img src="img/logo.png" alt=""><span id="brandText">מכינה בית התלמוד</span></span>
     <div id="tickWrap"><span id="tick"></span></div>
     <span id="dot" title="חיבור"></span>
   </footer>
 </div>
+<div id="draw"></div>
 <button id="fsBtn" title="מסך מלא (F)"><i class="bi bi-arrows-fullscreen"></i></button>
 <div id="hint"></div>
 
@@ -374,7 +690,8 @@ async function reportRuntime() {
       method: 'PATCH',
       headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({ value: { seenAt: new Date().toISOString(), root: srv.root, exists: srv.exists,
-        folders: srv.folders, videoCount: srv.videos.length, local: !!LOCAL } }),
+        folders: srv.folders, videoCount: srv.videos.length, local: !!LOCAL,
+        screen: innerWidth + 'x' + innerHeight + ' @' + (devicePixelRatio || 1) + ' (' + screen.width + 'x' + screen.height + ')' } }),
     });
   } catch (e) {}
 }
@@ -410,7 +727,7 @@ function dayState(rows, now) {
 function paintStatic() {
   var d = cfg.display;
   $('brandText').textContent = d.headline || '';
-  $('menuCard').style.display = d.showMenu ? 'block' : 'none';
+  $('menuCard').style.display = (d.showMenu && menuForDisplay().m) ? 'block' : 'none';
   $('agendaCard').style.display = d.showAgenda ? 'flex' : 'none';
   $('zmanim').style.display = d.showZmanim ? 'flex' : 'none';
   if (!d.showParasha) $('parasha').style.display = 'none';
@@ -590,8 +907,23 @@ function tick() {
 
   // "בלי סרטונים באמצע": בזמן שיעור המסך עובר לשעון, ומחוץ לשעות הלימוד הוא נשאר שקט.
   var d = cfg.display;
-  var allow = d.videosEnabled && srv.videos.length > 0 && !dayOver &&
-              !(d.videosOnlyOnBreaks && (inLesson || idx < 0 || !rows.length));
+  // תוכנית ההפסקות גוברת על הסרטונים הרגילים — אבל רק בהפסקה, בארוחה או בפער שבין משבצות
+  // ?prog=1 בכתובת = הדגמה/בדיקה: תוכנית ההפסקות פועלת גם מחוץ להפסקה
+  // תוכנית ההפסקות רצה רק בהפסקה ובארוחה — לא בשיעור, לא בתפילה, ולא בפער ביניהם (19/10: היא דלקה לפני מנחה)
+  var progOk = progTotal() > 0 && (/[?&]prog=1/.test(location.search) || (!dayOver && idx >= 0 && rows.length > 0 &&
+               (kind === 'break' || kind === 'meal')));
+  var regOk = d.videosEnabled && srv.videos.length > 0 && !dayOver &&
+              (!d.videosOnlyOnBreaks || kind === 'break' || kind === 'meal');
+  // חלון שקט אקראי (10 דק' ביום בהפסקה/ארוחה): בלי סרטונים, המסך מציג את הלוח. הסרטון נעצר מיד.
+  var quiet = quietNow(now, rows);
+  if (quiet) { progOk = false; regOk = false; }
+  drawTick(now); if (drawOn(now)) { progOk = false; regOk = false; }   // הגרלת הנואמים — בלי סרטונים מתחת
+  var allow = progOk || regOk;
+  if (progOk !== PROG.on) {   // מעבר בין תוכנית ההפסקות לסרטונים הרגילים: מתחילים נקי
+    stopVideo(); PROG.on = progOk; lastVideoAllowed = null;
+    try { active.removeAttribute('src'); active.load(); } catch (e) {}
+    vi = -1; document.body.classList.toggle('prog-on', progOk);
+  }
   if (allow !== lastVideoAllowed) { lastVideoAllowed = allow; allow ? startVideo() : stopVideo(); }
   // הבסיס לכל הספירות: עד סוף המשבצת הפעילה, או — בפער — עד תחילת הבאה
   var nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
@@ -606,13 +938,56 @@ function tick() {
     }
   }
   paintCountdown(left, total, nxt, st.gap);
+  if (PROG.on) paintProgBar(now, cur, nxt, st.gap, left, total);
   $('ov').className = allow ? '' : 'on';
-  if (!allow) {
+  // ?bech=1 = בדיקה: שכבת הבחירות מוצגת כל הזמן
+  bechShow((!allow && curSlide === 'bechirot') || (PROG.on && PROG.bech) || /[?&]bech=1/.test(location.search), now);
+  if (PIN) {   // בדיקה בלבד: השקופית נעולה על "מהשיח"; מציירים אותה פעם אחת אחרי שהמסרים נטענו
+    $('ov').className = 'on';
+    if (curSlide !== 'siach' || !$('slSiachHead').textContent) { curSlide = 'siach'; showSlide('siach', now); }
+  } else if (!allow) {
     paintOverlay(now, rows, idx, cur, nxt, dayOver, left, total, st.gap);
     rotate(now, inLesson, left);
   }
 }
 
+// ── חלון שקט אקראי ───────────────────────────────────────────────────────────
+// אקראי אבל דטרמיניסטי לפי התאריך (hash של YYYY-MM-DD) — רענון/אתחול לא משנה את החלון. בלי שרת ובלי אחסון.
+// נבחרת משבצת break/meal אחת, ובתוכה חלון של QUIET_MIN דקות. במשבצת ≥15 דק' החלון לא מתחיל ב-5 הדקות הראשונות
+// (כדי שהסרטון היומי בתחילת ההפסקה יוצג). משבצת בלי שעת סיום/הבאה, או קצרה מ-10 דק' — לא נכללת.
+var QUIET_MIN = 10, QUIET_CACHE = { k: '', w: null };
+function quietHash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function quietRand(seed) { return function () { seed = (seed + 0x6D2B79F5) >>> 0; var t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function quietWindow(now, rows) {
+  var iso = isoOf(now), key = iso + '#' + rows.map(function (r) { return r.t + (r.end || '') + (r.kind || ''); }).join('|');
+  if (QUIET_CACHE.k === key) return QUIET_CACHE.w;
+  var slots = [];
+  rows.forEach(function (r, i) {
+    var k = r.kind || 'lesson'; if (k !== 'break' && k !== 'meal') return;
+    var s = mins(r.t), e = r.end ? mins(r.end) : (rows[i + 1] ? mins(rows[i + 1].t) : null);
+    if (e == null || e - s < QUIET_MIN) return;
+    slots.push({ s: s, e: e });
+  });
+  var long = slots.filter(function (x) { return x.e - x.s >= QUIET_MIN + 5; });
+  if (long.length) slots = long;
+  var w = null;
+  if (slots.length) {
+    var rnd = quietRand(quietHash('quiet:' + iso)), sl = slots[Math.floor(rnd() * slots.length)];
+    var lo = (sl.e - sl.s >= QUIET_MIN + 5) ? sl.s + 5 : sl.s, hi = sl.e - QUIET_MIN;
+    var st = lo + Math.floor(rnd() * (hi - lo + 1));
+    w = { s: st, e: st + QUIET_MIN };
+  }
+  QUIET_CACHE = { k: key, w: w };
+  return w;
+}
+// ?quiet=1 מכריח חלון שקט עכשיו, ?quiet=0 מבטל
+function quietNow(now, rows) {
+  var q = /[?&]quiet=([01])/.exec(location.search);
+  if (q) return q[1] === '1';
+  var w = quietWindow(now, rows), c = now.getHours() * 60 + now.getMinutes();
+  return !!(w && c >= w.s && c < w.e);
+}
+window.__QUIET = function (d) { var n = d || new Date(); return quietWindow(n, todayRows(n)); };   // לבדיקה בקונסולה
 var mmss = function (sec) {
   sec = Math.max(0, Math.round(sec));
   return pad(Math.floor(sec / 60)) + ':' + pad(sec % 60);
@@ -649,7 +1024,295 @@ function paintCountdown(left, total, nxt, gap) {
 // השקופיות מתחלפות רק כשאין וידאו. שקופית בלי תוכן מדולגת, ובזמן שיעור אפשר
 // לרתק את המסך לשעון (lessonScreen) כדי שלא יתחלף מול הכיתה.
 var slideAt = 0, slideSince = 0, curSlide = 'clock';
-var SLIDE_EL = { clock:'slClock', birthdays:'slBirth', menu:'slMenu', agenda:'slAgenda', message:'slMsg' };
+// ── בוחרים לצמוח (28/10/2026) ───────────────────────────────────────────────
+// סיכום הבחירות של 27/10: 20 מפלגות = 20 מידות; 3 פתקים ב"האור שלי" (צהוב) ו-3 ב"הצמיחה שלי" (ירוק).
+// התוצאות והתמונות מגיעים מ-lobby_server.py (/bech/...) שקורא מהדיסק של שרת הבחירות — כך זה עובד גם כשהשרת ב-8585 כבוי.
+// אין כאן שמות תלמידים ולא תמונות (הריפו ציבורי). אם גם /bech/state לא עונה — תמונת מצב סופית מוטמעת.
+var BECH_UNTIL = '2026-11-27';
+var BECH_SCENE_SEC = 8, BECH_PER_TURN = 3, BECH_INTERLUDE = 4, BECH_EVERY = 2;   // אחרי כל N סרטונים בהפסקה — סיכום בחירות קצר (יוסף 28/10: "בין לבין את התוצאות"); 0 = כבוי
+var BECH_PARTIES = ['תפל|תפילה בכוונה','דרך|דרך ארץ בשיעור','קשב|הקשבה והשתתפות','לב|לב טוב וחברות','רב|כבוד רבנים',
+  'ברך|ברכות בכוונה','שמז|שמירת זמנים בבוקר','שמח|שמחה ועין טובה','סדר|סדר וארגון אישי','כבד|כיבוד הורים',
+  'טוב|ניצול ההפסקה לטובה','כתר|קביעות עתים לתורה','פה|שמירת הפה','נקי|שמירה על רכוש וניקיון','זהיר|זהירות ובטיחות',
+  'יגע|יגיעה במבחנים','אח|אחווה ויחס לאחים','רגוע|רוגע ושליטה עצמית','זריז|זריזות לשיעור','לילה|שינה בזמן'];
+var BECH_SNAP = { voted:32, of:36,
+  yellow:{1:12,2:2,3:0,4:4,5:4,6:4,7:8,8:4,9:6,10:3,11:2,12:2,13:3,14:7,15:7,16:4,17:4,18:4,19:4,20:9},
+  green:{1:9,2:2,3:3,4:2,5:4,6:7,7:5,8:2,9:1,10:11,11:1,12:4,13:5,14:5,15:3,16:3,17:5,18:5,19:5,20:8},
+  classes:[{n:"שיעור א'",v:10,of:10},{n:"שיעור ב'",v:8,of:12},{n:"שיעור ג'",v:14,of:14}] };
+var BECH = { data:null, scene:0, since:0, shown:false };
+function bechActive(now) { return LOCAL !== null && isoOf(now || new Date()) <= BECH_UNTIL; }
+async function bechLoad() {
+  if (LOCAL === null) return;
+  try {
+    var j = await (await fetch((LOCAL || '') + '/bech/state', { cache:'no-store' })).json();
+    if (j && j.yellow) { BECH.data = j; try { localStorage.setItem('lobby.bech', JSON.stringify(j)); } catch (e) {} }
+  } catch (e) {}
+  if (!BECH.data) { try { BECH.data = JSON.parse(localStorage.getItem('lobby.bech') || 'null'); } catch (e) {} }
+  if (!BECH.data) BECH.data = BECH_SNAP;
+}
+function bechRank(o) {
+  return Object.keys(o || {}).map(function (k) { return { n:+k, v:+o[k] }; }).filter(function (x) { return x.v > 0; })
+    .sort(function (a, b) { return b.v - a.v || a.n - b.n; });
+}
+function bp(n) { var p = (BECH_PARTIES[n - 1] || '|').split('|'); return { tag:p[0], name:p[1] }; }
+var bimg = function (sub, f) { return (LOCAL || '') + '/bech/' + sub + '/' + f; };
+var p2 = function (n) { return ('0' + n).slice(-2); };
+function bechScenes() {
+  var d = BECH.data || BECH_SNAP, Y = bechRank(d.yellow), G = bechRank(d.green);
+  var sum = function (R) { return R.reduce(function (a, x) { return a + x.v; }, 0); }, ty = sum(Y), tg = sum(G);
+  var pct = Math.round((d.voted || 0) / (d.of || 1) * 100);
+  function pod(title, sub, c, R) {
+    var order = [R[1], R[0], R[2]].filter(Boolean);
+    return '<div class="k bx-a">' + title + '</div><div class="T bx-a" style="animation-delay:.1s">' + sub + '</div><div class="bx-pod">' +
+      order.map(function (x) {
+        var r = R.indexOf(x) + 1, p = bp(x.n);
+        return '<div class="bx-pc r' + r + ' bx-a" style="--c:' + c + ';animation-delay:' + (0.3 + (3 - r) * 0.35) + 's">' +
+          '<img src="' + bimg('posters', 'p' + p2(x.n) + '.jpg') + '" alt=""><div class="rk">' + ['🥇','🥈','🥉'][r - 1] + '</div>' +
+          '<b>' + esc(p.tag) + '<small>' + esc(p.name) + '</small></b><span>' + x.v + ' פתקים</span></div>';
+      }).join('') + '</div>';
+  }
+  function col(title, c, R) {
+    var mx = R[0] ? R[0].v : 1;
+    return '<div class="bx-col" style="--c:' + c + '"><h4>' + title + '</h4>' + R.slice(0, 7).map(function (x, i) {
+      var p = bp(x.n);
+      return '<div class="bx-row bx-a" style="animation-delay:' + (0.15 + i * 0.1) + 's"><span class="n">' + (i + 1) + '</span><span class="nm">' +
+        esc(p.tag) + ' – ' + esc(p.name) + '</span><span class="tr"><i style="width:' + Math.round(x.v / mx * 100) + '%;animation-delay:' +
+        (0.3 + i * 0.1) + 's"></i></span><span class="v">' + x.v + '</span></div>';
+    }).join('') + '</div>';
+  }
+  var both = Y.slice(0, 5).filter(function (x) { return G.slice(0, 5).some(function (g) { return g.n === x.n; }); });
+  var S = [
+    '<img class="bx-a" src="' + (LOCAL || '') + '/bech/emblem.svg" style="height:24cqh" alt=""><div class="H bx-a" style="animation-delay:.15s">המכינה בחרה!</div>' +
+      '<div class="T bx-a" style="animation-delay:.3s">20 מפלגות · כל מפלגה היא מידה טובה</div><div class="bx-pills bx-a" style="animation-delay:.45s">' +
+      '<div class="bx-pill"><b>' + (d.voted || 0) + '/' + (d.of || 0) + '</b><span>תלמידים הצביעו</span></div>' +
+      '<div class="bx-pill"><b>' + pct + '%</b><span>אחוז הצבעה</span></div>' +
+      '<div class="bx-pill"><b>' + (ty + tg) + '</b><span>פתקים נספרו</span></div></div>',
+    bechTeaser(Y, G),
+    '<div class="k bx-a">איך זה עבד?</div><div class="H bx-a" style="font-size:7cqh">שתי מעטפות, שש בחירות</div><div class="bx-env bx-a" style="animation-delay:.25s">' +
+      '<div class="bx-envc" style="background:#ffd21a"><b>☀ האור שלי</b><span>3 פתקים למידות<br>שכבר מאירות אצלי</span></div>' +
+      '<div class="bx-envc" style="background:#2fbf6f"><b>🌱 הצמיחה שלי</b><span>3 פתקים למידות<br>שאני רוצה לצמוח בהן</span></div></div>',
+    '<div class="k bx-a">התהליך</div><div class="bx-steps">' + [
+      ['📣','הקמפיין','20 מפלגות, פוסטרים וסיסמאות'], ['🎤','הנאומים','כל מפלגה הציגה את המידה שלה'],
+      ['🗳️','ההצבעה','מעטפה צהובה ומעטפה ירוקה'], ['🔢','הספירה','ספירה חיה מול כל המכינה'], ['🏆','הזוכות','המידות שהמכינה בחרה']
+    ].map(function (s, i) { return '<div class="bx-step bx-a" style="animation-delay:' + (0.15 + i * 0.2) + 's"><i>' + (i + 1) + '</i><em>' + s[0] + '</em><b>' + s[1] + '</b><small>' + s[2] + '</small></div>'; }).join('') + '</div>',
+    pod('☀ האור שלי', 'המידות שכבר מאירות אצלנו', '#ffd21a', Y),
+    pod('🌱 הצמיחה שלי', 'המידות שבחרנו לצמוח בהן', '#2fbf6f', G),
+    '<div class="k bx-a">כל התוצאות</div><div class="bx-cols">' + col('☀ האור שלי · ' + ty + ' פתקים', '#ffd21a', Y) + col('🌱 הצמיחה שלי · ' + tg + ' פתקים', '#2fbf6f', G) + '</div>',
+    both.length ? '<div class="k bx-a">מעניין!</div><div class="H bx-a" style="font-size:7.5cqh">חזקים בזה — ורוצים עוד</div><div class="T bx-a" style="animation-delay:.2s">נבחרו גם באור וגם בצמיחה:</div>' +
+      '<div class="bx-pod bx-a" style="height:44cqh;animation-delay:.35s">' + both.slice(0, 3).map(function (x) { var p = bp(x.n);
+        return '<div class="bx-pc r2" style="--c:#ffd21a"><img src="' + bimg('posters', 'p' + p2(x.n) + '.jpg') + '" alt="" style="height:28cqh"><b>' + esc(p.name) + '</b></div>'; }).join('') + '</div>' : '',
+    '<div class="k bx-a">השתתפות לפי שיעור</div><div class="bx-cls">' + (d.classes || []).map(function (c, i) {
+      var r = c.of ? c.v / c.of : 0, full = r >= 1;
+      return '<div class="bx-ring bx-a" style="animation-delay:' + (0.2 + i * 0.2) + 's"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" stroke="rgba(255,255,255,.15)"/>' +
+        '<circle cx="50" cy="50" r="42" stroke="' + (full ? '#2fbf6f' : '#ffd21a') + '" stroke-linecap="round" stroke-dasharray="263.9" stroke-dashoffset="' + (263.9 * (1 - r)).toFixed(1) + '"/></svg>' +
+        '<b>' + Math.round(r * 100) + '%</b><span>' + esc(c.n) + (full ? ' 🏆' : '') + '</span><span style="font-size:2.2cqh;font-weight:500;margin-top:.4cqh">' + c.v + ' מתוך ' + c.of + '</span></div>';
+    }).join('') + '</div>',
+    '<div class="k bx-a">כל המכינה בבחירות</div><div class="bx-wall">' + Array.apply(null, Array(36)).map(function (_, i) {
+      return '<img src="' + bimg('photos', p2(i + 1) + '.jpg') + '" style="animation-delay:' + (i * 0.04).toFixed(2) + 's" alt="">'; }).join('') +
+      '</div><div class="H bx-a" style="font-size:6.5cqh;animation-delay:1.2s">יישר כוח — ממשיכים לצמוח! 🌱</div>'
+  ].filter(Boolean);
+  return S;
+}
+// "בקרוב: נאומי הזוכים" — 6 נאומים (3 בצהוב, 3 בירוק), ר' C:/projects/mechina-bechirot/speeches
+function bechTeaser(Y, G) {
+  var chip = function (x, c, i) { var p = bp(x.n); return '<div class="bx-pc bx-a" style="--c:' + c + ';animation-delay:' + (0.5 + i * 0.15) + 's"><img src="' + bimg('posters', 'p' + p2(x.n) + '.jpg') + '" alt="" style="height:26cqh"><b style="font-size:3.2cqh">' + esc(p.tag) + '</b></div>'; };
+  return '<div class="bx-a" style="font-size:9cqh;line-height:1">🎤</div><div class="k bx-a" style="animation-delay:.1s">בקרוב במכינה</div>' +
+    '<div class="H bx-a" style="animation-delay:.2s">נאומי הזוכים</div><div class="T bx-a" style="animation-delay:.3s">כל מפלגה שזכתה תעלה ותספר — <b>למה דווקא היא</b></div>' +
+    '<div class="bx-pod" style="gap:1.6cqw">' + Y.slice(0, 3).map(function (x, i) { return chip(x, '#ffd21a', i); }).join('') +
+    '<div style="width:.3cqw;align-self:stretch;background:rgba(255,255,255,.25);margin:0 1cqw"></div>' + G.slice(0, 3).map(function (x, i) { return chip(x, '#2fbf6f', i + 3); }).join('') + '</div>';
+}
+function bechPaint() {
+  var S = bechScenes(), i = BECH.scene % S.length;
+  if (BECH.tease) { BECH.tease = false; i = 1; BECH.scene = 1; }   // הפסקה בין סרטונים נפתחת ב"הנאומים בקרוב"
+  $('bxScene').innerHTML = S[i];
+  $('bxDots').innerHTML = S.map(function (_, k) { return '<i' + (k === i ? ' class="on"' : '') + '></i>'; }).join('');
+}
+function bechShow(on, now) {
+  var el = $('bech'); if (!el) return;
+  if (!on) { if (BECH.shown) { BECH.shown = false; el.classList.remove('on'); BECH.scene++; } return; }
+  var t = Date.now();
+  if (!BECH.data) bechLoad().then(function () { if (BECH.shown) bechPaint(); });
+  if (!BECH.shown) { BECH.shown = true; BECH.since = t; el.classList.add('on'); bechPaint(); }
+  else if (t - BECH.since >= BECH_SCENE_SEC * 1000) { BECH.scene++; BECH.since = t; bechPaint(); }
+  var n = now || new Date(); $('bxClock').textContent = pad(n.getHours()) + ':' + pad(n.getMinutes());
+}
+// ── "חדש במסך ההפסקות": מה שנוסף בשבוע האחרון לתוכנית (החדש ביותר קודם) ──
+function freshItems() {
+  var m = PROG.meta || {}, nowS = Date.now() / 1000, out = [];
+  Object.keys(m).forEach(function (rel) {
+    var x = m[rel]; if (!x || !x.mtime || nowS - x.mtime > 7 * 86400) return;
+    out.push({ rel:rel, kind:rel.split('/')[0], mtime:x.mtime, isNew:(nowS - x.mtime) <= PROG_FRESH_HOURS * 3600 });
+  });
+  return out.sort(function (a, b) { return b.mtime - a.mtime; });
+}
+// ── הגרלת הנואמים (28/10/2026, יוסף): 12:20 ספירה של 3 דק' · 12:23 הגרלה חיה · טבלת סיכום עד סוף ההפסקה (12:40) ──
+// ההגרלה בוצעה מראש בשרת (אקראית, בלי חזרות בכל צבע, ובלי אותה מפלגה פעמיים באותו שיעור) ונשמרה כאן —
+// כך רענון של המסך לא מגריל מחדש. החשיפה על המסך לפי השעה. בדיקה: ?drawtest=1 מתחיל את כל הרצף 5 שניות אחרי הטעינה.
+var DRAW_DAY = '2026-10-28', DRAW_T0 = [12, 27], DRAW_END = [14, 25], DRAW_CD = /[?&]drawtest=2/.test(location.search) ? 12 : 600, DRAW_STEP = 11, DRAW_SPIN = 7;
+var DRAW_RES = [   // הגרלה אקראית לגמרי 12:30 (יוסף: בלי כללים נוספים)
+  { cls:"שיעור א'", who:'דוד בן נון', c:'y', tag:'שמז', name:'שמירת זמנים בבוקר' },
+  { cls:"שיעור א'", who:'נתנאל המברסטון', c:'g', tag:'תפל', name:'תפילה בכוונה' },
+  { cls:"שיעור ב'", who:'רוזן', c:'y', tag:'לילה', name:'שינה בזמן' },
+  { cls:"שיעור ב'", who:'סנהדראי', c:'g', tag:'לילה', name:'שינה בזמן' },
+  { cls:"שיעור ג'", who:"ג' 1 · רוטשילד", c:'y', tag:'תפל', name:'תפילה בכוונה' },
+  { cls:"שיעור ג'", who:"ג' 2 · איציק דויטש", c:'g', tag:'כבד', name:'כיבוד הורים' }
+];
+var DRAW_TAGS = { y:['תפל','לילה','שמז'], g:['כבד','תפל','לילה'] };
+var DRAW_TEST = /[?&]drawtest=[12]/.test(location.search) ? Date.now() + 5000 : 0;
+var DRAW = { phase:'', built:false, locked:-1, spin:-1, ac:null, clickT:null };
+function drawT0(now) {
+  if (DRAW_TEST) return DRAW_TEST;
+  if (isoOf(now) !== DRAW_DAY) return null;
+  var d = new Date(now); d.setHours(DRAW_T0[0], DRAW_T0[1], 0, 0); return d.getTime();
+}
+function drawState(now) {
+  var t0 = drawT0(now); if (t0 == null) return null;
+  var t = now.getTime(), end = DRAW_TEST ? t0 + 160000 : new Date(now).setHours(DRAW_END[0], DRAW_END[1], 0, 0);
+  if (t < t0 || t >= end) return null;
+  var s = (t - t0) / 1000;
+  if (s < DRAW_CD) return { phase:'cd', left:Math.ceil(DRAW_CD - s) };
+  var r = s - DRAW_CD, i = Math.floor(r / DRAW_STEP);
+  if (i >= DRAW_RES.length) {
+    var tSum = DRAW_TEST ? t0 + (DRAW_CD + DRAW_STEP * 6 + 15) * 1000 : new Date(now).setHours(12, 42, 0, 0);
+    var tPrep = DRAW_TEST ? tSum + 25000 : new Date(now).setHours(14, 15, 0, 0);
+    if (t < tSum) return { phase:'sum', locked:DRAW_RES.length - 1, spin:-1 };
+    if (t < tPrep) return { phase:'prep', left:Math.ceil((tPrep - t) / 1000) };
+    return { phase:'go' };
+  }
+  var inStep = r - i * DRAW_STEP;
+  return { phase:'draw', locked:inStep >= DRAW_SPIN ? i : i - 1, spin:inStep >= DRAW_SPIN ? -1 : i };
+}
+function drawOn(now) { return !!drawState(now); }
+function drawBeep(f, d, type, vol) {
+  try {
+    if (!DRAW.ac) DRAW.ac = new (window.AudioContext || window.webkitAudioContext)();
+    var ac = DRAW.ac; if (ac.state === 'suspended') ac.resume();
+    var o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+    o.type = type || 'sine'; o.frequency.value = f; g.gain.setValueAtTime(vol || .18, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + d);
+  } catch (e) {}
+}
+function drawFanfare() { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { drawBeep(f, .35, 'triangle', .22); }, i * 120); }); }
+function drawBoom() {
+  var el = $('draw'); drawBeep(60, .7, 'sine', .5); drawBeep(110, .4, 'triangle', .3);
+  el.classList.remove('flash', 'shake'); void el.offsetWidth; el.classList.add('flash', 'shake');
+  setTimeout(function () { el.classList.remove('flash', 'shake'); }, 700);
+  var cols = ['#ffd21a', '#e3b96b', '#2fbf6f', '#ffffff', '#ff9f43'];
+  for (var k = 0; k < 70; k++) { var c = document.createElement('i'); c.className = 'dw-cf';
+    c.style.left = (Math.random() * 100) + 'cqw'; c.style.background = cols[k % cols.length];
+    c.style.animationDuration = (1.8 + Math.random() * 1.6) + 's'; c.style.animationDelay = (Math.random() * .3) + 's';
+    el.appendChild(c); setTimeout(function (n) { return function () { n.remove(); }; }(c), 3800); }
+}
+function drawCard(x, i) {
+  var strip = DRAW_TAGS[x.c].concat(DRAW_TAGS[x.c], DRAW_TAGS[x.c], DRAW_TAGS[x.c]).map(function (t) { return '<span>' + t + '</span>'; }).join('');
+  return '<div class="dw-card ' + x.c + '" id="dwc' + i + '"><div class="dw-lab">' + (x.c === 'y' ? '☀ נואם צהוב' : '🌱 נואם ירוק') +
+    (x.who ? ' · ' + esc(x.who) : '') + '</div><div class="dw-slot"><div class="dw-strip">' + strip + '</div>' +
+    '<div class="dw-fin"><b>' + esc(x.tag) + '</b><small>' + esc(x.name) + '</small></div><div class="dw-q">?</div></div></div>';
+}
+function drawBuild() {
+  var el = $('draw'); if (!el) return;
+  var cols = ["שיעור א'", "שיעור ב'", "שיעור ג'"].map(function (c) {
+    return '<div class="dw-col"><h3>' + c + '</h3>' + DRAW_RES.map(function (x, i) { return x.cls === c ? drawCard(x, i) : ''; }).join('') + '</div>';
+  }).join('');
+  el.innerHTML = '<div class="dw-head"><img src="/bech/emblem.svg" alt=""><div><b>בוחרים לצמוח</b><span>הגרלת הנואמים</span></div><div id="dwClock"></div></div>' +
+    '<div id="dwCd"><div class="dw-k">בעוד 10 דקות</div><div class="dw-t">ההגרלה!</div><div class="dw-s">מי ינאם על איזו מפלגה</div>' +
+    '<div class="dw-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" stroke="rgba(255,255,255,.14)"/><circle id="dwArc" cx="60" cy="60" r="54" stroke="#e3b96b" stroke-linecap="round" stroke-dasharray="339.3"/></svg><div id="dwNum">10:00</div></div>' +
+    '<div class="dw-s2" style="color:#ffd21a;font-weight:800;font-size:4cqh">מכיוון ששיעור ב\' עדיין לא בחרו מי ינאם — נעשה את ההגרלה מחדש</div><div class="dw-s2" style="font-size:3.6cqh;font-weight:800;color:#fff">כל שיעור בחר נציג צהוב ונציג ירוק — עכשיו נראה על מה הם ינאמו!</div>' +
+    '<div class="dw-chips">' + DRAW_TAGS.y.map(function (t) { return '<div style="--c:#ffd21a">☀ ' + t + '</div>'; }).join('') + DRAW_TAGS.g.map(function (t) { return '<div style="--c:#2fbf6f">🌱 ' + t + '</div>'; }).join('') + '</div></div>' +
+    '<div id="dwPrep"><div class="pr-t">יש לכם עד 14:15 בדיוק להכין את הנאום!</div><div id="prNum"></div><div class="pr-tab">' + ["שיעור א'", "שיעור ב'", "שיעור ג'"].map(function (c) {
+      var y = DRAW_RES.filter(function (x) { return x.cls === c && x.c === 'y'; })[0], g = DRAW_RES.filter(function (x) { return x.cls === c && x.c === 'g'; })[0];
+      return '<div><b>' + c + '</b><span class="y">צהוב: ' + esc(y.tag) + '</span><br><span class="g">ירוק: ' + esc(g.tag) + '</span></div>'; }).join('') + '</div></div>' +
+    '<div id="dwGo"><b>הנאומים מתחילים!</b><span>בוחרים לצמוח · נאומי הזוכים</span></div>' +
+    '<div id="dwMain"><div id="dwSpot"></div><div id="dwNow"></div><div class="dw-grid">' + cols + '</div>' +
+    '<div id="dwFoot">מתכוננים בשיעור הבא · הנאומים לפני מנחה · השיעור המנצח זוכה בארוחת בוקר מפנקת + פרס לכל השיעור</div></div>';
+  DRAW.built = true;
+}
+function drawSpot(st) {
+  var sp = $('dwSpot'); if (!sp || st.phase !== 'draw') return;
+  var i = st.spin >= 0 ? st.spin : st.locked, x = DRAW_RES[i]; if (!x) return;
+  var key = i + (st.spin >= 0 ? 's' : 'l'); if (sp.dataset.k === key) return; sp.dataset.k = key;
+  sp.className = x.c;
+  var head = '<div class="sp-cls">' + x.cls + '</div><div class="sp-col">' + (x.c === 'y' ? '☀ נואם צהוב' : '🌱 נואם ירוק') + '</div><div class="sp-who">' + esc(x.who || '') + '</div>';
+  var body = st.spin >= 0
+    ? '<div class="sp-slot"><div class="sp-strip">' + DRAW_TAGS[x.c].concat(DRAW_TAGS[x.c], DRAW_TAGS[x.c], DRAW_TAGS[x.c]).map(function (t) { return '<span>' + t + '</span>'; }).join('') + '</div></div>'
+    : '<div class="sp-slot" style="height:auto"><div class="sp-fin"><b>' + esc(x.tag) + '</b><small>' + esc(x.name) + '</small></div></div>';
+  sp.innerHTML = head + body + '<div class="sp-n">' + (i + 1) + ' מתוך ' + DRAW_RES.length + '</div>';
+}
+function drawTick(now) {
+  var st = drawState(now), el = $('draw'); if (!el) return;
+  if (!st) { if (DRAW.phase) { DRAW.phase = ''; el.className = ''; if (DRAW.clickT) { clearInterval(DRAW.clickT); DRAW.clickT = null; } } return; }
+  if (!DRAW.built) drawBuild();
+  el.className = 'on ' + st.phase;
+  $('dwClock').textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
+  if (st.phase === 'prep' || st.phase === 'go') {
+    if (st.phase === 'prep') { var h = Math.floor(st.left / 3600), mm = Math.floor(st.left % 3600 / 60), ss = st.left % 60; $('prNum').textContent = (h ? h + ':' + pad(mm) : mm) + ':' + pad(ss); }
+    DRAW.phase = st.phase; return;
+  }
+  if (st.phase === 'cd') {
+    var m = Math.floor(st.left / 60), sec = st.left % 60;
+    $('dwNum').textContent = m + ':' + pad(sec);
+    $('dwArc').style.strokeDashoffset = (339.3 * (1 - st.left / DRAW_CD)).toFixed(1);
+    el.classList.toggle('last', st.left <= 10);
+    if (st.left <= 10 && DRAW.lastBeep !== st.left) { DRAW.lastBeep = st.left; drawBeep(st.left <= 3 ? 880 : 660, .15, 'square', .12); }
+  } else {
+    for (var i = 0; i < DRAW_RES.length; i++) {
+      var c = $('dwc' + i), state = i <= st.locked ? 'lock' : (i === st.spin ? 'spin' : 'wait');
+      if (c.dataset.s !== state) {
+        c.dataset.s = state; c.className = 'dw-card ' + DRAW_RES[i].c + ' ' + state;
+        if (state === 'lock' && DRAW.phase === 'draw' && i === DRAW.locked + 1) { drawFanfare(); drawBoom(); }
+      }
+    }
+    var x = st.spin >= 0 ? DRAW_RES[st.spin] : (st.phase === 'draw' && st.locked >= 0 ? DRAW_RES[st.locked] : null);
+    $('dwNow').innerHTML = st.phase === 'sum' ? 'תוצאות ההגרלה'
+      : (st.spin >= 0 ? 'מגרילים: <b>' + x.cls + (x.who ? ' · ' + esc(x.who) : '') + '</b> · ' + (x.c === 'y' ? 'נואם צהוב' : 'נואם ירוק') + '…'
+      : (x ? x.cls + ' · ' + (x.c === 'y' ? 'נואם צהוב' : 'נואם ירוק') + ': <b>' + esc(x.tag) + ' – ' + esc(x.name) + '!</b>' : ''));
+    if (st.spin >= 0 && !DRAW.clickT) DRAW.clickT = setInterval(function () { drawBeep(1200, .03, 'square', .05); }, 110);
+    if (st.spin < 0 && DRAW.clickT) { clearInterval(DRAW.clickT); DRAW.clickT = null; }
+    drawSpot(st);
+    DRAW.locked = st.locked;
+  }
+  DRAW.phase = st.phase;
+}
+// ── מסרים מהשיח של הרב וינברג: נמשכים מהשרת (/api/siach), מוצגים בסבב השקופיות ובין סרטוני ההפסקה ──
+// בדיקת לובי בלבד: ?slide=siach&siachday=YYYY-MM-DD&siachi=N נועל את השקופית של רשומה אחת (בלי סבב, בלי המתנה)
+var PIN = (function () { try { var q = new URLSearchParams(location.search); return q.get('slide') === 'siach' ? { day: q.get('siachday') || '', i: Number(q.get('siachi')) || 0 } : null; } catch (e) { return null; } })();
+var SIACH = { items:[], i:0, at:0 };
+function siachPull() {
+  fetch('/api/siach', { cache:'no-store' }).then(function (r) { return r.json(); }).then(function (j) { SIACH.items = (j && j.items) || []; }).catch(function () {});
+}
+function siachDayLabel(it, now) {
+  var d = Math.round((new Date(isoOf(now)).getTime() - new Date(it.date).getTime()) / 86400000);
+  var when = d <= 0 ? 'היום' : (d === 1 ? 'אתמול' : 'לפני ' + d + ' ימים');
+  return 'מהשיח של הרב וינברג · ' + when + (it.session === 'צהריים' ? ' בצהריים' : ' בבוקר');
+}
+function siachPoints() {
+  var now = new Date(), out = [];
+  SIACH.items.forEach(function (it) {
+    if (PIN && PIN.day && it.date !== PIN.day) return;
+    (it.points || []).forEach(function (p) { if (p && p.head) out.push({ kick:siachDayLabel(it, now), head:p.head, body:p.body || '', kw:p.keywords || [] }); });
+    if (it.question) out.push({ kick:siachDayLabel(it, now) + ' · לחשוב על זה', head:it.question, body:'', kw:[] });
+  });
+  return out;
+}
+function siachNext() { var a = siachPoints(); if (!a.length) return null; if (PIN) return a[PIN.i % a.length]; return a[(SIACH.i++) % a.length]; }
+// גוף המסר עם מילות המפתח מודגשות (הבהוב מדורג); רק טקסט מוגן (esc) נכנס ל-HTML
+function kwHtml(text, kws) {
+  var h = esc(text), n = 0, list = (kws || []).map(function (k) { return String(k || '').trim(); }).filter(function (k) { return k && text.indexOf(k) >= 0; });
+  list.forEach(function (k) {
+    var ek = esc(k);
+    if (list.some(function (o) { return o !== k && o.indexOf(k) >= 0; })) return;   // מילה שמוכלת במילה ארוכה יותר — מסומנת דרך הארוכה
+    h = h.split(ek).join('<span class="kw" style="animation-delay:-' + (n++ * 0.7).toFixed(1) + 's">' + ek + '</span>');
+  });
+  return h;
+}
+var SB = { timer:null, at:-1 };
+function siachBreakCard(done) {   // בין סרטוני ההפסקה: מסר אחד מהשיח, ~22 שניות
+  var sp = siachNext(); if (!sp) { done(); return; }
+  $('sbKick').textContent = sp.kick; $('sbHead').textContent = sp.head; $('sbBody').textContent = sp.body;
+  try { active.pause(); } catch (e) {} active.classList.add('off');
+  $('sbCard').classList.add('on');
+  SB.timer = setTimeout(function () { SB.timer = null; $('sbCard').classList.remove('on'); done(); }, 22000);
+}
+var SLIDE_EL = { clock:'slClock', birthdays:'slBirth', menu:'slMenu', agenda:'slAgenda', message:'slMsg', fresh:'slFresh', bechirot:'slBech', siach:'slSiach' };
 
 function slideHasContent(name, now) {
   if (name === 'clock') return true;
@@ -657,16 +1320,21 @@ function slideHasContent(name, now) {
   if (name === 'menu') return !!menuForDisplay().m;
   if (name === 'agenda') return todayRows(now).length > 0;
   if (name === 'message') return activeMessages().length > 0;
+  if (name === 'fresh') return freshItems().length > 0;
+  if (name === 'siach') return siachPoints().length > 0;
+  if (name === 'bechirot') return bechActive(now);
   return false;
 }
 function rotate(now, inLesson, left) {
   var d = cfg.display, mode = d.lessonScreen || 'clock';
   var pool = (d.slides || ['clock']).filter(function (n) { return slideHasContent(n, now); });
-  if (inLesson && mode !== 'rotate') pool = [mode === 'menu' ? 'menu' : (mode === 'agenda' ? 'agenda' : 'clock')];
+  // 28/10/2026: "חדש במסך" ו"בוחרים לצמוח" נכנסים לסבב תמיד (לא תלוי בהגדרות בפאנל); בשיעור — רק הבחירות, לסירוגין עם השעון
+  ['fresh', 'bechirot', 'siach'].forEach(function (n) { if (pool.indexOf(n) < 0 && slideHasContent(n, now)) pool.push(n); });
+  if (inLesson && mode !== 'rotate') { pool = [mode === 'menu' ? 'menu' : (mode === 'agenda' ? 'agenda' : 'clock')]; if (bechActive(now)) pool.push('bechirot'); }
   // הספירה האחרונה חשובה מכל שקופית אחרת — היא נשארת על המסך עד המעבר
   if (left != null && left <= CD_WARN) pool = ['clock'];
   if (!pool.length) pool = ['clock'];
-  var sec = Math.max(5, Number(d.slideSec) || 18);
+  var sec = curSlide === 'bechirot' ? BECH_SCENE_SEC * BECH_PER_TURN : Math.max(5, Number(d.slideSec) || 18);
   var t = now.getTime();
   if (!slideSince) slideSince = t;
   if (pool.indexOf(curSlide) < 0 || (t - slideSince) / 1000 >= sec) {
@@ -715,6 +1383,15 @@ function showSlide(name, now) {
       return '<div class="ag ' + (i === idx ? 'now' : (i < idx ? 'done' : '')) + '"><span class="t">' + r.t +
         '</span><span>' + esc(r.title) + '</span></div>';
     }).join('');
+  } else if (name === 'fresh') {
+    $('slFreshList').innerHTML = freshItems().slice(0, 6).map(function (x) {
+      var inf = progInfo(x);
+      return '<div class="fi"><i class="bi ' + (x.kind === 'concepts' ? 'bi-lightbulb-fill' : (x.kind === 'siach' ? 'bi-chat-quote-fill' : 'bi-book-half')) + '"></i><div><b>' +
+        esc(inf.title) + (x.isNew ? '<span class="new">חדש</span>' : '') + '</b><small>' + esc(inf.kick.replace('הסרטון הבא · ', '')) + '</small></div></div>';
+    }).join('');
+  } else if (name === 'siach') {
+    var sp = siachNext();
+    if (sp) { $('slSiachKick').textContent = sp.kick; $('slSiachHead').textContent = sp.head; $('slSiachBody').innerHTML = kwHtml(sp.body || '', sp.kw); var sq = document.querySelector('#slSiach .sq'); if (sq) sq.classList.toggle('q', !sp.body); }
   } else if (name === 'message') {
     var msgs = activeMessages();
     var pick = msgs.filter(function (m) { return m.level === 'high'; });
@@ -812,6 +1489,7 @@ var vurl = function (rel) { return (LOCAL || '') + '/video/' + rel.split('/').ma
 
 async function syncVideoSource() {
   var d = cfg.display;
+  await syncProgram(d);
   // סרטונים כבויים = לוח מידע בלבד. אין טעם לפנות לשרת המקומי, ובוודאי לא
   // להציג הודעה על תיקיות שלא נבחרו.
   if (!d.videosEnabled) { srv.videos = []; hint(''); reportRuntime(); return; }
@@ -849,10 +1527,241 @@ async function syncVideoSource() {
   reportRuntime();
 }
 
-function startVideo() { if (vi < 0) playNext(true); else { active.play().catch(function () {}); schedule(); } }
-function stopVideo() { if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; } try { active.pause(); } catch (e) {} }
+// ── תוכנית ההפסקות (יוסף 18/10/2026) ─────────────────────────────────────
+// בהפסקה ובארוחה: שיח מעורר ← 10 שניות של הסבר עם ספירה ← מושג בגמרא עם ר' אלי סטפנסקי ← ...
+// הסרטונים מתיקייה קבועה בשרת (/api/program), לא מבחירת התיקיות בפאנל. בלי קול — הסרטונים בנויים לכתוביות.
+// כבוי רק אם בפאנל נקבע display.breakProgram=false.
+var PROG = { pool:{ siach:[], concepts:[], lashon:[], shabbat:[], fried:[], boker:[] }, turn:0, i:0, cur:null, on:false, timer:null, key:null, daily:{} }; window.__PROG = PROG;
+var PROG_FRESH_HOURS = 72, PROG_FRESH_MAX_PLAYS = 2, PROG_FAIL_LIMIT = 2, PROG_FAIL_SKIP_MIN = 30;   // thresholds
+var PLAYED_KEY = 'lobby.progPlayed.v1', DAILY_KEY = 'lobby.progDaily.v1';
+function progTotal() { var p = PROG.pool; return p.siach.length + p.concepts.length + (p.lashon || []).length + (p.shabbat || []).length + (p.fried || []).length + (p.boker || []).length; }
+// סרטון הלכה יומי (יוסף 20/10/2026): בהפסקה הראשונה של היום — "שמירת הלשון", בשנייה — "הלכות שבת", ורק אחר כך התוכנית הרגילה.
+// איזה סרטון: לפי הסדר המספרי של השם, אחד לכל יום — (ימים מאז 21.10.2026) מודולו מספר הקבצים. נגזר מהתאריך, בלי מצב שמור.
+function natCmp(a, b) { return String(a).localeCompare(String(b), 'he', { numeric:true }); }
+function dailyPick(list, now) {
+  if (!list || !list.length) return null;
+  var l = list.slice().sort(natCmp);
+  var days = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(2026, 9, 21)) / 864e5);
+  return l[((days % l.length) + l.length) % l.length];
+}
+// איזו הפסקה זו מבין משבצות ה-break של היום (0 = ראשונה). ?prog=1&brk=N מדמה הפסקה N מחוץ לשעות
+function breakNo(now) {
+  var m = /[?&]brk=(\d+)/.exec(location.search); if (m) return Number(m[1]);
+  var rows = todayRows(now), idx = slotAt(rows, now);
+  if (idx < 0 || (rows[idx].kind || 'lesson') !== 'break') return -1;
+  var n = 0; for (var i = 0; i < idx; i++) if (rows[i].kind === 'break') n++;
+  return n;
+}
+// איזו ארוחה זו מבין משבצות ה-meal של היום (0 = ארוחת בוקר). ?prog=1&meal=N מדמה ארוחה N מחוץ לשעות
+function mealNo(now) {
+  var m = /[?&]meal=(\d+)/.exec(location.search); if (m) return Number(m[1]);
+  if (/[?&]brk=/.test(location.search)) return -1;
+  var rows = todayRows(now), idx = slotAt(rows, now);
+  if (idx < 0 || rows[idx].kind !== 'meal') return -1;
+  var n = 0; for (var i = 0; i < idx; i++) if (rows[i].kind === 'meal') n++;
+  return n;
+}
+function dailyShown(k) { if (PROG.daily[k]) return true; try { return !!(JSON.parse(localStorage.getItem(DAILY_KEY) || '{}')[k]); } catch (e) { return false; } }
+function dailyMark(k) { PROG.daily[k] = 1; try { var o = {}; o[k] = 1; localStorage.setItem(DAILY_KEY, JSON.stringify(o)); } catch (e) {} }
+function dailyItem() {
+  // ארוחת הבוקר (הארוחה הראשונה, 09:25) — שיח הבוקר של אתמול (יוסף 01/11/2026: "בבוקר, כשכל התלמידים נמצאים");
+  // השרת מחזיר בדיוק סרטון אחד. n = 100 מסמן את הארוחה כדי שלא יתנגש במפתח של ההפסקות 0-2
+  var now = new Date(), n = breakNo(now);
+  if (n < 0 && mealNo(now) === 0) n = 100;
+  if (n !== 0 && n !== 1 && n !== 2 && n !== 100) return null;
+  var kind = n === 100 ? 'boker' : ['lashon', 'shabbat', 'fried'][n], rel = dailyPick(PROG.pool[kind], now); if (!rel) return null;
+  var k = isoOf(now) + '#' + n + (/[?&]brk=/.test(location.search) ? '#t' : '');
+  if (dailyShown(k)) return null;
+  dailyMark(k);
+  return { rel: rel, kind: kind, i: 0, t: 0 };
+}
+function playedMap() { try { return JSON.parse(localStorage.getItem(PLAYED_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function markPlayed(rel) {
+  try { var m = playedMap(); m[rel] = Date.now(); localStorage.setItem(PLAYED_KEY, JSON.stringify(m)); } catch (e) {}   // local fallback
+  try {   // server-side play count (fire-and-forget); keep the local copy of the meta current until the next sync
+    if (PROG.meta && PROG.meta[rel]) { PROG.meta[rel].plays = (PROG.meta[rel].plays || 0) + 1; PROG.meta[rel].last = Date.now() / 1000; }
+    var k = rel.indexOf('/');
+    fetch((LOCAL || '') + '/api/played', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ pool: rel.slice(0, k), rel: rel.slice(k + 1) }) }).catch(function () {});
+  } catch (e) {}
+}
+// broken-file guard: PROG_FAIL_LIMIT consecutive failures of the same file -> skipped for PROG_FAIL_SKIP_MIN minutes
+var PROG_FAILS = {};
+function progFailed(rel) {
+  var f = PROG_FAILS[rel] || (PROG_FAILS[rel] = { n: 0, until: 0 });
+  f.n++; if (f.n >= PROG_FAIL_LIMIT) { f.until = Date.now() + PROG_FAIL_SKIP_MIN * 60000; f.n = 0; }
+}
+function progOk(rel) { delete PROG_FAILS[rel]; }
+function progSkipped(rel) { var f = PROG_FAILS[rel]; return !!(f && f.until > Date.now()); }
+// Pick order (Yosef 23/10/2026): (a) FRESH first = modified within PROG_FRESH_HOURS and plays < PROG_FRESH_MAX_PLAYS, newest first;
+// (b) everyone else by plays ascending, ties newest first, ties least-recently played. No server meta -> plays come from local storage.
+function progOrder(list, kind) {
+  var pm = playedMap(), meta = PROG.meta || {}, nowS = Date.now() / 1000;
+  var items = list.filter(function (rel) { return !progSkipped(rel); }).map(function (rel, i) {
+    var m = meta[rel] || null, loc = pm[rel] || 0;
+    return { rel: rel, kind: kind, i: i,
+      mtime: m ? (m.mtime || 0) : 0,
+      plays: m ? (m.plays || 0) : (loc ? 1 : 0),
+      t: Math.max(m ? (m.last || 0) * 1000 : 0, loc) };
+  });
+  function fresh(x) { return x.mtime > 0 && (nowS - x.mtime) <= PROG_FRESH_HOURS * 3600 && x.plays < PROG_FRESH_MAX_PLAYS; }
+  return items.sort(function (a, b) {
+    var fa = fresh(a), fb = fresh(b);
+    if (fa !== fb) return fa ? -1 : 1;
+    if (fa) return (b.mtime - a.mtime) || (a.i - b.i);
+    return (a.plays - b.plays) || (b.mtime - a.mtime) || (a.t - b.t) || (a.i - b.i);
+  });
+}
+// Mix: per cycle of 3 picks = concepts, siach, concepts (concepts are the majority); an empty pool falls back to the other
+function progPick() {
+  var dl = dailyItem(); if (dl && !progSkipped(dl.rel)) return dl;   // daily halacha first in the break; does not affect the cycle
+  var S = progOrder(PROG.pool.siach, 'siach'), C = progOrder(PROG.pool.concepts, 'concepts');
+  var wantC = PROG.turn % 3 !== 1;
+  var a = wantC ? C : S, b = wantC ? S : C;
+  PROG.turn++;
+  return a.length ? a[0] : (b.length ? b[0] : null);
+}
+var pvurl = function (rel) { return (LOCAL || '') + '/pvideo/' + rel.split('/').map(encodeURIComponent).join('/'); };
+function progInfo(it) {
+  var base = it.rel.split('/').pop().replace(/\.[^.]+$/, '').replace(/\s*\(קצר\)\s*$/, ''), p = base.split(' - ');
+  if (it.kind === 'lashon' || it.kind === 'shabbat' || it.kind === 'fried') {   // "NN - שם"
+    var q = base.split(' - '); if (/^\d+$/.test(q[0])) q.shift();
+    if (it.kind === 'fried') return { kick:'הסרטון הבא · הלכה יומית', title:q.join(' - ') || base, sub:'הלכה יומית · הרב פריד', exp:'הלכה יומית בקצרה — עקבו אחרי הכתוביות' };
+    return it.kind === 'lashon'
+      ? { kick:'הסרטון הבא · שמירת הלשון', title:q.join(' - ') || base, sub:'הלכות שמירת הלשון · חפץ חיים', exp:'הלכה יומית בקצרה — עקבו אחרי הכתוביות' }
+      : { kick:'הסרטון הבא · הלכות שבת', title:q.join(' - ') || base, sub:'הלכות שבת', exp:'הלכה יומית בקצרה — עקבו אחרי הכתוביות' };
+  }
+  if (it.kind === 'boker') {   // "boker/<date>/שיח הבוקר - <date>.mp4"
+    var dm = /(\d{4})-(\d{2})-(\d{2})/.exec(it.rel), dd = dm ? new Date(+dm[1], +dm[2] - 1, +dm[3]) : null;
+    var dn = dd ? 'יום ' + ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][dd.getDay()] + ' ' + (+dm[3]) + '/' + (+dm[2]) : '';
+    return { kick:'הסרטון הבא · שיח הבוקר', title:'שיח הבוקר' + (dn ? ' · ' + dn : ''),
+             sub:'מתוך השיח בבית המדרש אחרי תפילת שחרית', exp:'השיח מהבוקר האחרון בבית המדרש, בהמחשה — עם הקול המקורי' };
+  }
+  if (it.kind === 'siach') // "<פרשה> - <מספר> - <נושא>"
+    return { kick:'הסרטון הבא · שיח מעורר', title:p.slice(2).join(' - ') || base,
+             sub:(p[0] ? 'פרשת ' + p[0] + ' · ' : '') + 'מהשיח שאחרי תפילת שחרית במכינה',
+             exp:'נושא אחד מהשיח של הבוקר — להמשך המחשבה סביב שולחן השבת' };
+  if (/^\d+$/.test(p[0])) p.shift();   // "NN - שם - הסבר" או "שם - הסבר"
+  return { kick:'הסרטון הבא · מושגים בגמרא', title:p[0] || base, sub:p.slice(1).join(' - '),
+           exp:'מושג מן הגמרא בהמחשה, עם ר׳ אלי סטפנסקי · עקבו אחרי הכתוביות' };
+}
+async function syncProgram(d) {
+  if (d.breakProgram === false || LOCAL === null) { PROG.pool = { siach:[], concepts:[], lashon:[], shabbat:[], fried:[], boker:[] }; return; }
+  try {
+    var pg = await (await fetch((LOCAL || '') + '/api/program', { cache:'no-store' })).json();
+    var S = pg.siach || [], C = pg.concepts || [], LA = pg.lashon || [], SH = pg.shabbat || [], FR = pg.fried || [], BK = pg.boker || [],
+        key = S.join('|') + '#' + C.join('|') + '#' + LA.join('|') + '#' + SH.join('|') + '#' + FR.join('|') + '#' + BK.join('|');
+    PROG.meta = pg.meta || null;
+    if (key !== PROG.key) { PROG.key = key; PROG.pool = { siach:S, concepts:C, lashon:LA, shabbat:SH, fried:FR, boker:BK }; lastVideoAllowed = null; }
+  } catch (e) { /* תקלה רגעית בשרת/בכונן — ממשיכים עם הרשימה הקודמת, לא עוצרים באמצע הפסקה */ }
+}
+// פס המידע שמתחת לסרטון: שעון גדול · שם ההפסקה · כמה נשאר + פס התקדמות · מה מוצג עכשיו ומה אחריו
+function paintProgBar(now, cur, nxt, gap, left, total) {
+  $('pbClock').innerHTML = pad(now.getHours()) + '<span class="bl">:</span>' + pad(now.getMinutes());
+  var title = gap ? 'הפסקה' : ((cur && cur.title) || 'הפסקה');
+  $('pbTitle').textContent = title;
+  var L = $('pbLeft'); L.className = '';
+  if (left == null) L.textContent = '';
+  else {
+    L.textContent = (gap && nxt ? nxt.title + ' בעוד ' : 'נותרו ') + (left <= CD_WARN ? mmss(left) : Math.ceil(left / 60) + ' דק׳');
+    if (left <= CD_WARN) L.className = left <= CD_LAST ? 'last' : 'warn';
+  }
+  $('pbBar').style.width = (total > 0 && left != null ? Math.max(0, Math.min(100, (total - left) / total * 100)) : 0) + '%';
+  var it = PROG.cur, inf = it ? progInfo(it) : null;
+  $('pbNow').innerHTML = (inf ? 'מוצג עכשיו: <b>' + esc(inf.kick.split('·').pop().trim() + ' — ' + inf.title) + '</b>' : '') +
+    (nxt ? (inf ? '  ·  ' : '') + 'אחר כך: <b>' + esc(nxt.t + ' ' + nxt.title) + '</b>' : '');
+}
+function progHideCard() { if (SB.timer) { clearTimeout(SB.timer); SB.timer = null; } $('sbCard').classList.remove('on'); if (PROG.timer) { clearInterval(PROG.timer); clearTimeout(PROG.timer); PROG.timer = null; } PROG.bech = false; $('progCard').classList.remove('on'); }
+// שמע: הלכה יומית (lashon/shabbat/fried) מנגנת בעוצמה מלאה; שאר המקורות מושתקים.
+// אם הדפדפן חוסם autoplay עם קול (NotAllowedError) — נופלים ל-muted כדי שלא ייתקע, ומנסים שוב בסרטון הבא/בלחיצה.
+var SOUND_KINDS = { lashon:1, shabbat:1, fried:1, siach:1, concepts:1, boker:1 }, soundForced = false;
+function wantsSound(it) { return !!(it && SOUND_KINDS[it.kind]); }
+function progAudio(v, it) { try { if (wantsSound(it)) { v.muted = false; v.volume = 1; } else { v.muted = true; } } catch (e) {} }
+function progPlay(v, it) {
+  return v.play().then(function () { setMuteHint(wantsSound(it) && v.muted); }, function (err) {
+    if (wantsSound(it) && !v.muted) {
+      v.muted = true; setMuteHint(true);
+      return v.play();
+    }
+    throw err;
+  });
+}
+function setMuteHint(on) { var h = $('muteHint'); if (h) h.style.display = on ? '' : 'none'; }
+function tryUnmute() {
+  var it = PROG.cur; if (!wantsSound(it) || !active.muted) return;
+  try { active.muted = false; active.volume = 1; } catch (e) {}
+  var p = active.play(); if (p && p.then) p.then(function () { setMuteHint(false); }, function () { try { active.muted = true; } catch (e) {} setMuteHint(true); });
+}
+['click', 'touchstart', 'keydown', 'pointerdown'].forEach(function (ev) { document.addEventListener(ev, tryUnmute, true); });
+// בדיקת מדיניות autoplay של הדפדפן (21/10): תג קטן בפינה — ירוק דקה אחרי טעינה אם קול מותר, אדום קבוע אם חסום עד לחיצה
+(function apBadge() {
+  var b = document.createElement('div');
+  b.id = 'apBadge';
+  b.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:99;padding:6px 12px;border-radius:10px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:none';
+  document.body.appendChild(b);
+  function pol() {
+    try { if (navigator.getAutoplayPolicy) return navigator.getAutoplayPolicy('mediaelement'); } catch (e) {}
+    return 'unknown';
+  }
+  function show() {
+    var p = pol(), act = !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
+    if (p === 'allowed' || act) { b.style.background = '#1b7f3b'; b.textContent = '🔊 קול פעיל (' + p + ') ' + new Date().toTimeString().slice(0,5); b.style.display = ''; setTimeout(function () { b.style.display = 'none'; }, 600000); }
+    else { b.style.background = '#a32020'; b.textContent = '🔇 קול חסום בדפדפן — לחצו כאן פעם אחת (' + p + ')'; b.style.display = ''; }
+  }
+  b.addEventListener('click', function () { setTimeout(show, 300); });
+  setTimeout(show, 3000);
+})();
+function progNext() {
+  if (busy || !progTotal() || PROG.timer || !PROG.on) return;   // !PROG.on: חלון שקט / מחוץ להפסקה
+  // בוחרים לצמוח בין הסרטונים: אחרי כל 3 סרטונים, הפסקה קצרה עם התוצאות (הפס התחתון עם השעון נשאר)
+  if (BECH_EVERY > 0 && PROG.i > 0 && PROG.i % BECH_EVERY === 0 && PROG.bechAt !== PROG.i && bechActive(new Date())) {
+    PROG.bechAt = PROG.i; PROG.bech = true; BECH.tease = true;
+    try { active.pause(); } catch (e) {} active.classList.add('off');
+    bechShow(true, new Date());
+    PROG.timer = setTimeout(function () { PROG.timer = null; PROG.bech = false; bechShow(false); progNext(); }, BECH_SCENE_SEC * BECH_INTERLUDE * 1000);
+    return;
+  }
+  if (PROG.i > 0 && PROG.i % 2 === 0 && SB.at !== PROG.i && siachPoints().length) {   // מסר מהשיח אחרי כל 2 סרטונים
+    SB.at = PROG.i; PROG.timer = setTimeout(function () {}, 1);   // תופס את המנעול עד שהכרטיס נגמר
+    siachBreakCard(function () { PROG.timer = null; progNext(); });
+    return;
+  }
+  var it = progPick(); if (!it) return;
+  PROG.cur = it; PROG.i++;
+  var inf = progInfo(it), n = 10;
+  try { active.pause(); } catch (e) {}
+  $('pcKick').textContent = inf.kick; $('pcTitle').textContent = inf.title; $('pcSub').textContent = inf.sub; $('pcExp').textContent = inf.exp;
+  $('pcNum').textContent = n; var arc = $('pcArc'); arc.style.transition = 'none'; arc.style.strokeDashoffset = 0;
+  void arc.getBoundingClientRect(); arc.style.transition = 'stroke-dashoffset 1s linear';
+  $('progCard').classList.add('on');
+  // הסרטון נטען כבר בזמן הספירה, כדי שיתחיל מיד כשהיא נגמרת
+  next.classList.add('off'); try { next.pause(); next.removeAttribute('src'); } catch (e) {}
+  // הסרטון נטען מוסתר מאחורי הכרטיס, ונחשף בהדרגה רק כשהספירה נגמרת ויש תמונה
+  active.classList.add('off'); active.src = pvurl(it.rel); active.load();
+  PROG.timer = setInterval(function () {
+    n--; $('pcNum').textContent = Math.max(n, 0); arc.style.strokeDashoffset = (339.3 * (10 - n) / 10).toFixed(1);
+    if (n > 0) return;
+    clearInterval(PROG.timer); PROG.timer = null; busy = true;
+    var go = function () {
+      if (!busy) return;
+      progAudio(active, it);
+      progPlay(active, it).then(function () {
+        busy = false; $('progCard').classList.remove('on'); active.classList.remove('off'); markPlayed(it.rel); progOk(it.rel);
+        $('vName').textContent = inf.title; $('vCount').textContent = PROG.i + ' / ' + progTotal();
+      }).catch(function () { busy = false; $('progCard').classList.remove('on'); active.classList.remove('off'); progFailed(it.rel); setTimeout(progNext, 1500); });
+    };
+    if (active.readyState >= 3) go(); else { active.addEventListener('canplay', go, { once:true }); setTimeout(go, 6000); }
+  }, 1000);
+}
+
+function startVideo() {
+  if (PROG.on) { if (!PROG.cur || !active.getAttribute('src') || active.ended) progNext(); else { active.classList.remove('off'); active.play().catch(function () {}); } return; }
+  if (vi < 0) playNext(true); else { active.play().catch(function () {}); schedule(); }
+}
+function stopVideo() { if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; } progHideCard(); busy = false; try { active.pause(); } catch (e) {} }
 
 function playNext(first) {
+  if (PROG.on) { progNext(); return; }
   if (busy || !srv.videos.length) return;
   busy = true;
   vi = (vi + 1) % srv.videos.length;
@@ -889,7 +1798,7 @@ function schedule() {
 }
 [vA, vB].forEach(function (v) {
   v.addEventListener('ended', function () { if (v === active && !busy) playNext(false); });
-  v.addEventListener('error', function () { if (v === active && !busy) setTimeout(function () { playNext(false); }, 800); });
+  v.addEventListener('error', function () { if (v === active && !busy && !PROG.timer) setTimeout(function () { playNext(false); }, 800); });
 });
 [vA, vB].forEach(function (v) { v.style.transitionDuration = ((Number(DEF.crossfadeSec) || 3)) + 's'; });
 
@@ -1073,8 +1982,20 @@ setInterval(paintTicker, 60000);
 setInterval(paintBirthCard, 60000);
 
 pullConfig().then(function (ok) { if (!ok) hint('אין חיבור לענן — מוצגות ההגדרות האחרונות שנשמרו'); });
+bechLoad(); setInterval(bechLoad, 30 * 60000);
+siachPull(); setInterval(siachPull, 300000);
 setInterval(function () { pullConfig(); }, Math.max(15, Number(cfg.display.refreshSec) || 60) * 1000);
 setInterval(reportRuntime, 120000);
+// עדכון עצמי: גרסה חדשה של screen.html נטענת לבד תוך 2 דקות — אבל לא באמצע תוכנית ההפסקות
+var BOOT_VER = null;
+async function checkVersion() {
+  if (LOCAL === null) return;
+  try {
+    var v = (await (await fetch((LOCAL || '') + '/api/version', { cache:'no-store' })).json()).v;
+    if (BOOT_VER === null) BOOT_VER = v; else if (v !== BOOT_VER && !PROG.on) location.reload();
+  } catch (e) {}
+}
+checkVersion(); setInterval(checkVersion, 120000);
 
 fetchWeather(); fetchParasha(); fetchZmanim();
 setInterval(fetchWeather, 10 * 60000);
