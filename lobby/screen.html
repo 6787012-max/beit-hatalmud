@@ -1366,7 +1366,7 @@ function drawTick(now) {
 var PIN = (function () { try { var q = new URLSearchParams(location.search); return q.get('slide') === 'siach' ? { day: q.get('siachday') || '', i: Number(q.get('siachi')) || 0 } : null; } catch (e) { return null; } })();
 var SIACH = { items:[], i:0, pinned:false, timer:null, dur:0, enabled:true };
 var SB = { timer:null, at:-1 };                 // נשמר לתאימות עם כרטיס ההפסקה הישן
-var SIACH_CHUNK = 85, SIACH_MAX_AGE_DAYS = 2, SIACH_KICK = 'מתוך השיח של הרב וינברג';
+var SIACH_CHUNK = 85, SIACH_MAX_AGE_DAYS = 3, SIACH_KICK = 'מתוך השיח של הרב וינברג';
 var SIACH_TONES = ['solemn', 'uplifting', 'challenging'];
 var SI_ICONS = ['candle', 'target', 'book', 'mountain', 'path', 'sprout', 'flame', 'scale', 'key', 'compass', 'star', 'drop', 'bridge', 'ladder', 'shield', 'lamp', 'clock', 'seed'];
 var SI_DEFAULT_ICON = { solemn:'candle', uplifting:'sprout', challenging:'target' };
@@ -1408,9 +1408,15 @@ function siShowIcon(name) {
 function siachPull() {
   fetch('/api/siach', { cache:'no-store' }).then(function (r) { return r.json(); }).then(function (j) { SIACH.items = (j && j.items) || []; SIACH.enabled = !(j && j.enabled === false); }).catch(function () {});
 }
+// 08/11/2026 (יוסף): רק המסר של היום, ואם עוד אין — של יום השיח הקודם (עד 3 ימים אחורה, כדי שראשון יראה את שישי)
 function siachFresh(it, now) {
-  var d = Math.round((new Date(isoOf(now)).getTime() - new Date(it.date).getTime()) / 86400000);
-  return d >= 0 && d <= SIACH_MAX_AGE_DAYS;
+  var today = isoOf(now), best = '';
+  SIACH.items.forEach(function (x) {
+    if (x.hidden || !x.date || x.date > today) return;
+    var age = Math.round((new Date(today).getTime() - new Date(x.date).getTime()) / 86400000);
+    if (age <= SIACH_MAX_AGE_DAYS && x.date > best) best = x.date;
+  });
+  return !!best && it.date === best;
 }
 // הודעות לסבב: רשומה = הודעה אחת (v4 או ישנה), שאלת שולחן השבת תמיד אחרונה
 function siachPoints() {
@@ -1554,7 +1560,8 @@ function rotate(now, inLesson, left) {
   var pool = (d.slides || ['clock']).filter(function (n) { return slideHasContent(n, now); });
   // 28/10/2026: "חדש במסך" ו"בוחרים לצמוח" נכנסים לסבב תמיד (לא תלוי בהגדרות בפאנל); בשיעור — רק הבחירות, לסירוגין עם השעון
   ['fresh', 'bechirot', 'siach'].forEach(function (n) { if (pool.indexOf(n) < 0 && slideHasContent(n, now)) pool.push(n); });
-  if (inLesson && mode !== 'rotate') { pool = [mode === 'menu' ? 'menu' : (mode === 'agenda' ? 'agenda' : 'clock')]; if (bechActive(now)) pool.push('bechirot'); }
+  // 08/11/2026 (יוסף): מסר השיח מוצג גם בזמן השיעורים, במקום שבו היו הבחירות
+  if (inLesson && mode !== 'rotate') { pool = [mode === 'menu' ? 'menu' : (mode === 'agenda' ? 'agenda' : 'clock')]; if (bechActive(now)) pool.push('bechirot'); if (slideHasContent('siach', now)) pool.push('siach'); }
   // הספירה האחרונה חשובה מכל שקופית אחרת — היא נשארת על המסך עד המעבר
   if (left != null && left <= CD_WARN) pool = ['clock'];
   if (!pool.length) pool = ['clock'];
