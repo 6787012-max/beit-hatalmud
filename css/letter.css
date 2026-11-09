@@ -1,14 +1,23 @@
 /* מכתב להורים על נייר המכינה — ר' js/letter.js */
 @font-face{font-family:'LtFrank';src:url('../fonts/frank-medium.woff2') format('woff2');font-display:swap}
 
+/* בלי תמונות רקע: הנייר, הגל והכתובת וקטוריים (ר' ההערה ב-js/letter.js). הצבעים מהמקור. */
 .lt-paper{position:relative; max-width:794px; margin:0 auto; color:#111; direction:rtl; text-align:right;
-  background:#eef0ea url('../img/letterhead-mid.jpg') center/100% 100% no-repeat;
+  background:linear-gradient(135deg, #e1e5d7 0%, #f4f6ef 22%, #fafcf9 45%, #ffffff 62%, #eef0e6 82%, #c0c5a5 100%);
   box-shadow:0 2px 16px rgba(0,0,0,.2); overflow:hidden;
   font-family:David,'David CLM','LtFrank','Frank Ruhl Libre',serif;
   font-size:clamp(15px, 2.36vw, 18.7px); line-height:1.5}
-.lt-top,.lt-bot{display:block; width:100%; height:auto}
+.lt-head{position:relative; width:100%; aspect-ratio:794/222}
+.lt-wave{position:absolute; inset:0; width:100%; height:100%; display:block}
+.lt-logo{position:absolute; top:19.8%; left:50%; width:28.2%; height:auto; transform:translateX(-50%)}
+.lt-foot{border-top:4px solid #b4b080; background:linear-gradient(#e8ece2, #dde3d4); color:#09425d;
+  font-weight:700; text-align:center; font-size:.74em; padding:.55em 4% .7em; letter-spacing:.01em}
 /* הטקסט במכתב המקורי מתחיל קצת מעל תחתית הלוגו, ליד בס"ד */
-.lt-body{padding:0 clamp(16px, 11.9%, 94px) 18px; margin-top:-4%; position:relative}
+.lt-body{padding:0 clamp(16px, 11.9%, 94px) 18px; margin-top:-2.5%; position:relative}
+/* בורר הבן בקישור הכללי — בתוך שורת "אנו הורי הבחור" */
+.lt-pick{font:inherit; font-weight:700; color:#09425d; background:#fff; border:0; border-bottom:2px solid #09425d;
+  border-radius:0; padding:2px 4px; max-width:min(260px, 70vw)}
+.lt-pick.lt-err{border-bottom-color:#c0392b; background:#fdecea}
 .lt-p{margin:.22em 0}
 .lt-c{text-align:center}
 .lt-big{font-size:1.29em; font-weight:700; margin:.35em 0}
@@ -54,6 +63,7 @@ body.letter-mode .sign-logo, body.letter-mode .sign-inst{display:none}
     -webkit-print-color-adjust:exact; print-color-adjust:exact}
   .lt-paper:last-child{break-after:auto}
   .lt-body{flex:1; padding:0 25mm 2mm}
+  .lt-head, .lt-foot{flex:none}
   .lt-p{margin:.18em 0}
   .lt-gap{height:.35em}
   .lt-tear{margin:10px -3% 8px}

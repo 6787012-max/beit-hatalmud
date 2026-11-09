@@ -25,7 +25,8 @@
     let h = esc(s);
     // קווי מילוי לפני קו תחתון — אחרת "______" נקרא כ-__…__
     h = h.replace(/_{3,}/g, m => '<span class="lt-blank" style="min-width:' + (m.length * 0.42).toFixed(1) + 'em"></span>');
-    h = h.replace(/\{\{\s*student_name\s*\}\}/g, () => opts.name
+    // nameHTML = HTML מוכן מהקורא (בורר "בחרו את שם הבן" בקישור הכללי); name = טקסט
+    h = h.replace(/\{\{\s*student_name\s*\}\}/g, () => opts.nameHTML ? opts.nameHTML : opts.name
       ? '<span class="lt-name">' + esc(opts.name) + '</span>'
       : '<span class="lt-blank" style="min-width:7em"></span>');
     h = h.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/__(.+?)__/g, '<u>$1</u>');
@@ -67,13 +68,30 @@
     return out;
   }
 
+  // ── נייר המכתבים — וקטורי לגמרי. התמונה היחידה היא הלוגו (img/logo.png). ──
+  // קודם היו כאן שלוש תמונות JPG של הנייר, ונטפרי החליף את התחתונה בדרך (נבדק
+  // 09/11/2026: הגיע קובץ אחר בגודל אחר). הלוגו עבר שלם. לכן הגל, הקווים, הרקע
+  // והכתובת מצוירים בקוד — אין מה לחסום. הצבעים והמידות נדגמו מנייר המכתבים המקורי.
+  const WAVE = 'M0,127 C40,142 90,145 150,134 C210,123 300,112 397,116 C494,112 584,123 644,134 C704,145 754,142 794,127';
+  const HEAD_SVG =
+    '<svg class="lt-wave" viewBox="0 0 794 222" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<path d="M0,0 H794 V127 C754,142 704,145 644,134 C584,123 494,112 397,116 C300,112 210,123 150,134 C90,145 40,142 0,127 Z" fill="#09425b"/>' +
+    '<path d="' + WAVE + '" transform="translate(0,3)" fill="none" stroke="#b4b080" stroke-width="4"/>' +
+    '<path d="' + WAVE + '" transform="translate(0,7)" fill="none" stroke="#0a435c" stroke-width="4"/>' +
+    '<path d="' + WAVE + '" transform="translate(0,12)" fill="none" stroke="#9f7a0a" stroke-width="5"/>' +
+    '</svg>';
+  // המייל בתוך span בכיוון שמאל-לימין — בלי זה הוא מתהפך ל-"gmail.com@6787012"
+  const ADDRESS_HTML = esc('נהר הירדן 106 (פינת נחל רפאים), רמת בית שמש א\' | מייל: ') +
+    '<span dir="ltr">6787012@gmail.com</span>';
+
   // עוטף תוכן בדף נייר מכתבים. base = נתיב לתיקיית האתר (ברירת מחדל: יחסי).
   function paper(inner, base) {
     const b = base || '';
     return '<div class="lt-paper">' +
-      '<img class="lt-top" src="' + b + 'img/letterhead-top.jpg" alt="מכינה בית התלמוד">' +
+      '<div class="lt-head">' + HEAD_SVG +
+      '<img class="lt-logo" src="' + b + 'img/logo.png" alt="בית התלמוד — מכינה לצעירים, בית שמש"></div>' +
       '<div class="lt-body">' + inner + '</div>' +
-      '<img class="lt-bot" src="' + b + 'img/letterhead-bot.jpg" alt="">' +
+      '<div class="lt-foot">' + ADDRESS_HTML + '</div>' +
       '</div>';
   }
 

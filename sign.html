@@ -95,6 +95,12 @@
         // קישור כללי ציבורי — לפי קוד אקראי; נפתח רק אם הטופס פעיל ולא פג תוקף
         const { data } = await sb.rpc('get_public_form', { g_token: gtok });
         if (data && data[0]) form = { title: data[0].title, body: data[0].body, fields: parseFields(data[0].fields) };
+        // מכתב בקישור כללי: ההורה בוחר את הבן מרשימה, והחתימה נרשמת אצל אותו תלמיד
+        // (מעקב "מי חתם" במסך הטפסים, כמו בכל טופס). השמות נשלפים רק למכתב פתוח.
+        if (form && isLetterForm(form)) {
+          const st = await sb.rpc('get_public_form_students', { g_token: gtok });
+          pickList = (st && st.data) || [];
+        }
       }
       if (!form) {
         content.innerHTML = gtok
@@ -197,14 +203,24 @@
 
     // ── מצב מכתב: הדף נראה כמו המכתב המודפס, עם שם התלמיד בספח ──────────
     const L = window.cv3Letter;
-    let studentName = '';
+    let studentName = '', pickList = null;
     const isLetterForm = form => !!(L && form && L.isLetter(form.body));
+    // בורר הבן — מקובץ לפי שיעור; מי שכבר נחתם עבורו מסומן (הורה שני עדיין יכול לחתום)
+    function pickHTML() {
+      const groups = {};
+      (pickList || []).forEach(s => { (groups[s.cls || 'אחר'] = groups[s.cls || 'אחר'] || []).push(s); });
+      return '<select id="lt_pick" class="lt-pick" aria-label="שם הבן"><option value="">— בחרו את שם הבן —</option>' +
+        Object.keys(groups).map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(s =>
+          '<option value="' + esc(s.id) + '" data-name="' + esc(s.name) + '">' + esc(s.name) + (s.signed ? ' ✓ (כבר נחתם)' : '') + '</option>'
+        ).join('') + '</optgroup>').join('') + '</select>';
+    }
 
     function letterHTML(form, resp) {
       const fields = form.fields || [];
       const sigF = fields.filter(f => f.type === 'signature');
       const other = fields.filter(f => f.type !== 'signature');
-      const letter = L.render(form.body, { name: studentName });
+      const picking = !!(gtok && pickList && pickList.length && !(resp && resp.status === 'signed'));
+      const letter = L.render(form.body, picking ? { nameHTML: pickHTML() } : { name: studentName });
       if (resp && resp.status === 'signed') {
         const ans = resp.answers || {};
         const items = other.map(f => {
@@ -269,11 +285,18 @@
 
       const btn = document.getElementById('signBtn');
       btn.addEventListener('click', async () => {
+        // איסוף תשובות + ולידציה
+        const answers = {};
+        const pick = document.getElementById('lt_pick');
+        if (pick) {
+          if (!pick.value) { pick.classList.add('lt-err'); pick.scrollIntoView({ block: 'center' }); alert('נא לבחור את שם הבן'); return; }
+          pick.classList.remove('lt-err');
+          answers._student_id = Number(pick.value);
+          studentName = pick.options[pick.selectedIndex].getAttribute('data-name') || '';
+        }
         const name = document.getElementById('sname').value.trim();
         if (name.length < 2) { alert('נא להזין שם מלא'); return; }
 
-        // איסוף תשובות + ולידציה
-        const answers = {};
         let sigValue = '';
         for (const f of fields) {
           const el = document.getElementById('fld_' + f.key);
