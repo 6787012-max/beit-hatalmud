@@ -21,7 +21,18 @@
   const linkOf = m => pubBase() + '?g=' + m.public_token;
   const className = id => { const c = S.classes.find(x => x.id === id); return c ? c.name.split(' - ')[0] : ''; };
   const phoneOf = s => (s.parent_phone || (s.reg && s.reg['נייד אב']) || s.mother_phone || (s.reg && s.reg['נייד אם']) || '');
-  const stuName = id => { const s = S.students.find(x => x.id === id); return s ? s.name : ('#' + id); };
+  // שם מלא: name אם הוא כבר מסתיים בשם המשפחה, אחרת name + family (כמו asifa_full_name במסד)
+  const fullName = s => {
+    const n = String(s.name || '').trim(), f = String(s.family || '').trim();
+    if (!f || n.slice(-f.length) === f) return n;
+    return (n + ' ' + f).trim();
+  };
+  const stuName = id => { const s = S.students.find(x => x.id === id); return s ? fullName(s) : ('#' + id); };
+  // תגית להזמנה שנרשמה לפי שם (לא מאומתת)
+  const byNameTag = b => b.created_by === 'parent_name'
+    ? '<span class="as-vtag">נרשם לפי שם — לאמת</span><small>' + esc(b.parent_name || '') + (b.parent_name && b.parent_phone ? ' · ' : '') +
+      '<span style="direction:ltr;unicode-bidi:embed">' + esc(b.parent_phone || '') + '</span></small>'
+    : '';
   const stuOf = id => S.students.find(x => x.id === id);
 
   function dateHe(d) {
@@ -124,7 +135,8 @@
     }
     h += '<style>.as-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.as-tbl{width:100%;border-collapse:collapse;font-size:.9rem}' +
       '.as-tbl th,.as-tbl td{border:1px solid var(--line);padding:5px;vertical-align:middle}.as-board td.free{color:#9aa6b1;text-align:center}' +
-      '.as-board td.out{background:#eef1f4}.as-board td.bk{background:rgba(31,138,91,.10)}.as-board small{color:var(--muted);display:block}</style>';
+      '.as-board td.out{background:#eef1f4}.as-board td.bk{background:rgba(31,138,91,.10)}.as-board td.bk.byname{background:rgba(230,150,20,.16)}.as-board small{color:var(--muted);display:block}' +
+      '.as-vtag{display:inline-block;margin-top:2px;font-size:.72rem;font-weight:800;background:#f2a100;color:#fff;border-radius:10px;padding:1px 7px}</style>';
     page.innerHTML = h; wire(page);
   }
 
@@ -145,7 +157,8 @@
         const b = S.bookings.find(x => x.rav === r.name && x.slot_time === hm);
         if (b) {
           const s = stuOf(b.student_id);
-          h += '<td class="bk"><b>' + esc(stuName(b.student_id)) + '</b><small>' + esc(s ? phoneOf(s) : '') + (b.created_by === 'admin' ? ' · ידני' : '') + '</small>' +
+          h += '<td class="bk' + (b.created_by === 'parent_name' ? ' byname' : '') + '"><b>' + esc(stuName(b.student_id)) + '</b>' +
+            (b.created_by === 'parent_name' ? byNameTag(b) : '<small>' + esc(s ? phoneOf(s) : '') + (b.created_by === 'admin' ? ' · ידני' : '') + '</small>') +
             '<button class="btn-ghost xs" data-unbook="' + b.id + '"><i class="bi bi-x-lg"></i> בטל</button></td>';
         } else {
           h += '<td class="free"><button class="btn-ghost xs" data-add="' + esc(r.name) + '|' + hm + '"><i class="bi bi-plus"></i></button></td>';
@@ -162,7 +175,7 @@
       (r.classes || []).forEach(cid => {
         const miss = S.students.filter(s => s.class_id === cid && !S.bookings.some(b => b.student_id === s.id && b.rav === r.name));
         if (miss.length) rows.push('<div style="margin:6px 0"><b>' + esc(className(cid)) + ' · ' + esc(r.name) + '</b> (' + miss.length + ' חסרים)<br>' +
-          miss.map(s => esc(s.name) + ' <span style="direction:ltr;unicode-bidi:embed;color:var(--muted)">' + esc(phoneOf(s)) + '</span>').join('<br>') + '</div>');
+          miss.map(s => esc(fullName(s)) + ' <span style="direction:ltr;unicode-bidi:embed;color:var(--muted)">' + esc(phoneOf(s)) + '</span>').join('<br>') + '</div>');
       });
     });
     return '<div class="qr-card"><h3><i class="bi bi-person-exclamation"></i> עוד לא נרשמו</h3>' +
@@ -274,12 +287,14 @@
   function printAll(m) {
     const pageCss = '<style>@page{size:A4;margin:14mm}body{font-family:Heebo,Arial,sans-serif;direction:rtl}h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 10px;color:#555}' +
       'table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #444;padding:6px 8px;text-align:right}th{background:#eee}.pb{page-break-after:always}.ph{direction:ltr;unicode-bidi:embed}</style>';
+    const phoneShown = (b, s) => b.created_by === 'parent_name' ? (b.parent_phone || '') : (s ? phoneOf(s) : '');
+    const noteOf = b => b.created_by === 'parent_name' ? 'נרשם לפי שם — לאמת' + (b.parent_name ? ' · ' + b.parent_name : '') : '';
     const rows = (rav, withRav) => {
       const r = (m.rabbis || []).find(x => x.name === rav);
       let out = '';
       for (let t = hm2min(r.start); t + m.slot_minutes <= hm2min(r.end); t += m.slot_minutes) {
         const hm = min2hm(t), b = S.bookings.find(x => x.rav === rav && x.slot_time === hm), s = b ? stuOf(b.student_id) : null;
-        out += '<tr><td>' + hm + '</td><td>' + (withRav ? esc(rav) : '') + (b ? esc(stuName(b.student_id)) : '') + '</td><td>' + (s ? esc(className(s.class_id)) : '') + '</td><td class="ph">' + (s ? esc(phoneOf(s)) : '') + '</td><td></td></tr>';
+        out += '<tr><td>' + hm + '</td><td>' + (withRav ? esc(rav) : '') + (b ? esc(stuName(b.student_id)) : '') + '</td><td>' + (s ? esc(className(s.class_id)) : '') + '</td><td class="ph">' + (b ? esc(phoneShown(b, s)) : '') + '</td><td>' + (b ? esc(noteOf(b)) : '') + '</td></tr>';
       }
       return out;
     };
@@ -290,8 +305,8 @@
     });
     // דף מרוכז: כל התורים התפוסים, לפי שעה
     const all = S.bookings.slice().sort((a, b) => a.slot_time.localeCompare(b.slot_time) || a.rav.localeCompare(b.rav));
-    html += '<div><h1>דף מרוכז</h1><h2>' + esc(m.title) + ' · ' + esc(dateHe(m.date)) + '</h2><table><tr><th>שעה</th><th>רב</th><th>תלמיד</th><th>שיעור</th><th>טלפון הורה</th></tr>' +
-      all.map(b => { const s = stuOf(b.student_id); return '<tr><td>' + esc(b.slot_time) + '</td><td>' + esc(b.rav) + '</td><td>' + esc(stuName(b.student_id)) + '</td><td>' + (s ? esc(className(s.class_id)) : '') + '</td><td class="ph">' + (s ? esc(phoneOf(s)) : '') + '</td></tr>'; }).join('') +
+    html += '<div><h1>דף מרוכז</h1><h2>' + esc(m.title) + ' · ' + esc(dateHe(m.date)) + '</h2><table><tr><th>שעה</th><th>רב</th><th>תלמיד</th><th>שיעור</th><th>טלפון הורה</th><th>הערות</th></tr>' +
+      all.map(b => { const s = stuOf(b.student_id); return '<tr><td>' + esc(b.slot_time) + '</td><td>' + esc(b.rav) + '</td><td>' + esc(stuName(b.student_id)) + '</td><td>' + (s ? esc(className(s.class_id)) : '') + '</td><td class="ph">' + esc(phoneShown(b, s)) + '</td><td>' + esc(noteOf(b)) + '</td></tr>'; }).join('') +
       '</table></div></body></html>';
     const w = window.open('', '_blank');
     if (!w) { window.UI.toast('החלון נחסם — אפשרו חלונות קופצים', 'err'); return; }

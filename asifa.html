@@ -44,6 +44,11 @@
     .as-mine { font-size: 1.15rem; font-weight: 800; color: var(--ok); margin: 4px 0 8px; }
     .as-row { display: flex; gap: 8px; }
     .as-row .as-btn { margin-top: 6px; padding: 11px; font-size: 1rem; }
+    .as-alt { margin-top: 14px; padding: 12px; font-size: 1.02rem; line-height: 1.5; }
+    .as-pick { display: block; text-align: right; font-size: 1.15rem; padding: 13px 14px; margin-top: 8px; }
+    .as-inp.txt { direction: rtl; font-size: 1.2rem; }
+    .as-fld { margin-top: 12px; }
+    .as-opt { font-weight: 600; color: var(--muted); font-size: .95rem; }
   </style>
 </head>
 <body>
@@ -63,6 +68,7 @@
     ? window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY) : null;
 
   let meeting = null, phone = '', students = [], openPick = {}, done = null, busy = false;
+  let roster = null, nm = { cls: '', sid: null, sel: null, contact: '', pname: '' }, nmDone = null;
 
   function hm2min(t) { const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1]); }
   function min2hm(n) { return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); }
@@ -129,7 +135,8 @@
     root.innerHTML = head() +
       '<div class="as-card"><label class="as-lbl" for="ph">הכניסו את מספר הטלפון שרשום במכינה</label>' +
       '<input id="ph" class="as-inp" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" value="' + esc(phone) + '">' +
-      '<button class="as-btn" id="go">המשך</button><div class="as-msg" id="msg">' + esc(msg || '') + '</div></div>' +
+      '<button class="as-btn" id="go">המשך</button><div class="as-msg" id="msg">' + esc(msg || '') + '</div>' +
+      (meeting.open ? '<button class="as-btn ghost as-alt" id="byname">אין לי טלפון רשום במכינה / הטלפון לא מזוהה — בחירה לפי שם</button>' : '') + '</div>' +
       (meeting.open ? '' : '<div class="as-card"><div class="as-msg" style="color:var(--primary-dark)">ההרשמה סגורה כרגע.' +
         (meeting.contact_text ? '<br>' + esc(meeting.contact_text) : '') + '</div></div>');
     const inp = document.getElementById('ph');
@@ -145,6 +152,107 @@
     };
     document.getElementById('go').addEventListener('click', go);
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    const bn = document.getElementById('byname');
+    if (bn) bn.addEventListener('click', () => { nm = { cls: '', sid: null, sel: null, contact: '', pname: '' }; nmDone = null; viewName(); });
+  }
+
+  // ===== רישום לפי שם (למי שאין טלפון רשום או שהטלפון לא מזוהה) =====
+  async function viewName(msg) {
+    if (!roster) {
+      root.innerHTML = head() + '<div class="as-card"><div class="as-note">טוען רשימת תלמידים…</div></div>';
+      try {
+        const { data, error } = await sb.rpc('asifa_roster', { p_token: token });
+        if (error) throw error;
+        roster = data || [];
+      } catch (e) { viewPhone('שגיאה בחיבור, נסו שוב'); return; }
+    }
+    let html = head();
+    const back = '<button class="as-btn ghost" id="nm_phone">חזרה להזנת טלפון</button>';
+    if (nmDone) {
+      html += '<div class="as-card"><div class="as-ok"><i class="bi bi-check-circle-fill"></i><div class="big">הפגישה נקבעה בהצלחה</div></div>' +
+        '<div class="as-sum">' + esc(nmDone.full) + '<br>' + esc(nmDone.rav) + '<br>' + esc(dateText()) + '<br>בשעה ' + esc(nmDone.slot) +
+        '<br><span dir="ltr" style="unicode-bidi:embed">' + esc(nmDone.contact) + '</span></div>' +
+        '<div class="as-note" style="font-weight:700;color:var(--ink)">לשינוי או לביטול: ' + esc(meeting.contact_text || 'פנו למזכירות המכינה.') + '</div>' +
+        '<button class="as-btn ghost" id="nm_again">רישום נוסף</button></div>';
+      root.innerHTML = html;
+      document.getElementById('nm_again').addEventListener('click', () => { nmDone = null; nm = { cls: '', sid: null, sel: null, contact: '', pname: '' }; viewName(); });
+      return;
+    }
+    const classes = []; roster.forEach(x => { if (classes.indexOf(x.class_name) < 0) classes.push(x.class_name); });
+    if (!nm.cls) {
+      html += '<div class="as-card"><label class="as-lbl">בחירה לפי שם: באיזה שיעור לומד הבן?</label>' +
+        classes.map(c => '<button class="as-btn ghost as-pick" data-cls="' + esc(c) + '">' + esc(c) + '</button>').join('') +
+        '<div class="as-msg" id="msg">' + esc(msg || '') + '</div>' + back + '</div>';
+    } else if (!nm.sid) {
+      html += '<div class="as-card"><div class="as-cls">' + esc(nm.cls) + '</div><label class="as-lbl">בחרו את שם הבן:</label>' +
+        roster.filter(x => x.class_name === nm.cls).map(x => '<button class="as-btn ghost as-pick" data-sid="' + x.student_id + '">' + esc(x.full_name) + '</button>').join('') +
+        '<div class="as-msg" id="msg">' + esc(msg || '') + '</div>' +
+        '<button class="as-btn ghost" id="nm_cls">חזרה לבחירת שיעור</button></div>';
+    } else {
+      const st = roster.find(x => x.student_id === nm.sid) || { full_name: '', class_name: nm.cls };
+      html += '<div class="as-card"><div class="as-hello">שלום להורי ' + esc(st.full_name) + '</div><div class="as-cls">' + esc(st.class_name) + '</div>';
+      const rabs = (meeting.rabbis || []).filter(r => (r.class_names || []).indexOf(st.class_name) >= 0);
+      if (!rabs.length) html += '<div class="as-msg">לא נמצא רב לשיעור זה. פנו למזכירות המכינה.</div>';
+      rabs.forEach(r => {
+        html += '<div class="as-rav"><h3>' + esc(r.name) + (r.optional ? ' <span class="as-tag">פגישה נוספת, לבחירה</span>' : '') + '</h3>' +
+          '<div class="as-hint">בחרו שעה (תפוסות באפור):</div><div class="as-slots">';
+        const taken = (meeting.occupied && meeting.occupied[r.name]) || [];
+        slotsOf(r).forEach(t => {
+          const sel = nm.sel && nm.sel.rav === r.name && nm.sel.slot === t;
+          html += '<button class="as-slot' + (sel ? ' mine' : '') + '"' + (taken.indexOf(t) >= 0 ? ' disabled' : '') +
+            ' data-pick="' + esc(r.name) + '" data-slot="' + t + '">' + t + '</button>';
+        });
+        html += '</div></div>';
+      });
+      html += '<div class="as-msg" id="msg">' + esc(msg || '') + '</div><button class="as-btn ghost" id="nm_stu">חזרה לרשימת התלמידים</button></div>';
+      if (nm.sel) {
+        html += '<div class="as-card" id="nm_form"><div class="as-sum">' + esc(st.full_name) + '<br>' + esc(nm.sel.rav) + '<br>' + esc(dateText()) + '<br>בשעה ' + esc(nm.sel.slot) + '</div>' +
+          '<div class="as-fld"><label class="as-lbl" for="nm_ph">טלפון ליצירת קשר (חובה)</label>' +
+          '<input id="nm_ph" class="as-inp" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" value="' + esc(nm.contact) + '"></div>' +
+          '<div class="as-fld"><label class="as-lbl" for="nm_pn">שם ההורה <span class="as-opt">(לא חובה)</span></label>' +
+          '<input id="nm_pn" class="as-inp txt" type="text" autocomplete="name" value="' + esc(nm.pname) + '"></div>' +
+          '<div class="as-msg" id="msg2"></div><button class="as-btn" id="nm_go">אישור הפגישה</button></div>';
+      }
+    }
+    root.innerHTML = html;
+    const $ = id => document.getElementById(id);
+    if ($('nm_phone')) $('nm_phone').addEventListener('click', () => viewPhone());
+    root.querySelectorAll('[data-cls]').forEach(b => b.addEventListener('click', () => { nm.cls = b.dataset.cls; nm.sid = null; nm.sel = null; viewName(); }));
+    root.querySelectorAll('[data-sid]').forEach(b => b.addEventListener('click', () => { nm.sid = +b.dataset.sid; nm.sel = null; viewName(); }));
+    if ($('nm_cls')) $('nm_cls').addEventListener('click', () => { nm.cls = ''; nm.sid = null; nm.sel = null; viewName(); });
+    if ($('nm_stu')) $('nm_stu').addEventListener('click', () => { nm.sid = null; nm.sel = null; viewName(); });
+    root.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async () => {
+      nm.sel = { rav: b.dataset.pick, slot: b.dataset.slot }; await viewName();
+      const f = document.getElementById('nm_form'); if (f) f.scrollIntoView({ block: 'center' });
+    }));
+    if ($('nm_ph')) {
+      $('nm_ph').addEventListener('input', e => { nm.contact = e.target.value; });
+      $('nm_pn').addEventListener('input', e => { nm.pname = e.target.value; });
+      $('nm_go').addEventListener('click', bookByName);
+    }
+  }
+  async function bookByName() {
+    if (busy || !nm.sel) return;
+    const m2 = document.getElementById('msg2');
+    const v = (nm.contact || '').trim();
+    if (v.replace(/\D/g, '').length < 9) { m2.textContent = 'נא להזין טלפון ליצירת קשר (לפחות 9 ספרות)'; return; }
+    busy = true; document.getElementById('nm_go').disabled = true;
+    const st = roster.find(x => x.student_id === nm.sid);
+    try {
+      const { error } = await sb.rpc('asifa_book_by_name', { p_token: token, p_student_id: nm.sid, p_rav: nm.sel.rav,
+        p_slot: nm.sel.slot, p_contact_phone: v, p_parent_name: (nm.pname || '').trim() || null });
+      meeting = await loadMeeting() || meeting;
+      if (error) {
+        const txt = error.message || 'שגיאה, נסו שוב';
+        const t = (meeting.occupied && meeting.occupied[nm.sel.rav]) || [];
+        if (t.indexOf(nm.sel.slot) >= 0) nm.sel = null;
+        await viewName(txt); const mm = document.getElementById('msg'); if (mm) mm.scrollIntoView({ block: 'center' });
+        return;
+      }
+      nmDone = { full: st ? st.full_name : '', rav: nm.sel.rav, slot: nm.sel.slot, contact: v };
+      nm.sel = null; nm.contact = ''; nm.pname = '';
+      await viewName();
+    } catch (e) { await viewName('שגיאה בחיבור, נסו שוב'); } finally { busy = false; }
   }
 
   function viewMain() {
@@ -159,7 +267,7 @@
       return;
     }
     students.forEach(s => {
-      html += '<div class="as-card"><div class="as-hello">שלום להורי ' + esc(s.first_name) + '</div>' +
+      html += '<div class="as-card"><div class="as-hello">שלום להורי ' + esc(s.full_name || s.first_name) + '</div>' +
         '<div class="as-cls">' + esc(s.class_name) + '</div>';
       if (!meeting.open) html += '<div class="as-msg" style="color:var(--primary-dark)">ההרשמה סגורה כרגע.' + (meeting.contact_text ? '<br>' + esc(meeting.contact_text) : '') + '</div>';
       s.rabbis.forEach(rb => {
@@ -207,7 +315,7 @@
       if (error) { await refresh().catch(() => {}); viewMain(); say(error.message || 'שגיאה, נסו שוב'); return; }
       await refresh();
       openPick = {};
-      done = { first: st ? st.first_name : '', rav: rav, slot: slot };
+      done = { first: st ? (st.full_name || st.first_name) : '', rav: rav, slot: slot };
       viewMain();
     } catch (e) { say('שגיאה בחיבור, נסו שוב'); } finally { busy = false; }
   }
@@ -220,7 +328,7 @@
       if (error) { say(error.message || 'שגיאה'); return; }
       const st = students.find(x => x.student_id === sid);
       await refresh();
-      done = { cancelled: true, first: st ? st.first_name : '' };
+      done = { cancelled: true, first: st ? (st.full_name || st.first_name) : '' };
       viewMain();
     } catch (e) { say('שגיאה בחיבור, נסו שוב'); } finally { busy = false; }
   }
