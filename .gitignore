@@ -44,3 +44,5 @@ _qa_*.xlsx
 
 # הזרעת שכר — שמות + סכומי משכורת אמיתיים, אסור לריפו ציבורי
 supabase/seed_staff_salary.sql
+lobby/evening_mode.log
+lobby/evening_mode_backup_*.json
