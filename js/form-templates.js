@@ -160,6 +160,8 @@
   // פסקאות. הכל עובר escape — אין הזרקת HTML מתוכן הטופס.
   function fmtBody(t) {
     if (!t) return '';
+    // טופס-מכתב ([מכתב] בשורה הראשונה) — מוצג על נייר המכינה, ר' js/letter.js
+    if (window.cv3Letter && window.cv3Letter.isLetter(t)) return window.cv3Letter.paper(window.cv3Letter.render(t, {}));
     const e2 = x => String(x == null ? '' : x).replace(/[&<>"]/g,
       c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     let out = '', list = [];

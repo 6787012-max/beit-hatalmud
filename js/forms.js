@@ -392,6 +392,7 @@
     }
     function viewSigned(f, r) {
       if (!r) return;
+      if (isLetterForm(f)) { viewSignedLetter(f, r); return; }
       const m = window.UI.modal({
         title: 'צפייה בטופס החתום',
         bodyHTML: '<div id="sigView">' + signedBlockHTML(f, r) + '</div>' +
@@ -399,6 +400,55 @@
       });
       const pb = m.el.querySelector('[data-print]');
       if (pb) pb.addEventListener('click', () => printHTML(esc(f.title), '<h2>' + esc(f.title) + '</h2>' + (f.body ? window.cv3FormTemplates.fmtBody(f.body) : '') + signedBlockHTML(f, r)));
+    }
+
+    // ---------- טופס-מכתב: המכתב החתום כמו נייר שההורה חתם עליו ביד ----------
+    // נייר המכינה, שם התלמיד בספח, שם ההורה, החתימה ותאריך — ר' js/letter.js
+    const isLetterForm = f => !!(window.cv3Letter && f && window.cv3Letter.isLetter(f.body));
+    function signedLetterHTML(f, r) {
+      const L = window.cv3Letter;
+      const fields = parseFields(f);
+      const ans = parseAnswers(r);
+      const sigF = fields.find(fl => fl.type === 'signature');
+      const items = fields.filter(fl => fl.type !== 'signature').map(fl => {
+        let v = ans[fl.key];
+        if (fl.type === 'checkbox') v = (v === true || v === 'true' || v === 'כן') ? 'כן' : 'לא';
+        return [fl.label, v];
+      });
+      return L.paper(L.render(f.body, { name: nameOf(r.student_id) }) + L.signedSlip({
+        items: items, signer: r.signer_name, sigLabel: sigF ? sigF.label : 'חתימת הורים',
+        sigHTML: signatureImg(r), date: r.signed_at }));
+    }
+    function viewSignedLetter(f, r) {
+      const m = window.UI.modal({
+        title: 'המכתב החתום — ' + esc(nameOf(r.student_id)),
+        bodyHTML: '<div id="sigView">' + signedLetterHTML(f, r) + '</div>' +
+          '<div class="det-actions" style="margin-top:14px">' +
+          '<button class="btn-ghost sm" data-print><i class="bi bi-printer"></i> הדפסה</button> ' +
+          (window.cv3Pdf ? window.cv3Pdf.button('ltPdf', 'הורד PDF') : '') + '</div>',
+      });
+      if (m.el) { m.el.style.maxWidth = '860px'; m.el.style.width = '96vw'; }
+      const pb = m.el.querySelector('[data-print]');
+      if (pb) pb.addEventListener('click', () => printLetters(esc(f.title) + ' — ' + esc(nameOf(r.student_id)), [r], f));
+      if (window.cv3Pdf) window.cv3Pdf.wire(m.el.querySelector('#ltPdf'), () => m.el.querySelector('.lt-paper'),
+        () => f.title + ' - ' + nameOf(r.student_id), { margin: 0 });
+    }
+    // כל מכתב חתום = עמוד A4 משלו, בדיוק כמו הטופס המודפס
+    function printLetters(title, rs, f) {
+      const w = window.open('', '_blank');
+      if (!w) { window.UI.toast('חלון ההדפסה נחסם', 'err'); return; }
+      const base = location.href.replace(/[^/]*$/, '');
+      w.document.write('<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>' + title + '</title>' +
+        '<base href="' + esc(base) + '"><link rel="stylesheet" href="css/letter.css">' +
+        '<style>@page{size:A4;margin:0}body{margin:0;background:#888}</style>' +
+        '</head><body class="lt-print">' + rs.map(r => signedLetterHTML(f, r)).join('') + '</body></html>');
+      w.document.close();
+      w.focus();
+      // מחכים לנייר המכתבים ולגופן — אחרת העמוד הראשון יוצא בלי הרקע
+      const go = () => setTimeout(() => { try { w.print(); } catch (_) {} }, 250);
+      const imgs = Array.from(w.document.images);
+      Promise.all(imgs.map(i => i.complete ? 1 : new Promise(res => { i.onload = i.onerror = res; })))
+        .then(() => (w.document.fonts && w.document.fonts.ready) || 1).then(go, go);
     }
 
     // ---------- הדפסה ----------
@@ -420,6 +470,7 @@
     function printAll(f) {
       const rs = respOf(f.id).filter(r => r.status === 'signed');
       if (!rs.length) { window.UI.toast('אין חתומים להדפסה', 'err'); return; }
+      if (isLetterForm(f)) { printLetters(esc(f.title), rs, f); return; }
       const inner = '<h2>' + esc(f.title) + '</h2>' + (f.body ? window.cv3FormTemplates.fmtBody(f.body) : '') +
         '<p style="color:#666">סה"כ ' + rs.length + ' חתומים</p>' +
         rs.map(r => '<div class="rec">' + signedBlockHTML(f, r) + '</div>').join('');

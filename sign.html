@@ -6,8 +6,10 @@
   <title>חתימת אישור — מכינה בית התלמוד</title>
   <link rel="stylesheet" href="vendor/bootstrap-icons.css">
   <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/letter.css">
   <script src="vendor/supabase.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/letter.js"></script>
 </head>
 <body>
   <div class="sign-wrap">
@@ -79,8 +81,11 @@
       // גישה מאובטחת דרך RPC (SECURITY DEFINER) — לפי טוקן אישי, או לפי מזהה טופס לקישור כללי.
       let form = null, resp = null;
       if (token) {
-        // קישור אישי לתלמיד — לפי טוקן חד-פעמי
+        // קישור אישי לתלמיד — לפי טוקן חד-פעמי. שם התלמיד נשלף בנפרד, לספח של מכתב
+        // (get_signing_student; אם הפונקציה חסרה — הספח נשאר עם קו ריק, לא נשבר).
+        const nameP = sb.rpc('get_signing_student', { p_token: token }).then(r => r.data || '', () => '');
         const { data } = await sb.rpc('get_signing', { p_token: token });
+        studentName = await nameP;
         if (data && data[0]) {
           const d = data[0];
           form = { title: d.title, body: d.body, fields: parseFields(d.fields) };
@@ -190,9 +195,44 @@
       return '<label class="fld fld-wide"><span>' + esc(fld.label) + req + '</span>' + inner + '</label>';
     }
 
+    // ── מצב מכתב: הדף נראה כמו המכתב המודפס, עם שם התלמיד בספח ──────────
+    const L = window.cv3Letter;
+    let studentName = '';
+    const isLetterForm = form => !!(L && form && L.isLetter(form.body));
+
+    function letterHTML(form, resp) {
+      const fields = form.fields || [];
+      const sigF = fields.filter(f => f.type === 'signature');
+      const other = fields.filter(f => f.type !== 'signature');
+      const letter = L.render(form.body, { name: studentName });
+      if (resp && resp.status === 'signed') {
+        const ans = resp.answers || {};
+        const items = other.map(f => {
+          let v = ans[f.key];
+          if (f.type === 'checkbox') v = (v === true || v === 'true' || v === 'כן') ? 'כן' : 'לא';
+          return [f.label, v];
+        });
+        return L.paper(letter + L.signedSlip({
+          items: items, signer: resp.signer_name, sigLabel: sigF[0] ? sigF[0].label : 'חתימת הורים',
+          sigHTML: sigHTML(resp.signature), date: resp.signed_at })) +
+          '<div class="sign-done lt-thanks"><i class="bi bi-check2-circle"></i><div>החתימה התקבלה. תודה רבה!</div></div>';
+      }
+      return L.paper(letter +
+        '<div class="lt-slip">' + other.map(fieldInputHTML).join('') +
+        '<label class="lt-field"><span>שם ההורה החותם:</span><input class="inp" id="sname" placeholder="שם מלא" autocomplete="name"></label>' +
+        sigF.map(f => '<div class="lt-field lt-sigf"><span>' + esc(f.label) + ':' + (f.required ? ' <span style="color:#c0392b">*</span>' : '') + '</span>' +
+          '<canvas id="fld_' + esc(f.key) + '" class="sign-canvas lt-canvas"></canvas>' +
+          '<button type="button" class="btn-ghost sm" data-clear="fld_' + esc(f.key) + '"><i class="bi bi-eraser"></i> נקה</button></div>').join('') +
+        '</div>') +
+        '<button class="btn-primary lt-btn" id="signBtn"><i class="bi bi-pencil-square"></i> אני מאשר/ת וחותם/ת</button>';
+    }
+
     function render(form, resp) {
       const signed = resp && resp.status === 'signed';
       const fields = (form.fields && form.fields.length) ? form.fields : [];
+      const letterMode = isLetterForm(form);
+      if (letterMode) document.body.classList.add('letter-mode');
+      if (signed && letterMode) { content.innerHTML = letterHTML(form, resp); return; }
       if (signed) {
         const ans = resp.answers || {};
         const ansHTML = fields.filter(f => f.type !== 'signature').map(f => {
@@ -213,7 +253,7 @@
         return;
       }
 
-      content.innerHTML =
+      content.innerHTML = letterMode ? letterHTML(form, null) :
         '<h2>' + esc(form.title) + '</h2>' +
         (form.body ? fmtBody(form.body) : '') +
         '<label class="fld fld-wide"><span>שם החותם (הורה) *</span><input class="inp" id="sname" placeholder="שם מלא"></label>' +

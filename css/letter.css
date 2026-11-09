@@ -1,0 +1,65 @@
+/* מכתב להורים על נייר המכינה — ר' js/letter.js */
+@font-face{font-family:'LtFrank';src:url('../fonts/frank-medium.woff2') format('woff2');font-display:swap}
+
+.lt-paper{position:relative; max-width:794px; margin:0 auto; color:#111; direction:rtl; text-align:right;
+  background:#eef0ea url('../img/letterhead-mid.jpg') center/100% 100% no-repeat;
+  box-shadow:0 2px 16px rgba(0,0,0,.2); overflow:hidden;
+  font-family:David,'David CLM','LtFrank','Frank Ruhl Libre',serif;
+  font-size:clamp(15px, 2.36vw, 18.7px); line-height:1.5}
+.lt-top,.lt-bot{display:block; width:100%; height:auto}
+/* הטקסט במכתב המקורי מתחיל קצת מעל תחתית הלוגו, ליד בס"ד */
+.lt-body{padding:0 clamp(16px, 11.9%, 94px) 18px; margin-top:-4%; position:relative}
+.lt-p{margin:.22em 0}
+.lt-c{text-align:center}
+.lt-big{font-size:1.29em; font-weight:700; margin:.35em 0}
+.lt-gap{height:.55em}
+.lt-ul{margin:.15em 0; padding:0 1.5em 0 0}
+.lt-li{margin:.12em 0}
+.lt-cols{display:flex; gap:6%; margin:.2em 0}
+.lt-col{flex:1; min-width:0}
+.lt-tear{border-top:1.5px solid #222; margin:16px -3% 12px}
+.lt-blank{display:inline-block; border-bottom:1px solid #222; height:1em; vertical-align:baseline}
+.lt-name{font-weight:700; border-bottom:1px solid #222; padding:0 .45em}
+
+/* ספח החתימה בתוך הדף */
+.lt-slip{margin-top:.4em; text-align:center}
+.lt-field{display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin:.45em 0}
+.lt-field>span{white-space:nowrap}
+.lt-paper .inp{background:#fff; color:#111; border:0; border-bottom:1.5px solid #222; border-radius:0;
+  font:inherit; padding:2px 6px; width:min(260px, 70%); text-align:center}
+.lt-sigf{flex-direction:column}
+.lt-canvas{width:min(340px, 100%); height:140px; border:1.5px dashed #888; border-radius:8px;
+  background:#fff; touch-action:none; display:block}
+.lt-sig svg{width:min(260px, 80%); height:auto; background:transparent !important; border:0 !important}
+.lt-stamp{display:inline-flex; align-items:center; gap:6px; color:#1e7a46; font-weight:700; font-size:.85em;
+  border:1.5px solid #1e7a46; border-radius:8px; padding:2px 10px; margin-top:.3em}
+.lt-paper .btn-ghost{color:#333}
+
+/* דף החתימה במצב מכתב: בלי כרטיס ולוגו — המכתב עצמו הוא הדף */
+body.letter-mode .sign-wrap{padding:12px 0 24px}
+body.letter-mode .sign-card{max-width:820px; background:none; border:0; box-shadow:none; padding:0 8px}
+body.letter-mode .sign-logo, body.letter-mode .sign-inst{display:none}
+.lt-btn{display:flex; align-items:center; justify-content:center; gap:8px; width:min(794px, 100%);
+  margin:14px auto 0; font-size:1.08rem; padding:12px}
+.lt-thanks{max-width:794px; margin:12px auto 0}
+
+/* חלון ההדפסה של מסך הטפסים — כל מכתב עמוד */
+.lt-print .lt-paper{margin:14px auto}
+
+@media print{
+  body.letter-mode .sign-wrap{padding:0}
+  /* מרווח שורות כמו בוורד (David 14pt, רווח יחיד) — אחרת המכתב גולש לעמוד שני */
+  .lt-paper{box-shadow:none; max-width:none; width:210mm; min-height:296mm; margin:0 !important;
+    display:flex; flex-direction:column; font-size:14pt; line-height:1.28; break-after:page;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact}
+  .lt-paper:last-child{break-after:auto}
+  .lt-body{flex:1; padding:0 25mm 2mm}
+  .lt-p{margin:.18em 0}
+  .lt-gap{height:.35em}
+  .lt-tear{margin:10px -3% 8px}
+  .lt-slip .lt-field{margin:.15em 0}
+  .lt-sigf{flex-direction:row}
+  .lt-sig svg, .lt-sig img{width:42mm !important; max-width:42mm !important}
+  .lt-stamp{font-size:10pt; margin-top:0}
+  .lt-btn, .lt-paper .btn-ghost, .lt-thanks{display:none}
+}
