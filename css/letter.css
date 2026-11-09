@@ -18,6 +18,10 @@
 .lt-pick{font:inherit; font-weight:700; color:#09425d; background:#fff; border:0; border-bottom:2px solid #09425d;
   border-radius:0; padding:2px 4px; max-width:min(260px, 70vw)}
 .lt-pick.lt-err{border-bottom-color:#c0392b; background:#fdecea}
+/* פתיחה אישית בקישור הכללי: מתחלפת כשההורה בוחר את הבן */
+.lt-ifname{display:none}
+.lt-named .lt-ifname{display:block}
+.lt-named .lt-ifnoname{display:none}
 .lt-p{margin:.22em 0}
 .lt-c{text-align:center}
 .lt-big{font-size:1.29em; font-weight:700; margin:.35em 0}

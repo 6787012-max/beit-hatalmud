@@ -276,6 +276,18 @@
         fields.map(fieldInputHTML).join('') +
         '<button class="btn-primary" id="signBtn" style="width:100%;margin-top:8px"><i class="bi bi-pencil-square"></i> אני מאשר/ת וחותם/ת</button>';
 
+      // בחירת הבן בקישור הכללי — הפתיחה הופכת ל"לכבוד הורי הבחור <שם> נ"י"
+      const pk = document.getElementById('lt_pick');
+      if (pk) pk.addEventListener('change', () => {
+        const nm = pk.value ? (pk.options[pk.selectedIndex].getAttribute('data-name') || '') : '';
+        const pp = pk.closest('.lt-paper');
+        if (pp) {
+          pp.classList.toggle('lt-named', !!nm);
+          pp.querySelectorAll('.lt-live-name').forEach(e => { e.textContent = nm; });
+        }
+        pk.classList.remove('lt-err');
+      });
+
       // הפעלת קנבסים
       const canvases = {};
       fields.forEach(f => { if (f.type === 'signature') { const el = document.getElementById('fld_' + f.key); if (el) canvases[f.key] = setupCanvas(el); } });

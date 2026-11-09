@@ -10,6 +10,7 @@
 //   [[2]] … [[|]] … [[/2]]   שתי עמודות (רשימות "יש להביא" / "אין להביא")
 //   ---          קו הספח          ___ (3+)   קו ריק למילוי
 //   {{student_name}}          שם התלמיד (בקישור האישי של כל הורה)
+//   ?שורה        רק כששם התלמיד ידוע   ~שורה      רק כשלא ידוע (פתיחה אישית/כללית)
 //   שורה ריקה    רווח
 (function () {
   const MARK = '[מכתב]';
@@ -53,16 +54,30 @@
       if (t === '[[/2]]') { flushUl(); closeCols(); return; }
       if (!t) { flushUl(); emit('<div class="lt-gap"></div>'); return; }
       if (t === '---') { flushUl(); emit('<div class="lt-tear"></div>'); return; }
-      let x = t;
+      let x = t, cond = '';
       const cls = [];
-      while (/^[\^!]/.test(x)) { cls.push(x.charAt(0) === '^' ? 'lt-c' : 'lt-big'); x = x.slice(1).trim(); }
+      while (/^[\^!?~]/.test(x)) {
+        const ch = x.charAt(0);
+        if (ch === '^') cls.push('lt-c'); else if (ch === '!') cls.push('lt-big'); else cond = ch;
+        x = x.slice(1).trim();
+      }
+      // ?שורה = רק כשידוע שם התלמיד ("לכבוד הורי הבחור X נ"י"), ~שורה = רק כשלא ידוע.
+      // בקישור הכללי (בורר) שתיהן נכתבות, והבחירה מחליפה ביניהן (lt-named ב-sign.html).
+      let o = opts;
+      if (cond === '?') {
+        if (opts.nameHTML) { cls.push('lt-ifname'); o = { nameHTML: '<span class="lt-name lt-live-name"></span>' }; }
+        else if (!opts.name) return;
+      } else if (cond === '~') {
+        if (opts.nameHTML) cls.push('lt-ifnoname');
+        else if (opts.name) return;
+      }
       const c = cls.length ? ' ' + cls.join(' ') : '';
       if (/^[•·]/.test(x)) {
-        ul = (ul || '') + '<li class="lt-li' + c + '">' + inline(x.replace(/^[•·]\s*/, ''), opts) + '</li>';
+        ul = (ul || '') + '<li class="lt-li' + c + '">' + inline(x.replace(/^[•·]\s*/, ''), o) + '</li>';
         return;
       }
       flushUl();
-      emit('<p class="lt-p' + c + '">' + inline(x, opts) + '</p>');
+      emit('<p class="lt-p' + c + '">' + inline(x, o) + '</p>');
     });
     flushUl(); closeCols();
     return out;
