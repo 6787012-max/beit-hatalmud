@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>רישום לאסיפת הורים — מכינה בית התלמוד</title>
+  <link rel="stylesheet" href="vendor/bootstrap-icons.css">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <style>
+    body { background: var(--bg); }
+    .as-wrap { max-width: 560px; margin: 0 auto; padding: 14px 12px 40px; }
+    .as-head { text-align: center; padding: 10px 0 6px; }
+    .as-head img { width: 64px; height: 64px; object-fit: contain; background: #fff; border-radius: 16px; padding: 5px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+    .as-inst { color: var(--muted); font-weight: 700; margin-top: 6px; }
+    .as-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 16px; margin-top: 14px; }
+    .as-card h1 { font-size: 1.5rem; color: var(--primary-dark); font-weight: 800; text-align: center; margin: 0 0 6px; }
+    .as-when { text-align: center; font-size: 1.15rem; font-weight: 700; color: var(--accent); line-height: 1.5; }
+    .as-note { text-align: center; color: var(--muted); font-size: 1rem; line-height: 1.6; margin-top: 8px; }
+    .as-lbl { display: block; font-weight: 800; font-size: 1.1rem; color: var(--primary-dark); margin: 6px 0 8px; }
+    .as-inp { width: 100%; font-size: 1.4rem; padding: 14px; border: 2px solid var(--line); border-radius: 12px; direction: ltr; text-align: center; font-family: inherit; background: var(--card); color: var(--ink); }
+    .as-inp:focus { outline: none; border-color: var(--accent); }
+    .as-btn { width: 100%; margin-top: 12px; padding: 15px; font-size: 1.2rem; font-weight: 800; border: none; border-radius: 12px; background: var(--primary-dark); color: #fff; cursor: pointer; font-family: inherit; }
+    .as-btn.ghost { background: var(--card); color: var(--primary-dark); border: 2px solid var(--line); }
+    .as-btn.danger { background: var(--card); color: var(--danger); border: 2px solid var(--danger); }
+    .as-btn:disabled { opacity: .55; }
+    .as-msg { margin-top: 12px; text-align: center; font-size: 1.05rem; font-weight: 700; color: var(--danger); min-height: 1.2em; line-height: 1.5; }
+    .as-hello { font-size: 1.3rem; font-weight: 800; color: var(--primary-dark); text-align: center; }
+    .as-cls { text-align: center; color: var(--accent); font-weight: 800; font-size: 1.05rem; margin-bottom: 6px; }
+    .as-rav { border: 2px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 12px; }
+    .as-rav.done { border-color: var(--ok); background: rgba(31,138,91,.06); }
+    .as-rav h3 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 800; color: var(--primary-dark); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .as-tag { font-size: .8rem; font-weight: 800; background: var(--accent-soft); color: var(--accent); border-radius: 20px; padding: 2px 10px; }
+    .as-hint { color: var(--muted); font-size: .95rem; margin: 2px 0 10px; }
+    .as-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .as-slot { padding: 14px 0; font-size: 1.2rem; font-weight: 800; border: 2px solid var(--primary-light); border-radius: 12px; background: var(--card); color: var(--primary-dark); cursor: pointer; font-family: inherit; }
+    .as-slot:disabled { background: #e9edf1; color: #9aa6b1; border-color: #e9edf1; cursor: not-allowed; text-decoration: line-through; }
+    .as-slot.mine { background: var(--ok); color: #fff; border-color: var(--ok); }
+    .as-ok { text-align: center; padding: 6px 0; }
+    .as-ok i { font-size: 3rem; color: var(--ok); }
+    .as-ok .big { font-size: 1.5rem; font-weight: 800; color: var(--primary-dark); margin: 6px 0; }
+    .as-sum { background: var(--accent-soft); border-radius: 12px; padding: 12px; margin: 10px 0; font-size: 1.15rem; line-height: 1.9; text-align: center; font-weight: 700; color: var(--ink); }
+    .as-mine { font-size: 1.15rem; font-weight: 800; color: var(--ok); margin: 4px 0 8px; }
+    .as-row { display: flex; gap: 8px; }
+    .as-row .as-btn { margin-top: 6px; padding: 11px; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="as-wrap">
+    <div class="as-head"><img src="img/logo.png" alt="לוגו"><div class="as-inst" id="inst"></div></div>
+    <div id="root"><div class="as-card"><div class="as-note">טוען…</div></div></div>
+  </div>
+<script>
+(function () {
+  'use strict';
+  const C = window.CV3 || {};
+  const root = document.getElementById('root');
+  document.getElementById('inst').textContent = C.INSTANCE_NAME || '';
+  const token = new URLSearchParams(location.search).get('g');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sb = (C.SUPABASE_URL && C.SUPABASE_ANON_KEY && window.supabase)
+    ? window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY) : null;
+
+  let meeting = null, phone = '', students = [], openPick = {}, done = null, busy = false;
+
+  function hm2min(t) { const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1]); }
+  function min2hm(n) { return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); }
+  function slotsOf(r) {
+    const out = []; const st = hm2min(r.start), en = hm2min(r.end), d = meeting.slot_minutes;
+    for (let t = st; t + d <= en; t += d) out.push(min2hm(t));
+    return out;
+  }
+  // העתק של UI.gematria/UI.hebDate מ-js/ui.js (הדף הזה לא טוען את ui.js).
+  // Intl מחזיר יום ושנה בספרות ("8 בכסלו 5787"), ולכן ממירים לאותיות: "ח׳ בכסלו תשפ״ז".
+  function gematria(n) {
+    const H = [[400, 'ת'], [300, 'ש'], [200, 'ר'], [100, 'ק'], [90, 'צ'], [80, 'פ'], [70, 'ע'],
+      [60, 'ס'], [50, 'נ'], [40, 'מ'], [30, 'ל'], [20, 'כ'], [10, 'י'], [9, 'ט'], [8, 'ח'],
+      [7, 'ז'], [6, 'ו'], [5, 'ה'], [4, 'ד'], [3, 'ג'], [2, 'ב'], [1, 'א']];
+    n = Number(n) % 1000;
+    if (n === 15) return 'ט״ו';
+    if (n === 16) return 'ט״ז';
+    let out = '';
+    for (const [v, ch] of H) while (n >= v) { out += ch; n -= v; }
+    if (!out) return '';
+    return out.length > 1 ? out.slice(0, -1) + '״' + out.slice(-1) : out + '׳';
+  }
+  function hebDateTxt(d) {
+    try {
+      const parts = new Intl.DateTimeFormat('he-u-ca-hebrew',
+        { day: 'numeric', month: 'long', year: 'numeric' }).formatToParts(d);
+      const get = t => (parts.find(p => p.type === t) || {}).value || '';
+      let month = get('month');
+      if (month && month.charAt(0) !== 'ב') month = 'ב' + month;
+      return gematria(parseInt(get('day'), 10)) + ' ' + month + ' ' +
+        gematria(parseInt(String(get('year')).replace(/\D/g, ''), 10));
+    } catch (_) { return ''; }
+  }
+  function dateText() {
+    try {
+      const d = new Date(meeting.date + 'T12:00:00');
+      const g = d.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const h = hebDateTxt(d);
+      return g + (h ? ' · ' + h : '');
+    } catch (_) { return meeting.date; }
+  }
+  function firstStart() {
+    const s = (meeting.rabbis || []).map(r => r.start).filter(Boolean).sort();
+    return s[0] || '';
+  }
+  function head() {
+    return '<div class="as-card"><h1>' + esc(meeting.title) + '</h1>' +
+      '<div class="as-when">' + esc(dateText()) + (firstStart() ? '<br>החל משעה ' + esc(firstStart()) : '') + '</div>' +
+      '<div class="as-note">לכל הורה פגישה של ' + meeting.slot_minutes + ' דקות. מי שנרשם קודם בוחר קודם.</div></div>';
+  }
+
+  async function loadMeeting() {
+    const { data, error } = await sb.rpc('asifa_public', { p_token: token });
+    if (error || !data) return null;
+    return data;
+  }
+  async function loadStudents() {
+    const { data, error } = await sb.rpc('asifa_lookup', { p_token: token, p_phone: phone });
+    if (error) throw error;
+    return data || [];
+  }
+
+  function viewPhone(msg) {
+    root.innerHTML = head() +
+      '<div class="as-card"><label class="as-lbl" for="ph">הכניסו את מספר הטלפון שרשום במכינה</label>' +
+      '<input id="ph" class="as-inp" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" value="' + esc(phone) + '">' +
+      '<button class="as-btn" id="go">המשך</button><div class="as-msg" id="msg">' + esc(msg || '') + '</div></div>' +
+      (meeting.open ? '' : '<div class="as-card"><div class="as-msg" style="color:var(--primary-dark)">ההרשמה סגורה כרגע.' +
+        (meeting.contact_text ? '<br>' + esc(meeting.contact_text) : '') + '</div></div>');
+    const inp = document.getElementById('ph');
+    const go = async () => {
+      const v = inp.value.trim();
+      if (v.replace(/\D/g, '').length < 9) { document.getElementById('msg').textContent = 'נא להזין מספר טלפון תקין'; return; }
+      phone = v; document.getElementById('go').disabled = true;
+      try {
+        students = await loadStudents();
+        if (!students.length) { phone = ''; viewPhone('לא מצאנו מספר זה במערכת.' + (meeting.contact_text ? ' ' + meeting.contact_text : ' אנא פנו למכינה.')); return; }
+        done = null; openPick = {}; viewMain();
+      } catch (e) { viewPhone('שגיאה בחיבור, נסו שוב'); }
+    };
+    document.getElementById('go').addEventListener('click', go);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  }
+
+  function viewMain() {
+    let html = head();
+    if (done) {
+      html += '<div class="as-card"><div class="as-ok"><i class="bi bi-check-circle-fill"></i>' +
+        '<div class="big">' + (done.cancelled ? 'הפגישה בוטלה' : 'הפגישה נקבעה בהצלחה') + '</div></div>' +
+        (done.cancelled ? '' : '<div class="as-sum">' + esc(done.first) + '<br>' + esc(done.rav) + '<br>' + esc(dateText()) + '<br>בשעה ' + esc(done.slot) + '</div>') +
+        '<button class="as-btn ghost" id="back">חזרה לרישום</button></div>';
+      root.innerHTML = html;
+      document.getElementById('back').addEventListener('click', () => { done = null; viewMain(); });
+      return;
+    }
+    students.forEach(s => {
+      html += '<div class="as-card"><div class="as-hello">שלום להורי ' + esc(s.first_name) + '</div>' +
+        '<div class="as-cls">' + esc(s.class_name) + '</div>';
+      if (!meeting.open) html += '<div class="as-msg" style="color:var(--primary-dark)">ההרשמה סגורה כרגע.' + (meeting.contact_text ? '<br>' + esc(meeting.contact_text) : '') + '</div>';
+      s.rabbis.forEach(rb => {
+        const r = (meeting.rabbis || []).find(x => x.name === rb.name); if (!r) return;
+        const mine = (s.bookings || []).find(b => b.rav === rb.name);
+        const key = s.student_id + '|' + rb.name;
+        const picking = meeting.open && (!mine || openPick[key]);
+        html += '<div class="as-rav' + (mine ? ' done' : '') + '"><h3>' + esc(rb.name) +
+          (rb.optional ? ' <span class="as-tag">פגישה נוספת, לבחירה</span>' : '') + '</h3>';
+        if (mine) html += '<div class="as-mine"><i class="bi bi-check-circle-fill"></i> נקבעה פגישה בשעה ' + esc(mine.slot) + '</div>';
+        if (mine && meeting.open && !picking) {
+          html += '<div class="as-row"><button class="as-btn ghost" data-chg="' + esc(key) + '">שינוי שעה</button>' +
+            '<button class="as-btn danger" data-cancel="' + s.student_id + '" data-rav="' + esc(rb.name) + '">ביטול</button></div>';
+        } else if (picking) {
+          html += '<div class="as-hint">' + (mine ? 'בחרו שעה חדשה:' : 'בחרו שעה (תפוסות באפור):') + '</div><div class="as-slots">';
+          const taken = (meeting.occupied && meeting.occupied[rb.name]) || [];
+          slotsOf(r).forEach(t => {
+            const isMine = mine && mine.slot === t;
+            const dis = taken.indexOf(t) >= 0 && !isMine;
+            html += '<button class="as-slot' + (isMine ? ' mine' : '') + '"' + (dis ? ' disabled' : '') +
+              ' data-book="' + s.student_id + '" data-rav="' + esc(rb.name) + '" data-slot="' + t + '">' + t + '</button>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+    html += '<div class="as-card"><div class="as-msg" id="msg"></div><button class="as-btn ghost" id="other">מספר טלפון אחר</button></div>';
+    root.innerHTML = html;
+    document.getElementById('other').addEventListener('click', () => { phone = ''; students = []; viewPhone(); });
+    root.querySelectorAll('[data-chg]').forEach(b => b.addEventListener('click', () => { openPick[b.dataset.chg] = true; viewMain(); }));
+    root.querySelectorAll('[data-book]').forEach(b => b.addEventListener('click', () => book(+b.dataset.book, b.dataset.rav, b.dataset.slot)));
+    root.querySelectorAll('[data-cancel]').forEach(b => b.addEventListener('click', () => cancel(+b.dataset.cancel, b.dataset.rav)));
+  }
+
+  function say(t) { const m = document.getElementById('msg'); if (m) { m.textContent = t; m.scrollIntoView({ block: 'center' }); } }
+  async function refresh() { meeting = await loadMeeting() || meeting; students = await loadStudents(); }
+
+  async function book(sid, rav, slot) {
+    if (busy) return; busy = true;
+    try {
+      const { error } = await sb.rpc('asifa_book', { p_token: token, p_phone: phone, p_student_id: sid, p_rav: rav, p_slot: slot });
+      const st = students.find(x => x.student_id === sid);
+      if (error) { await refresh().catch(() => {}); viewMain(); say(error.message || 'שגיאה, נסו שוב'); return; }
+      await refresh();
+      openPick = {};
+      done = { first: st ? st.first_name : '', rav: rav, slot: slot };
+      viewMain();
+    } catch (e) { say('שגיאה בחיבור, נסו שוב'); } finally { busy = false; }
+  }
+  async function cancel(sid, rav) {
+    if (busy) return;
+    if (!window.confirm('לבטל את הפגישה?')) return;
+    busy = true;
+    try {
+      const { error } = await sb.rpc('asifa_cancel', { p_token: token, p_phone: phone, p_student_id: sid, p_rav: rav });
+      if (error) { say(error.message || 'שגיאה'); return; }
+      const st = students.find(x => x.student_id === sid);
+      await refresh();
+      done = { cancelled: true, first: st ? st.first_name : '' };
+      viewMain();
+    } catch (e) { say('שגיאה בחיבור, נסו שוב'); } finally { busy = false; }
+  }
+
+  (async function init() {
+    if (!token) { root.innerHTML = '<div class="as-card"><h1>קישור לא תקין</h1><div class="as-note">פנו למכינה לקבלת קישור מעודכן.</div></div>'; return; }
+    if (!sb) { root.innerHTML = '<div class="as-card"><div class="as-note">המערכת במצב הדגמה.</div></div>'; return; }
+    meeting = await loadMeeting();
+    if (!meeting) { root.innerHTML = '<div class="as-card"><h1>הקישור לא נמצא</h1><div class="as-note">ייתכן שהקישור אינו תקין. פנו למכינה.</div></div>'; return; }
+    viewPhone();
+  })();
+})();
+</script>
+</body>
+</html>

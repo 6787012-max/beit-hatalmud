@@ -45,6 +45,8 @@
     { id: 'voicereports',  label: 'דיווחים קוליים',    icon: 'bi-mic-fill',        group: G3, color: '#8e44ad', adminOnly: true },
     // דיוור להורים: מזכירה/מנהל בלבד (adminOnly). מייל + קול + צינתוק בערוץ אחד.
     { id: 'messaging',     label: 'שליחת דיוור',       icon: 'bi-envelope-paper',  group: G3, color: '#059669', adminOnly: true },
+    // אסיפת הורים: רישום הורים לתורים של רבע שעה (09/11/2026).
+    { id: 'asifa',         label: 'אסיפת הורים',       icon: 'bi-people',          group: G3, color: '#a87830', adminOnly: true },
     // הטענת כרטיס נטען "טייצר" — היה גיליון Sheets נפרד, עבר לגמרי לכאן (09/09/2026).
     { id: 'taitzer',       label: 'כרטיסי טייצר',      icon: 'bi-credit-card-fill', group: G3, color: '#0891b2', adminOnly: true },
     { id: 'exporter',      label: 'יצוא והדפסה',      icon: 'bi-printer',         group: G3, color: '#475569' },
