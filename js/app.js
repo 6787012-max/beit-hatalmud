@@ -23,6 +23,8 @@
     { id: 'passport',      label: 'דרכון',            icon: 'bi-passport',        group: G1, color: '#b7791f' },
     { id: 'students',      label: 'תלמידים',          icon: 'bi-people-fill',     group: G2, color: '#2b7c98' },
     { id: 'medical',       label: 'רפואי',            icon: 'bi-capsule',         group: G2, color: '#d35400' },
+    // אירועים חריגים (תאונות, פציעות, אירועים רפואיים, אלימות) — קבצים לאירוע עצמו (2026-11-12)
+    { id: 'incidents',     label: 'אירועים חריגים',   icon: 'bi-exclamation-octagon', group: G2, color: '#b91c1c' },
     { id: 'books',         label: 'הזמנת ספרים',      icon: 'bi-journals',        group: G2, color: '#8a6d3b' },
     { id: 'forms',         label: 'טפסים וחתימות',    icon: 'bi-file-earmark-check', group: G2, color: '#c0398a' },
     { id: 'calendar',      label: 'לוח שנה',          icon: 'bi-calendar3',       group: G2, color: '#117a65' },

@@ -410,6 +410,7 @@
         // תל"א מוצג רק למי שיש לו גישה למסך תל"א (מלמד — לא).
         ((window.cv3Tla && canTla) ? window.cv3Tla.cardSection(tlaData.plans, tlaData.goals) : '') +
         (window.cv3StudentDocs ? window.cv3StudentDocs.cardSection(sdocs) : '') +
+        (window.cv3Incidents ? window.cv3Incidents.cardSection(s) : '') +
         (window.cv3Taitzer ? window.cv3Taitzer.cardSection(txData) : '') +
         // ── כל השאר מאחורי "הרחב": פרטי הרישום המלאים וההיסטוריה ──
         '<button class="btn-ghost sm det-more-btn" id="stuMoreBtn" type="button">' +
@@ -500,6 +501,8 @@
       if (window.cv3AI) setTimeout(() => window.cv3AI.renderStudent(m.el.querySelector('#aiStuSum'), s), 60);
       const dcb = m.el.querySelector('[data-docs]');
       if (dcb && window.cv3StudentDocs) dcb.addEventListener('click', () => { m.close(); window.cv3StudentDocs.openManager(s, () => {}); });
+      // סעיף "אירועים חריגים" (js/incidents.js) — נטען אחרי שהכרטיס על המסך
+      if (window.cv3Incidents) window.cv3Incidents.fillCard(m.el.querySelector('#incCard'), s);
 
       // ---------- מייל+דרייב מתוך Supabase (אונדקסו ע"י Apps Script בענן — עוקף חסימת NetFree) ----------
       m.el.classList.add('modal-wide');

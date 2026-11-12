@@ -10,7 +10,7 @@ window.CV3_GUIDE = {
   roles: {
     'מנהל':  { label: 'מנהל', screens: 'all' },
     'מפקח':  { label: 'מפקח', screens: 'all', note: 'צפייה בלבד — אלא אם המנהל הרחיב את ההרשאות באופן פרטני.' },
-    'מחנך':  { label: 'מחנך', screens: ['behavior', 'followup', 'attendance', 'tests', 'weekly', 'students', 'medical', 'forms', 'calendar', 'reports'], note: 'רואה את תלמידי כיתתו בלבד.' },
+    'מחנך':  { label: 'מחנך', screens: ['behavior', 'followup', 'attendance', 'tests', 'weekly', 'students', 'medical', 'incidents', 'forms', 'calendar', 'reports'], note: 'רואה את תלמידי כיתתו בלבד.' },
     'מלמד':  { label: 'מלמד', screens: ['behavior', 'followup', 'attendance', 'tests', 'readassess', 'weekly', 'passport'], note: 'רואה ומזין לתלמידי השיעורים שהוקצו לו (בלי הקצאה — לכל המכינה). מתקן ומוחק רק רישומים שהוא עצמו רשם.' },
     'מזכירה': { label: 'מזכירה', screens: ['pettycash'], note: 'כספים בלבד.' },
   },
@@ -136,6 +136,17 @@ window.CV3_GUIDE = {
         'לוחצים "הוסף".',
       ],
       tips: ['המידע מאובטח ברמה הגבוהה ומוגבל רק לבעלי התפקידים שהמנהל אישר מראש.'],
+    },
+    incidents: {
+      title: 'אירועים חריגים', icon: 'bi-exclamation-octagon',
+      intro: 'תיעוד תאונות, פציעות, אירועים רפואיים ואלימות — עם תמונות וסרטונים שמצורפים לאירוע עצמו.',
+      steps: [
+        'לוחצים "אירוע חדש", בוחרים תלמיד, תאריך, סוג וחומרה.',
+        'כותבים מה קרה, פציעה וטיפול, ואם ההורים עודכנו.',
+        'מצרפים תמונות או סרטונים (עד 25MB לקובץ) ושומרים.',
+        'להדפסה: פותחים את האירוע ולוחצים "הדפסת דוח אירוע".',
+      ],
+      tips: ['הקבצים מופיעים באירוע עצמו, ולא בתיק המסמכים של התלמיד.', 'מחיקה של אירוע עוברת לסל; היא לא מוחקת את הקבצים שלו.'],
     },
     forms: {
       title: 'טפסים וחתימות', icon: 'bi-file-earmark-check',
