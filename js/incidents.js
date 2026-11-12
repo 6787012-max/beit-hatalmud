@@ -14,6 +14,10 @@
   const BUCKET = 'student-docs';
   const MAX_MB = 25;
   const MAX_BYTES = MAX_MB * 1048576;
+  // עד 10MB: הקובץ נשמר בעמודה data_b64 במסד (JSON עובר נטפרי). מעל — ב-Storage, עם אזהרה.
+  const INLINE_MAX = 10 * 1048576;
+  // רשימות לא קוראות את data_b64 (נטען לפי דרישה, שורה אחת בכל פעם)
+  const FILE_COLS = 'id,incident_id,student_id,path,title,mime,size_bytes,created_by,created_at';
   const KINDS = ['תאונה', 'פציעה', 'אירוע רפואי', 'אלימות', 'אחר'];
   const SEVERITIES = ['נמוכה', 'רגילה', 'גבוהה'];
   const STATUSES = ['פתוח', 'סגור'];
@@ -43,7 +47,7 @@
   async function loadAll() {
     const [incs, files, studs, classes] = await Promise.all([
       window.store.list('incidents'),
-      window.store.list('incident_files'),
+      window.store.list('incident_files', { select: FILE_COLS }),
       window.cv3Students ? window.cv3Students.getStudents() : window.store.list('students'),
       window.store.list('classes'),
     ]);
@@ -77,8 +81,39 @@
     return clean + ext.replace(/[^A-Za-z0-9.]/g, '').slice(0, 10).toLowerCase();
   }
 
-  // הורדה כ-blob דרך ה-API (לא קישור חתום — נטפרי חוסם קישורים שנפתחים בטאב חדש)
+  // קובץ "inline" = נשמר ב-data_b64 במסד (הנתיב מכיל /inline-). השאר ב-Storage.
+  const isInline = f => /\/inline-/.test(String(f.path || ''));
+
+  function b64ToBytes(b64) {
+    const bin = atob(b64);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+
+  // קריאת קובץ לבסיס64 (בלי הקידומת data:...;base64,)
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => { const s = String(r.result || ''); resolve(s.slice(s.indexOf(',') + 1)); };
+      r.onerror = () => reject(new Error('קריאת הקובץ נכשלה'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  // הורדה / תצוגה: inline → שורה בודדת עם data_b64 לפי דרישה; השאר → blob מ-Storage דרך ה-API
+  // (לא קישור חתום — נטפרי חוסם קישורים שנפתחים בטאב חדש, וגם הורדה בינארית מ-Storage נחסמת)
   async function getBlob(f) {
+    if (isInline(f)) {
+      let b64 = f.data_b64 || null;   // מצב הדגמה מחזיק את התוכן ברשומה
+      if (!b64) {
+        if (!window.sb) throw new Error('הקובץ לא זמין במצב הדגמה');
+        const { data, error } = await window.sb.from('incident_files').select('data_b64').eq('id', f.id).single();
+        if (error || !data || !data.data_b64) throw new Error('הקובץ לא נטען: ' + ((error && error.message) || 'אין תוכן'));
+        b64 = data.data_b64;
+      }
+      return new Blob([b64ToBytes(b64)], { type: f.mime || '' });
+    }
     if (!window.sb) throw new Error('קבצים זמינים רק במערכת החיה');
     const { data, error } = await window.sb.storage.from(BUCKET).download(f.path);
     if (error || !data) throw new Error('הקובץ לא נטען: ' + ((error && error.message) || 'אין נתונים'));
@@ -113,25 +148,31 @@
     return !error;
   }
 
-  // מעלה כמה קבצים לאירוע אחד. לכל קובץ: אחסון ואז שורת קובץ. כישלון ברשומה מוחק את הקובץ שהועלה.
+  // מעלה כמה קבצים לאירוע אחד.
+  //  • עד 10MB: הקובץ מקודד ל-base64 ונשמר ב-data_b64 של שורת הקובץ (בלי Storage). נתיב לוגי: {sid}/inline-…
+  //  • מעל 10MB (עד 25MB): מועלה ל-Storage כמו קודם, עם אזהרה. כישלון ברישום מוחק את הקובץ שהועלה.
   async function uploadFiles(incId, studentId, files, onStep) {
     const ok = [], bad = [];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      const kind = kindOf(f);
-      if (!kind) { bad.push(f.name + ' (רק תמונות וסרטונים)'); continue; }
+      if (!kindOf(f)) { bad.push(f.name + ' (רק תמונות וסרטונים)'); continue; }
       if (f.size > MAX_BYTES) { bad.push(f.name + ' (מעל ' + MAX_MB + 'MB)'); continue; }
-      const path = studentId + '/' + rnd() + '-' + safeName(f.name);
-      if (onStep) onStep(i, files.length, 0, f.name);
-      try {
-        await uploadXhr(path, f, p => onStep && onStep(i, files.length, p, f.name));
-      } catch (e) { bad.push(f.name + ' — ' + (e.message || e)); continue; }
-      const res = await window.store.add('incident_files', {
-        incident_id: incId, student_id: studentId, path, title: f.name,
-        mime: f.type || null, size_bytes: f.size,
-      });
+      const inline = f.size <= INLINE_MAX;
+      const path = studentId + (inline ? '/inline-' : '/') + rnd() + '-' + safeName(f.name);
+      const row = { incident_id: incId, student_id: studentId, path, title: f.name, mime: f.type || null, size_bytes: f.size };
+      if (inline) {
+        if (onStep) onStep(i, files.length, 0, f.name);
+        try { row.data_b64 = await fileToBase64(f); }
+        catch (e) { bad.push(f.name + ' — ' + (e.message || e)); continue; }
+      } else {
+        if (!window.sb) { bad.push(f.name + ' — מעל 10MB דורש מערכת חיה'); continue; }
+        try {
+          await uploadXhr(path, f, p => onStep && onStep(i, files.length, p, f.name));
+        } catch (e) { bad.push(f.name + ' — ' + (e.message || e)); continue; }
+      }
+      const res = await window.store.add('incident_files', row);
       if (!res || res.ok === false) {
-        await removeObject(path);
+        if (!inline) await removeObject(path);
         bad.push(f.name + ' — הרישום נכשל, הקובץ לא נשמר');
         continue;
       }
@@ -140,12 +181,12 @@
     return { ok, bad };
   }
 
-  // מחיקת קובץ: קודם שורת המטא-דאטה עם select (כדי לאמת ש-RLS לא חסם בשקט), ורק אז הקובץ
+  // מחיקת קובץ: קודם שורת המטא-דאטה עם select (כדי לאמת ש-RLS לא חסם בשקט), ורק אז הקובץ (אם ב-Storage)
   async function deleteFile(f) {
     if (!window.sb) { await window.store.remove('incident_files', f.id); return true; }
-    const { data, error } = await window.sb.from('incident_files').delete().eq('id', f.id).select();
+    const { data, error } = await window.sb.from('incident_files').delete().eq('id', f.id).select('id');
     if (error || !data || !data.length) { toast('המחיקה נכשלה — אין הרשאה לקובץ הזה', 'err'); return false; }
-    await removeObject(f.path);
+    if (!isInline(f)) await removeObject(f.path);
     return true;
   }
 
@@ -300,8 +341,10 @@
       F('פרטי עדכון הורים', '<input class="inp mb0" id="inc_pnote" value="' + esc(v('parent_note', '')) + '" placeholder="מתי, איך, מי דיבר">', true) +
       F('תלמידים נוספים', '<textarea class="inp mb0" id="inc_others" rows="2" placeholder="מי היה מעורב או נכח">' + esc(v('other_students', '')) + '</textarea>', true) +
       F('מעקב / המשך', '<textarea class="inp mb0" id="inc_follow" rows="2">' + esc(v('followup_note', '')) + '</textarea>', true) +
-      F('קבצים לאירוע (תמונות וסרטונים, עד ' + MAX_MB + 'MB לקובץ)',
+      F('קבצים לאירוע (תמונות וסרטונים; עד 10MB נשמר במסד, עד ' + MAX_MB + 'MB ב-Storage)',
         '<input type="file" class="inp mb0" id="inc_files" multiple accept="image/*,video/*">' +
+        '<div id="inc_warn" hidden style="margin-top:6px;padding:8px 10px;border:2px solid #ea580c;background:#fff7ed;color:#9a3412;font-weight:600;border-radius:8px">' +
+          '⚠️ קובץ מעל 10MB נשמר באחסון, ובמכינה סרטון כזה עלול להיחסם בנטפרי. מומלץ לכווץ את הסרטון לפני ההעלאה.</div>' +
         '<div id="inc_fl" class="tl-note" style="font-size:.82rem;margin-top:4px"></div>' +
         '<div id="inc_prog" class="tl-note" style="font-size:.82rem"></div>', true) +
       '</div>';
@@ -318,7 +361,9 @@
         if (!date) { toast('חובה לבחור תאריך', 'err'); return false; }
         if (!desc) { toast('חובה לכתוב מה קרה', 'err'); return false; }
         const files = [...mel.querySelector('#inc_files').files];
-        if (files.length && !window.sb) { toast('העלאת קבצים זמינה רק במערכת החיה', 'err'); return false; }
+        if (files.some(f => !kindOf(f))) { toast('מותר לצרף רק תמונות וסרטונים', 'err'); return false; }
+        if (files.some(f => f.size > MAX_BYTES)) { toast('יש קובץ מעל ' + MAX_MB + 'MB — לכווץ או להסיר', 'err'); return false; }
+        if (files.some(f => f.size > INLINE_MAX) && !window.sb) { toast('קובץ מעל 10MB נשמר באחסון ודורש מערכת חיה', 'err'); return false; }
         const row = {
           student_id: studentId,
           incident_date: date,
@@ -377,11 +422,16 @@
     // תצוגת הקבצים שנבחרו, עם סימון של מה שייפסל מיד
     const fin = m.el.querySelector('#inc_files');
     fin.addEventListener('change', () => {
-      const box = m.el.querySelector('#inc_fl');
+      const box = m.el.querySelector('#inc_fl'), warn = m.el.querySelector('#inc_warn');
+      let big = false;
       box.innerHTML = [...fin.files].map(f => {
-        const bad = !kindOf(f) ? ' — לא תמונה או סרטון' : (f.size > MAX_BYTES ? ' — מעל ' + MAX_MB + 'MB' : '');
-        return '<div' + (bad ? ' style="color:#b91c1c"' : '') + '>' + esc(f.name) + ' · ' + kb(f.size) + esc(bad) + '</div>';
+        let note = '', color = '';
+        if (!kindOf(f)) { note = ' — לא תמונה או סרטון'; color = '#b91c1c'; }
+        else if (f.size > MAX_BYTES) { note = ' — מעל ' + MAX_MB + 'MB, לא יישמר'; color = '#b91c1c'; }
+        else if (f.size > INLINE_MAX) { note = ' — מעל 10MB: יישמר באחסון, עלול להיחסם בנטפרי'; color = '#9a3412'; big = true; }
+        return '<div' + (color ? ' style="color:' + color + '"' : '') + '>' + esc(f.name) + ' · ' + kb(f.size) + esc(note) + '</div>';
       }).join('');
+      if (warn) warn.hidden = !big;
     });
   }
 
@@ -488,7 +538,8 @@
       inp.addEventListener('change', async () => {
         const list = [...inp.files];
         if (!list.length) return;
-        if (!window.sb) { toast('העלאת קבצים זמינה רק במערכת החיה', 'err'); return; }
+        if (list.some(f => f.size > INLINE_MAX) && !window.sb) { toast('קובץ מעל 10MB נשמר באחסון ודורש מערכת חיה', 'err'); return; }
+        if (list.some(f => f.size > INLINE_MAX)) toast('קובץ מעל 10MB נשמר באחסון — במכינה עלול להיחסם בנטפרי; מומלץ לכווץ', 'err');
         const r = await uploadFiles(inc.id, inc.student_id, list, (i, n, p, name) => {
           if (dmsg) dmsg.innerHTML = 'מעלה ' + (i + 1) + ' מתוך ' + n + ' · ' + esc(name) + ' · ' + Math.round(p * 100) + '%';
         });

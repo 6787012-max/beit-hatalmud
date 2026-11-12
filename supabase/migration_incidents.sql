@@ -121,6 +121,11 @@ create table if not exists public.incident_files (
   -- התיקייה הראשונה בנתיב חייבת להיות מזהה התלמיד — אחרת ה-policy של Storage לא יאכוף הרשאה
   constraint incident_files_path_chk check (split_part(path, '/', 1) = student_id::text)
 );
+-- קבצים עד 10MB נשמרים כאן (base64) ולא ב-Storage: נטפרי חוסם הורדה בינארית מ-Storage
+-- (סרטון הוחזר 418 ותמונות הוחלפו בממלא מקום). הנתיב של קובץ כזה הוא {student_id}/inline-…
+-- כדי שה-constraint וה-policy יישארו תקפים. לקבצים מעל 10MB העמודה ריקה והקובץ ב-Storage.
+alter table public.incident_files add column if not exists data_b64 text;
+
 create index if not exists incident_files_incident_idx on public.incident_files(incident_id);
 create index if not exists incident_files_student_idx  on public.incident_files(student_id);
 
