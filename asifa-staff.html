@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>אסיפת הורים — לוח הצוות</title>
+  <link rel="stylesheet" href="vendor/bootstrap-icons.css">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <style>
+    body { background: var(--bg); }
+    .st-wrap { max-width: 640px; margin: 0 auto; padding: 14px 12px 40px; }
+    .st-head { text-align: center; padding: 10px 0 6px; }
+    .st-head img { width: 64px; height: 64px; object-fit: contain; background: #fff; border-radius: 16px; padding: 5px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+    .st-inst { color: var(--muted); font-weight: 700; margin-top: 6px; }
+    .st-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 16px; margin-top: 14px; }
+    .st-card h1 { font-size: 1.4rem; color: var(--primary-dark); font-weight: 800; text-align: center; margin: 0 0 6px; }
+    .st-when { text-align: center; font-size: 1.05rem; font-weight: 700; color: var(--accent); line-height: 1.5; }
+    .st-note { text-align: center; color: var(--muted); font-size: 1rem; line-height: 1.6; margin-top: 8px; }
+    .st-tabs { display: flex; gap: 8px; margin-top: 14px; }
+    .st-tab { flex: 1; padding: 12px; font-size: 1.1rem; font-weight: 800; border: 2px solid var(--line); border-radius: 12px; background: var(--card); color: var(--primary-dark); cursor: pointer; font-family: inherit; }
+    .st-tab.on { background: var(--primary-dark); color: #fff; border-color: var(--primary-dark); }
+    .st-rav h2 { margin: 0 0 4px; font-size: 1.25rem; font-weight: 800; color: var(--primary-dark); }
+    .st-sub { color: var(--muted); font-size: .95rem; margin-bottom: 8px; }
+    .st-row { display: flex; gap: 12px; align-items: flex-start; border-top: 1px solid var(--line); padding: 10px 0; }
+    .st-time { font-size: 1.3rem; font-weight: 800; color: var(--accent); min-width: 64px; direction: ltr; text-align: center; }
+    .st-who { flex: 1; line-height: 1.5; }
+    .st-who b { font-size: 1.1rem; color: var(--ink); }
+    .st-cls { color: var(--muted); font-size: .95rem; }
+    .st-ph { direction: ltr; unicode-bidi: embed; }
+    .st-ph a { color: var(--primary-dark); font-weight: 700; text-decoration: none; }
+    .st-empty { color: var(--muted); padding: 10px 0; text-align: center; }
+    .st-btn { width: 100%; margin-top: 12px; padding: 12px; font-size: 1.05rem; font-weight: 800; border: 2px solid var(--line); border-radius: 12px; background: var(--card); color: var(--primary-dark); cursor: pointer; font-family: inherit; }
+  </style>
+</head>
+<body>
+  <div class="st-wrap">
+    <div class="st-head"><img src="img/logo.png" alt="לוגו"><div class="st-inst" id="inst"></div></div>
+    <div id="root"><div class="st-card"><div class="st-note">טוען…</div></div></div>
+  </div>
+<script>
+(function () {
+  'use strict';
+  const C = window.CV3 || {};
+  const root = document.getElementById('root');
+  document.getElementById('inst').textContent = C.INSTANCE_NAME || '';
+  const key = new URLSearchParams(location.search).get('k');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sb = (C.SUPABASE_URL && C.SUPABASE_ANON_KEY && window.supabase)
+    ? window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY) : null;
+  let data = null, tab = 'me';
+
+  function fmtPhone(p) {
+    const d = String(p || '').replace(/\D/g, '');
+    if (!d) return '';
+    const n = d.length === 9 ? '0' + d : d;
+    return n.length === 10 ? n.slice(0, 3) + '-' + n.slice(3) : n;
+  }
+  function dateText() {
+    try {
+      return new Date(data.date + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (_) { return data.date; }
+  }
+  function ravBlock(r, isMe) {
+    let h = '<div class="st-card st-rav"><h2>' + esc(r.name) + (isMe ? ' (אתה)' : '') + '</h2>' +
+      '<div class="st-sub">' + esc(r.start) + '–' + esc(r.end) + ' · ' + r.bookings.length + ' פגישות</div>';
+    if (!r.bookings.length) h += '<div class="st-empty">אין עדיין פגישות</div>';
+    r.bookings.forEach(b => {
+      const ph = fmtPhone(b.phone);
+      h += '<div class="st-row"><div class="st-time">' + esc(b.time) + '</div><div class="st-who"><b>' + esc(b.student) + '</b>' +
+        '<div class="st-cls">' + esc(b.class_name) + (b.parent_name ? ' · ' + esc(b.parent_name) : '') + '</div>' +
+        (ph ? '<div class="st-ph"><a href="tel:' + esc(ph.replace(/-/g, '')) + '">' + esc(ph) + '</a></div>' : '') + '</div></div>';
+    });
+    return h + '</div>';
+  }
+  function render() {
+    const me = data.rabbis.find(r => r.name === data.me);
+    let h = '<div class="st-card"><h1>' + esc(data.title) + '</h1><div class="st-when">' + esc(dateText()) + '</div>' +
+      '<div class="st-note">לוח צפייה בלבד. מתעדכן בכל טעינה.</div></div>' +
+      '<div class="st-tabs"><button class="st-tab' + (tab === 'me' ? ' on' : '') + '" data-t="me">' + esc(data.me) + '</button>' +
+      '<button class="st-tab' + (tab === 'all' ? ' on' : '') + '" data-t="all">כל הצוות</button></div>';
+    if (tab === 'me') h += me ? ravBlock(me, true) : '<div class="st-card st-empty">אין נתונים</div>';
+    else h += data.rabbis.map(r => ravBlock(r, r.name === data.me)).join('');
+    h += '<button class="st-btn" id="rf">רענון</button>';
+    root.innerHTML = h;
+    root.querySelectorAll('[data-t]').forEach(b => b.addEventListener('click', () => { tab = b.dataset.t; render(); }));
+    document.getElementById('rf').addEventListener('click', load);
+  }
+  async function load() {
+    try {
+      const { data: d, error } = await sb.rpc('asifa_staff_view', { p_key: key });
+      if (error || !d) { root.innerHTML = '<div class="st-card"><h1>הקישור לא תקין</h1><div class="st-note">פנו למזכירות לקבלת קישור.</div></div>'; return; }
+      data = d; render();
+    } catch (e) { root.innerHTML = '<div class="st-card"><div class="st-note">שגיאה בחיבור, נסו לרענן.</div></div>'; }
+  }
+  if (!key || !sb) { root.innerHTML = '<div class="st-card"><h1>הקישור לא תקין</h1><div class="st-note">פנו למזכירות לקבלת קישור.</div></div>'; return; }
+  load();
+})();
+</script>
+</body>
+</html>
