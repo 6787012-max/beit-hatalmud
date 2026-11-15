@@ -120,6 +120,8 @@
     const hg = document.querySelector('.home-grid');
     // כרטיס "יתרת ההדפסות שלי" — לכל משתמש שמקושר לאיש צוות, בשני סוגי הבית (prints.js).
     if (window.cv3Prints) window.cv3Prints.homeCard($('#homePrints'));
+    // כרטיס "אסיפת הורים" — לכל איש צוות מחובר, כשיש אסיפה קרובה (asifa-staff.js).
+    if (window.cv3AsifaStaff) window.cv3AsifaStaff.homeCard($('#homeAsifa'));
     if (isTeacher && window.renderTeacherHome) {
       tg.style.display = 'none'; th.style.display = '';
       if (hg) hg.style.display = 'none';
