@@ -20,6 +20,8 @@
 }
 html,body{width:100%;height:100%;overflow:hidden;background:#00131e;color:var(--ink);
   font-family:'Heebo',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+:root{--cw:19.2px;--ch:10.8px}
+#canvas{position:absolute;left:50%;top:50%;width:1920px;height:1080px;margin:-540px 0 0 -960px;transform:scale(var(--k,1));transform-origin:50% 50%}
 #bg{position:fixed;inset:0;z-index:0;background:
   radial-gradient(1200px 800px at 85% -10%,rgba(168,120,48,.20),transparent 60%),
   radial-gradient(1000px 700px at 10% 110%,rgba(0,64,95,.55),transparent 60%),
@@ -28,7 +30,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#00131e;color:var(--
   background:url(../img/logo.png) center/contain no-repeat;opacity:.05}
 
 #stage{position:relative;z-index:2;display:grid;grid-template-columns:minmax(300px,23%) 1fr;
-  grid-template-rows:1fr auto;gap:16px;height:100vh;padding:16px}
+  grid-template-rows:1fr auto;gap:16px;height:calc(100*var(--ch));padding:16px}
 aside{grid-row:1/2;display:flex;flex-direction:column;gap:calc(12px*var(--side,1));min-height:0;--side:1}
 main{grid-row:1/2;position:relative;border-radius:20px;overflow:hidden;background:#000;
   border:1px solid var(--line);box-shadow:0 24px 70px rgba(0,0,0,.6)}
@@ -112,18 +114,18 @@ main:hover #vinfo{opacity:1}
 /* תוכנית ההפסקות (18/10/2026): שיח מעורר ← 10 שניות הסבר ← מושג בגמרא.
    יוסף: "הסרטונים על מסך מלא, מעוצב יפה וגדול — אבל שיהיה עדיין השעון ועוד כמה זמן הפסקה".
    כל המסך לסרטון; פס מידע בתחתית — מתחת לסרטון ולא עליו, כדי לא לכסות את הכתוביות שבתוכו. */
-:root{--pbH:clamp(84px,11.5vh,128px)}
+:root{--pbH:clamp(84px,calc(11.5*var(--ch)),128px)}
 body.prog-on #stage{grid-template-columns:1fr;grid-template-rows:1fr;padding:0;gap:0}
 body.prog-on aside, body.prog-on footer{display:none}
 body.prog-on main{grid-column:1/-1;grid-row:1/-1;border:0;border-radius:0;box-shadow:none;
   background:radial-gradient(ellipse at 50% 38%,#163240 0%,#0a161c 58%,#05090c 100%)}
-body.prog-on main video{inset:auto;left:50%;top:calc((100vh - var(--pbH) - min(100vh - var(--pbH) - 28px,(100vw - 40px)*9/16))/2);
-  transform:translateX(-50%);width:min(100vw - 40px,(100vh - var(--pbH) - 28px)*16/9);height:auto;aspect-ratio:16/9;
+body.prog-on main video{inset:auto;left:50%;top:calc((calc(100*var(--ch)) - var(--pbH) - min(calc(100*var(--ch)) - var(--pbH) - 28px,(calc(100*var(--cw)) - 40px)*9/16))/2);
+  transform:translateX(-50%);width:min(calc(100*var(--cw)) - 40px,(calc(100*var(--ch)) - var(--pbH) - 28px)*16/9);height:auto;aspect-ratio:16/9;
   border-radius:16px;box-shadow:0 0 0 1px rgba(224,169,59,.35),0 26px 80px rgba(0,0,0,.75),0 0 120px rgba(224,169,59,.10)}
 body.prog-on #vinfo, body.prog-on #ov{display:none}
 body.prog-on #progCard{bottom:var(--pbH)}
-#progBadge{position:absolute;inset-inline:0;bottom:0;height:var(--pbH);z-index:6;display:none;align-items:center;gap:clamp(18px,2.4vw,46px);
-  padding:0 clamp(22px,2.6vw,52px);background:linear-gradient(to top,#04090c 0%,rgba(6,14,19,.97) 100%);
+#progBadge{position:absolute;inset-inline:0;bottom:0;height:var(--pbH);z-index:6;display:none;align-items:center;gap:clamp(18px,calc(2.4*var(--cw)),46px);
+  padding:0 clamp(22px,calc(2.6*var(--cw)),52px);background:linear-gradient(to top,#04090c 0%,rgba(6,14,19,.97) 100%);
   border-top:2px solid rgba(224,169,59,.55);box-shadow:0 -18px 50px rgba(0,0,0,.45);color:#fff;white-space:nowrap}
 body.prog-on #progBadge{display:flex}
 #pbClock{font-size:calc(var(--pbH)*.56);font-weight:800;line-height:1;letter-spacing:-2px;font-variant-numeric:tabular-nums}
@@ -141,35 +143,35 @@ body.prog-on #progBadge{display:flex}
 #pbLogo{height:calc(var(--pbH)*.62);opacity:.95}
 @keyframes blink{50%{opacity:.35}}
 #progCard{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:1.8vh;text-align:center;padding:4vw;background:radial-gradient(ellipse at 50% 40%,#17323C 0%,#0B1418 72%);
+  gap:calc(1.8*var(--ch));text-align:center;padding:calc(4*var(--cw));background:radial-gradient(ellipse at 50% 40%,#17323C 0%,#0B1418 72%);
   opacity:0;pointer-events:none;transition:opacity .6s}
 #progCard.on{opacity:1}
-#pcKick{font-size:clamp(1.3rem,2.4vw,2.3rem);font-weight:800;color:#0B1418;background:var(--gold);padding:.25em 1.1em;border-radius:99px}
-#pcTitle{font-size:clamp(3.2rem,8vw,8rem);font-weight:900;line-height:1.05;color:#fff}
-#pcSub{font-size:clamp(1.5rem,3.2vw,3rem);font-weight:700;color:var(--gold-lt)}
-#pcExp{font-size:clamp(1.2rem,2.3vw,2.1rem);color:#c9d6da;max-width:32ch}
-#pcRing{position:relative;width:clamp(130px,14vw,230px);height:clamp(130px,14vw,230px);margin-top:1vh}
+#pcKick{font-size:clamp(1.3rem,calc(2.4*var(--cw)),2.3rem);font-weight:800;color:#0B1418;background:var(--gold);padding:.25em 1.1em;border-radius:99px}
+#pcTitle{font-size:clamp(3.2rem,calc(8*var(--cw)),8rem);font-weight:900;line-height:1.05;color:#fff}
+#pcSub{font-size:clamp(1.5rem,calc(3.2*var(--cw)),3rem);font-weight:700;color:var(--gold-lt)}
+#pcExp{font-size:clamp(1.2rem,calc(2.3*var(--cw)),2.1rem);color:#c9d6da;max-width:32ch}
+#pcRing{position:relative;width:clamp(130px,calc(14*var(--cw)),230px);height:clamp(130px,calc(14*var(--cw)),230px);margin-top:calc(1*var(--ch))}
 #pcRing svg{width:100%;height:100%;transform:rotate(-90deg)}
 #pcRing circle{fill:none;stroke-width:11}
-#pcNum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(3.2rem,6.5vw,6rem);font-weight:900;color:#fff}
+#pcNum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(3.2rem,calc(6.5*var(--cw)),6rem);font-weight:900;color:#fff}
 
 /* מסך שיעור / מנוחה */
 #ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;padding:30px;text-align:center;opacity:0;pointer-events:none;transition:opacity 1s;
   background:radial-gradient(ellipse at center,#00243a 0%,#00131e 75%)}
 #ov.on{opacity:1;pointer-events:auto}
-#ovClock{font-size:calc(clamp(5rem,17vw,15rem)*var(--s,1));font-weight:800;line-height:.95;letter-spacing:-5px;
+#ovClock{font-size:calc(clamp(5rem,calc(17*var(--cw)),15rem)*var(--s,1));font-weight:800;line-height:.95;letter-spacing:-5px;
   font-variant-numeric:tabular-nums;text-shadow:0 0 70px rgba(255,255,255,.22)}
 #ovClock .bl{animation:bl 1.1s infinite}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
-#ovTitle{font-size:calc(clamp(1.6rem,3.6vw,3.2rem)*var(--s,1));font-weight:700;color:var(--gold-lt)}
-#ovSub{font-size:calc(clamp(1rem,1.8vw,1.5rem)*var(--s,1));color:var(--muted)}
+#ovTitle{font-size:calc(clamp(1.6rem,calc(3.6*var(--cw)),3.2rem)*var(--s,1));font-weight:700;color:var(--gold-lt)}
+#ovSub{font-size:calc(clamp(1rem,calc(1.8*var(--cw)),1.5rem)*var(--s,1));color:var(--muted)}
 #ovBarWrap{width:min(560px,70%);height:8px;border-radius:99px;background:rgba(255,255,255,.12);
   overflow:hidden;margin-top:14px;display:none}
 #ovBar{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-lt));
   border-radius:99px;transition:width 1s linear}
 /* חמש הדקות האחרונות: המסך עובר לספירה לאחור, ובדקה האחרונה היא נצבעת ופועמת */
-#ovCd{display:none;font-size:calc(clamp(4.5rem,15vw,13rem)*var(--s,1));font-weight:800;line-height:.95;
+#ovCd{display:none;font-size:calc(clamp(4.5rem,calc(15*var(--cw)),13rem)*var(--s,1));font-weight:800;line-height:.95;
   letter-spacing:-4px;font-variant-numeric:tabular-nums;color:var(--gold-lt);
   text-shadow:0 0 70px rgba(168,120,48,.45)}
 #ov.cd-on #ovClock{display:none}
@@ -184,26 +186,26 @@ body.prog-on #progBadge{display:flex}
   gap:10px;padding:36px;text-align:center;opacity:0;pointer-events:none;transition:opacity .55s ease-in;
   overflow:hidden}
 .slide.on{opacity:1;transition:opacity .55s ease-out .55s}
-.sl-kicker{font-size:calc(clamp(.9rem,1.5vw,1.3rem)*var(--s,1));letter-spacing:.22em;color:var(--gold);opacity:.85}
-.sl-title{font-size:calc(clamp(2rem,5.5vw,4.6rem)*var(--s,1));font-weight:800;line-height:1.1}
-.sl-sub{font-size:calc(clamp(1.05rem,2vw,1.8rem)*var(--s,1));color:var(--muted)}
+.sl-kicker{font-size:calc(clamp(.9rem,calc(1.5*var(--cw)),1.3rem)*var(--s,1));letter-spacing:.22em;color:var(--gold);opacity:.85}
+.sl-title{font-size:calc(clamp(2rem,calc(5.5*var(--cw)),4.6rem)*var(--s,1));font-weight:800;line-height:1.1}
+.sl-sub{font-size:calc(clamp(1.05rem,calc(2*var(--cw)),1.8rem)*var(--s,1));color:var(--muted)}
 /* מזל טוב */
-#slBirth .cake{font-size:calc(clamp(3rem,7vw,6rem)*var(--s,1));line-height:1}
+#slBirth .cake{font-size:calc(clamp(3rem,calc(7*var(--cw)),6rem)*var(--s,1));line-height:1}
 #slBirth .names{display:flex;flex-wrap:wrap;gap:10px 26px;justify-content:center;margin-top:6px}
-#slBirth .nm{font-size:calc(clamp(1.35rem,3.2vw,2.8rem)*var(--s,1));font-weight:800;color:#fff;max-width:15ch}
+#slBirth .nm{font-size:calc(clamp(1.35rem,calc(3.2*var(--cw)),2.8rem)*var(--s,1));font-weight:800;color:#fff;max-width:15ch}
 #slBirth .nm small{display:block;font-size:.42em;font-weight:600;color:var(--gold-lt);margin-top:2px}
-#slBirth .soon{margin-top:20px;font-size:calc(clamp(.95rem,1.6vw,1.35rem)*var(--s,1));color:var(--muted);
+#slBirth .soon{margin-top:20px;font-size:calc(clamp(.95rem,calc(1.6*var(--cw)),1.35rem)*var(--s,1));color:var(--muted);
   border-top:1px solid var(--line);padding-top:12px;max-width:80%}
 #slBirth .soon b{color:#dbe7ee;font-weight:600}
 /* תפריט גדול */
-#slMenu .dish{font-size:calc(clamp(2.2rem,6vw,5rem)*var(--s,1));font-weight:800}
-#slMenu .side{font-size:calc(clamp(1.3rem,3vw,2.4rem)*var(--s,1));color:#d7e6ee;margin-top:4px}
-#slMenu .veg{font-size:calc(clamp(1.05rem,2.2vw,1.7rem)*var(--s,1));color:var(--muted)}
+#slMenu .dish{font-size:calc(clamp(2.2rem,calc(6*var(--cw)),5rem)*var(--s,1));font-weight:800}
+#slMenu .side{font-size:calc(clamp(1.3rem,calc(3*var(--cw)),2.4rem)*var(--s,1));color:#d7e6ee;margin-top:4px}
+#slMenu .veg{font-size:calc(clamp(1.05rem,calc(2.2*var(--cw)),1.7rem)*var(--s,1));color:var(--muted)}
 /* סדר יום מלא */
 #slAgenda .list{width:min(860px,92%);max-height:76%;overflow:hidden;display:flex;flex-direction:column;gap:4px;text-align:start}
-#slAgenda .ag{font-size:calc(clamp(1rem,2.2vh,1.4rem)*var(--s,1))}
+#slAgenda .ag{font-size:calc(clamp(1rem,calc(2.2*var(--ch)),1.4rem)*var(--s,1))}
 /* הודעה */
-#slMsg .msg{font-size:calc(clamp(1.6rem,4vw,3.4rem)*var(--s,1));font-weight:700;line-height:1.3;max-width:88%}
+#slMsg .msg{font-size:calc(clamp(1.6rem,calc(4*var(--cw)),3.4rem)*var(--s,1));font-weight:700;line-height:1.3;max-width:88%}
 
 /* כרטיס ימי הולדת בסרגל */
 #birthCard{display:none}
@@ -230,7 +232,7 @@ footer{display:flex;align-items:center;gap:14px;background:var(--card);border:1p
 /* לא בתחתית — שם הוא חפף את הפס התחתון */
 #hint{position:fixed;inset-inline-start:16px;top:16px;z-index:9;font-size:.78rem;color:var(--muted);
   background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:10px;padding:7px 11px;
-  opacity:0;transition:opacity .3s;pointer-events:none;max-width:46vw}
+  opacity:0;transition:opacity .3s;pointer-events:none;max-width:calc(46*var(--cw))}
 #hint.on{opacity:1}
 #fsBtn{position:fixed;inset-inline-end:16px;top:16px;z-index:20;width:52px;height:52px;border-radius:14px;
   background:rgba(0,0,0,.55);border:1px solid var(--line);color:var(--gold-lt);font-size:1.3rem;cursor:pointer;
@@ -239,7 +241,7 @@ footer{display:flex;align-items:center;gap:14px;background:var(--card);border:1p
 body:hover #fsBtn,#fsBtn.show{opacity:.9}
 body.fs #fsBtn{display:none}
 @media (max-width:900px){#stage{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
-  aside{grid-row:1/2}main{grid-row:2/3;min-height:40vh}}
+  aside{grid-row:1/2}main{grid-row:2/3;min-height:calc(40*var(--ch))}}
 /* מסך נמוך: סדר היום קודם לכל השאר. מה שיורד כאן ממשיך להופיע בקרוסלה. */
 @media (max-height:860px){ #birthCard{display:none !important} }
 @media (max-height:740px){ #menuCard{display:none !important} #zmanim{display:none !important} }
@@ -296,23 +298,23 @@ footer{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,
   background:radial-gradient(ellipse at 50% 38%,#17323C 0%,#0B1418 72%)}
 #slSiach>*{animation:none}   /* הכלל הכללי .slide.on>* (rise) לא נוגע בשקופית הזאת */
 #slSiach:not(.on) *{animation-play-state:paused}   /* שקופית מוסתרת: אפס תנועה */
-#slSiach .si-ring{position:absolute;width:76vh;height:76vh;border-radius:50%;border:2px solid rgba(227,185,107,.16);top:12vh;inset-inline-start:12vw;animation:siSpin 70s linear infinite}
+#slSiach .si-ring{position:absolute;width:calc(76*var(--ch));height:calc(76*var(--ch));border-radius:50%;border:2px solid rgba(227,185,107,.16);top:calc(12*var(--ch));inset-inline-start:calc(12*var(--cw));animation:siSpin 70s linear infinite}
 @keyframes siSpin{to{transform:rotate(360deg)}}
-#slSiach .si-glow{position:absolute;display:none;width:90vh;height:90vh;border-radius:50%;background:radial-gradient(circle,rgba(227,185,107,.2),transparent 66%);top:5vh;inset-inline-start:50%;margin-inline-start:-45vh;animation:siBreathe 10s ease-in-out infinite}
+#slSiach .si-glow{position:absolute;display:none;width:calc(90*var(--ch));height:calc(90*var(--ch));border-radius:50%;background:radial-gradient(circle,rgba(227,185,107,.2),transparent 66%);top:calc(5*var(--ch));inset-inline-start:50%;margin-inline-start:calc(-45*var(--ch));animation:siBreathe 10s ease-in-out infinite}
 @keyframes siBreathe{0%,100%{opacity:.55}50%{opacity:1}}
-#slSiach .si-shape{position:absolute;display:none;width:34vh;height:34vh;border:2px solid rgba(255,255,255,.1);top:9vh;inset-inline-end:7vw;transform:rotate(20deg)}
-@keyframes siSlant{from{transform:translateX(-3vw) rotate(20deg)}to{transform:translateX(3vw) rotate(38deg)}}
+#slSiach .si-shape{position:absolute;display:none;width:calc(34*var(--ch));height:calc(34*var(--ch));border:2px solid rgba(255,255,255,.1);top:calc(9*var(--ch));inset-inline-end:calc(7*var(--cw));transform:rotate(20deg)}
+@keyframes siSlant{from{transform:translateX(calc(-3*var(--cw))) rotate(20deg)}to{transform:translateX(calc(3*var(--cw))) rotate(38deg)}}
 #slSiach .si-lines{position:absolute;inset:-25%;display:none;background:repeating-linear-gradient(115deg,rgba(227,185,107,.09) 0 2px,transparent 2px 70px);animation:siLines 18s linear infinite}
-@keyframes siLines{to{transform:translate(-12vh,6vh)}}
+@keyframes siLines{to{transform:translate(calc(-12*var(--ch)),calc(6*var(--ch)))}}
 #slSiach .si-dots{position:absolute;inset:0;display:none}
-#slSiach .si-dots i{position:absolute;bottom:-3vh;width:.9vh;height:.9vh;border-radius:50%;background:var(--gold-lt);opacity:0;animation:siRise 11s linear infinite}
+#slSiach .si-dots i{position:absolute;bottom:calc(-3*var(--ch));width:calc(.9*var(--ch));height:calc(.9*var(--ch));border-radius:50%;background:var(--gold-lt);opacity:0;animation:siRise 11s linear infinite}
 #slSiach .si-dots i:nth-child(1){inset-inline-start:14%;animation-delay:0s}
-#slSiach .si-dots i:nth-child(2){inset-inline-start:30%;animation-delay:-3s;width:1.3vh;height:1.3vh}
+#slSiach .si-dots i:nth-child(2){inset-inline-start:30%;animation-delay:-3s;width:calc(1.3*var(--ch));height:calc(1.3*var(--ch))}
 #slSiach .si-dots i:nth-child(3){inset-inline-start:48%;animation-delay:-6s}
-#slSiach .si-dots i:nth-child(4){inset-inline-start:64%;animation-delay:-2s;width:1.1vh;height:1.1vh}
+#slSiach .si-dots i:nth-child(4){inset-inline-start:64%;animation-delay:-2s;width:calc(1.1*var(--ch));height:calc(1.1*var(--ch))}
 #slSiach .si-dots i:nth-child(5){inset-inline-start:80%;animation-delay:-8s}
-#slSiach .si-dots i:nth-child(6){inset-inline-start:91%;animation-delay:-5s;width:.7vh;height:.7vh}
-@keyframes siRise{0%{transform:translateY(0);opacity:0}10%{opacity:.6}90%{opacity:.25}100%{transform:translateY(-108vh);opacity:0}}
+#slSiach .si-dots i:nth-child(6){inset-inline-start:91%;animation-delay:-5s;width:calc(.7*var(--ch));height:calc(.7*var(--ch))}
+@keyframes siRise{0%{transform:translateY(0);opacity:0}10%{opacity:.6}90%{opacity:.25}100%{transform:translateY(calc(-108*var(--ch)));opacity:0}}
 #slSiach.tone-solemn .si-glow{display:block}
 #slSiach.tone-uplifting .si-dots{display:block}
 #slSiach.tone-challenging .si-shape{display:block;animation:siSlant 14s ease-in-out infinite alternate}
@@ -320,10 +322,10 @@ footer{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,
 
 /* איור האובייקט: מאחורי הטקסט, קווי זהב בשקיפות נמוכה (לא פוגע בקריאות) */
 /* hook/kw/tag: איור גדול וחלש מאחורי הטקסט (שקיפות עד 0.12, בלי קווים חזקים מעל האותיות) */
-#slSiach #siArt{position:absolute;left:50%;top:50%;width:84vh;height:84vh;transform:translate(-50%,-50%);opacity:.12;overflow:visible;pointer-events:none;transition:none}
+#slSiach #siArt{position:absolute;left:50%;top:50%;width:calc(84*var(--ch));height:calc(84*var(--ch));transform:translate(-50%,-50%);opacity:.12;overflow:visible;pointer-events:none;transition:none}
 /* body/q: עמודה שמאל (שליש), טקסט בשני השלישים הימניים (RTL). האיור ~44% מגובה המסך */
-#slSiach.lay-col #siArt{left:15vw;top:50%;width:46vh;height:46vh;opacity:.92}
-#slSiach.lay-col .si-stage{justify-content:flex-start;padding:0 4vw 7vh 36vw}
+#slSiach.lay-col #siArt{left:calc(15*var(--cw));top:50%;width:calc(46*var(--ch));height:calc(46*var(--ch));opacity:.92}
+#slSiach.lay-col .si-stage{justify-content:flex-start;padding:0 calc(4*var(--cw)) calc(7*var(--ch)) calc(36*var(--cw))}
 #slSiach.lay-col #siText{text-align:start;width:100%}
 #slSiach #siArt .ic{fill:none;stroke:var(--gold-lt);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;animation:siFloat 7s ease-in-out infinite}
 #slSiach #siArt .pl{fill:url(#siGl);stroke:none;transform-box:fill-box;transform-origin:center;animation:siBreathe 10s ease-in-out infinite}
@@ -354,13 +356,13 @@ footer{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,
 @keyframes siFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @keyframes siTwinkle{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 
-#slSiach .si-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 3vw 7vh;box-sizing:border-box}
-#slSiach #siText{position:relative;font-weight:900;line-height:1.2;color:#fff;text-align:center;text-shadow:0 .4vh 2.4vh rgba(0,0,0,.35);animation:siBlurIn .9s cubic-bezier(.2,.8,.2,1) both}
-@keyframes siBlurIn{from{opacity:0;filter:blur(12px);transform:translateY(2.4vh)}to{opacity:1;filter:blur(0);transform:none}}
-#slSiach.bt-hook #siText{font-size:min(210px,10.9vw);line-height:1.1;width:100%}
-#slSiach.bt-kw #siText{font-size:min(250px,13vw);line-height:1.08;color:var(--gold-lt);width:100%}
-#slSiach.bt-body #siText{font-size:clamp(100px,6.8vw,130px);font-weight:800;line-height:1.32;color:#f3e6c8}   /* קצר = עד 130px, אבל לא פחות מ-100px */
-#slSiach.bt-q #siText{font-size:min(120px,6.2vw);font-weight:900;line-height:1.22;color:var(--gold-lt)}
+#slSiach .si-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 calc(3*var(--cw)) calc(7*var(--ch));box-sizing:border-box}
+#slSiach #siText{position:relative;font-weight:900;line-height:1.2;color:#fff;text-align:center;text-shadow:0 calc(.4*var(--ch)) calc(2.4*var(--ch)) rgba(0,0,0,.35);animation:siBlurIn .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes siBlurIn{from{opacity:0;filter:blur(12px);transform:translateY(calc(2.4*var(--ch)))}to{opacity:1;filter:blur(0);transform:none}}
+#slSiach.bt-hook #siText{font-size:min(210px,calc(10.9*var(--cw)));line-height:1.1;width:100%}
+#slSiach.bt-kw #siText{font-size:min(250px,calc(13*var(--cw)));line-height:1.08;color:var(--gold-lt);width:100%}
+#slSiach.bt-body #siText{font-size:clamp(100px,calc(6.8*var(--cw)),130px);font-weight:800;line-height:1.32;color:#f3e6c8}   /* קצר = עד 130px, אבל לא פחות מ-100px */
+#slSiach.bt-q #siText{font-size:min(120px,calc(6.2*var(--cw)));font-weight:900;line-height:1.22;color:var(--gold-lt)}
 #slSiach.bt-tag #siText{opacity:0;animation:none}
 #slSiach #siText .w{display:inline-block;animation-delay:var(--d,0s);animation-fill-mode:both;animation-duration:1s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
 /* שלושה טונים = שלוש שפות תנועה (אותו פריסה) */
@@ -368,9 +370,9 @@ footer{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,
 #slSiach.tone-uplifting #siText .w{animation-name:siPop;animation-duration:.8s;animation-timing-function:cubic-bezier(.2,1.25,.4,1)}
 #slSiach.tone-challenging #siText .w{animation-name:siSlide;animation-duration:.45s;animation-timing-function:cubic-bezier(.2,.9,.3,1)}
 #slSiach.tone-challenging.bt-kw #siText .w{animation-name:siSlam;animation-duration:.5s;animation-timing-function:cubic-bezier(.2,1.4,.4,1)}
-@keyframes siFade{from{opacity:0;transform:translateY(2.4vh)}to{opacity:1;transform:none}}
+@keyframes siFade{from{opacity:0;transform:translateY(calc(2.4*var(--ch)))}to{opacity:1;transform:none}}
 @keyframes siPop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
-@keyframes siSlide{from{opacity:0;transform:translateX(7vw)}to{opacity:1;transform:none}}
+@keyframes siSlide{from{opacity:0;transform:translateX(calc(7*var(--cw)))}to{opacity:1;transform:none}}
 @keyframes siSlam{from{opacity:0;transform:scale(1.45)}to{opacity:1;transform:none}}
 /* מילת מפתח: סימון מרקר (רצועת זהב שנמשכת מאחורי המילה, transform בלבד) */
 #slSiach .kwi{position:relative;display:inline-block;z-index:0;color:#fff}
@@ -384,29 +386,29 @@ footer{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,
 #slSiach.tone-uplifting .kwi,#slSiach.tone-challenging .kwi{animation:siPop2 .5s .9s both}
 @keyframes siPop2{0%{transform:scale(1)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
 /* כרטיס התג: beat מלא במרכז המסך, נכנס בהסחה מהצד; מופיע פעם אחת בתחילת כל מסר */
-#slSiach #siTag{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;padding-bottom:7vh;box-sizing:border-box;pointer-events:none}
-#slSiach #siTagTxt{display:inline-block;padding:4vh 4.5vw;border-radius:2.4vh;max-width:86vw;
-  background:linear-gradient(90deg,rgba(224,169,59,.96),rgba(227,185,107,.78));color:#0B1418;font-size:min(104px,5.4vw);font-weight:900;line-height:1.2;text-align:center;
-  box-shadow:0 1.5vh 4vh rgba(0,0,0,.35)}
+#slSiach #siTag{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;padding-bottom:calc(7*var(--ch));box-sizing:border-box;pointer-events:none}
+#slSiach #siTagTxt{display:inline-block;padding:calc(4*var(--ch)) calc(4.5*var(--cw));border-radius:calc(2.4*var(--ch));max-width:calc(86*var(--cw));
+  background:linear-gradient(90deg,rgba(224,169,59,.96),rgba(227,185,107,.78));color:#0B1418;font-size:min(104px,calc(5.4*var(--cw)));font-weight:900;line-height:1.2;text-align:center;
+  box-shadow:0 calc(1.5*var(--ch)) calc(4*var(--ch)) rgba(0,0,0,.35)}
 #slSiach.bt-tag #siTag{opacity:1}
 #slSiach.bt-tag #siTagTxt{animation:siSweep 1.6s cubic-bezier(.6,0,.2,1) both}
 #slSiach.tone-solemn.bt-tag #siTagTxt{background:rgba(227,185,107,.85);animation-name:siSweepSoft;animation-duration:2.2s}
 #slSiach.tone-challenging.bt-tag #siTagTxt{animation-duration:.9s}
 @keyframes siSweep{0%{transform:translateX(-30%) skewY(-3deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
 @keyframes siSweepSoft{0%{transform:translateX(-8%);opacity:0}40%{opacity:1}100%{transform:none;opacity:1}}
-#sbCard{position:absolute;inset:0;bottom:var(--pbH);z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4vh;text-align:center;padding:4vw;
+#sbCard{position:absolute;inset:0;bottom:var(--pbH);z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(2.4*var(--ch));text-align:center;padding:calc(4*var(--cw));
   background:radial-gradient(ellipse at 50% 40%,#17323C 0%,#0B1418 72%);opacity:0;pointer-events:none;transition:opacity .6s}
 #sbCard.on{opacity:1}
-#sbKick{font-size:clamp(1.3rem,2.4vw,2.3rem);font-weight:800;color:#0B1418;background:var(--gold);padding:.25em 1.1em;border-radius:99px}
-#sbHead{font-size:clamp(3rem,7vw,7rem);font-weight:900;line-height:1.08;color:#fff;max-width:22ch}
-#sbBody{font-size:clamp(1.6rem,3.4vw,3.2rem);font-weight:700;color:var(--gold-lt);max-width:34ch;line-height:1.3}
+#sbKick{font-size:clamp(1.3rem,calc(2.4*var(--cw)),2.3rem);font-weight:800;color:#0B1418;background:var(--gold);padding:.25em 1.1em;border-radius:99px}
+#sbHead{font-size:clamp(3rem,calc(7*var(--cw)),7rem);font-weight:900;line-height:1.08;color:#fff;max-width:22ch}
+#sbBody{font-size:clamp(1.6rem,calc(3.4*var(--cw)),3.2rem);font-weight:700;color:var(--gold-lt);max-width:34ch;line-height:1.3}
 /* ── "חדש במסך ההפסקות" ── */
 #slFresh .fr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px;width:min(1100px,94%);margin-top:10px}
 #slFresh .fi{display:flex;align-items:center;gap:14px;text-align:start;padding:14px 18px;border-radius:16px;
   background:linear-gradient(90deg,rgba(224,169,59,.16),rgba(255,255,255,.04));border:1px solid rgba(227,185,107,.25)}
-#slFresh .fi i{font-size:calc(clamp(1.4rem,2.6vw,2.3rem)*var(--s,1));color:var(--gold-lt)}
-#slFresh .fi b{display:block;font-size:calc(clamp(1.15rem,2.2vw,2rem)*var(--s,1));font-weight:800;line-height:1.15}
-#slFresh .fi small{display:block;font-size:calc(clamp(.8rem,1.3vw,1.15rem)*var(--s,1));color:var(--muted);margin-top:2px}
+#slFresh .fi i{font-size:calc(clamp(1.4rem,calc(2.6*var(--cw)),2.3rem)*var(--s,1));color:var(--gold-lt)}
+#slFresh .fi b{display:block;font-size:calc(clamp(1.15rem,calc(2.2*var(--cw)),2rem)*var(--s,1));font-weight:800;line-height:1.15}
+#slFresh .fi small{display:block;font-size:calc(clamp(.8rem,calc(1.3*var(--cw)),1.15rem)*var(--s,1));color:var(--muted);margin-top:2px}
 #slFresh .new{font-size:.62em;font-weight:800;color:#0b1418;background:var(--gold-lt);border-radius:99px;padding:.1em .6em;margin-inline-start:.4em;vertical-align:middle}
 
 /* ── בוחרים לצמוח: שכבה משלו בתוך main (גם כשקופית בקרוסלה וגם כהפסקה קצרה בין סרטונים) ── */
@@ -577,6 +579,7 @@ body.prog-on #bxClock{display:none}
 </script>
 <div id="bg"></div>
 
+<div id="canvas">
 <div id="stage">
   <aside>
     <div class="card" id="clockCard">
@@ -679,10 +682,14 @@ body.prog-on #bxClock{display:none}
 </div>
 <button id="fsBtn" title="מסך מלא (F)"><i class="bi bi-arrows-fullscreen"></i></button>
 <div id="hint"></div>
+</div>
 
 <script>
 (function () {
 'use strict';
+// גודל הקנבס לחלון: מקטין או מגדיל את כל המסך פרופורציונלית (נבנה ל-1920x1080)
+function setK() { document.documentElement.style.setProperty('--k', Math.min(innerWidth / 1920, innerHeight / 1080).toFixed(4)); }
+setK(); window.addEventListener('resize', setK);
 
 // ── חיבורים ──────────────────────────────────────────────────────────────
 var SB_URL = 'https://jpcepdbhouuwpjdidqfo.supabase.co';
@@ -2108,7 +2115,7 @@ function asideFree() {
   var used = 0, shown = 0;
   ['clockCard', 'menuCard', 'birthCard'].forEach(function (id) {
     var el = $(id);
-    if (el && getComputedStyle(el).display !== 'none') { used += el.getBoundingClientRect().height; shown++; }
+    if (el && getComputedStyle(el).display !== 'none') { used += el.offsetHeight; shown++; }
   });
   return aside.clientHeight - used - shown * 12;
 }
@@ -2155,7 +2162,7 @@ function asideFree() {
   ['clockCard', 'menuCard', 'birthCard'].forEach(function (id) {
     var el = $(id);
     if (el && el.dataset.hidden !== '1' && getComputedStyle(el).display !== 'none') {
-      used += el.getBoundingClientRect().height; shown++;
+      used += el.offsetHeight; shown++;
     }
   });
   return aside.clientHeight - used - shown * 12;
@@ -2272,6 +2279,30 @@ if (/[?&]test=1/.test(location.search)) window.__lobbyTest = { rotate: rotate, r
   // בדיקת מעבר בין מסרים (?test=1 בלבד): מציג פיסה j של מסר m בלי טיימרים, כדי לכפות מעבר מסוף מסר א' לתג של מסר ב'
   siachBeat: function (m, j) { var ms = siachPoints(), b = ms[m] ? siachBeats(ms[m]) : []; if (!b[j]) return null; siachRender(b[j]); return b[j].t; },
   siachMsgBeats: function () { return siachPoints().map(function (m) { return siachBeats(m).length; }); } };
+})();
+</script>
+<script>
+// טריילר טיול תל גזר (11/11/2026): ב-12/11 בין 09:00 ל-23:00, כל 2-3 דקות שכבה במסך מלא עם הטריילר (בלי קול).
+// לא נוגע בשאר המסך: אם הקובץ /tiyul/trailer.mp4 לא קיים, או מחוץ לחלון הזמן, לא קורה כלום.
+(function () { return; // כבוי 16/11/2026: השכבה הייתה לטיול 12/11 בלבד
+  var FROM = new Date(2026, 10, 12, 9, 0, 0).getTime(), TO = new Date(2026, 10, 12, 23, 0, 0).getTime();
+  var base = (typeof LOCAL !== 'undefined' && LOCAL) ? LOCAL : '';
+  var url = base + '/tiyul/trailer.mp4', busyT = false;
+  function inWindow() { var t = Date.now(); return t >= FROM && t < TO; }
+  function play() {
+    if (busyT || !inWindow()) return;
+    busyT = true;
+    var v = document.createElement('video');
+    v.src = url; v.muted = true; v.playsInline = true; v.preload = 'auto';
+    v.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;object-fit:cover;background:#000;z-index:2147483000;opacity:0;transition:opacity .8s ease';
+    var done = function () { try { v.pause(); } catch (e) {} v.style.opacity = '0'; setTimeout(function () { try { v.remove(); } catch (e) {} busyT = false; }, 900); };
+    v.addEventListener('canplay', function () { document.body.appendChild(v); requestAnimationFrame(function () { v.style.opacity = '1'; }); v.play().catch(done); }, { once: true });
+    v.addEventListener('ended', done); v.addEventListener('error', function () { try { v.remove(); } catch (e) {} busyT = false; });
+    setTimeout(function () { if (busyT) done(); }, 150000);   // רשת ביטחון: לעולם לא נתקע על המסך
+    v.load();
+  }
+  function tick() { setTimeout(function () { play(); tick(); }, (130 + Math.random() * 50) * 1000); }
+  setTimeout(tick, 20000);
 })();
 </script>
 </body>
