@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>שלט אסיפת ההורים: מעבר על התמונות</title>
+  <script src="vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <style>
+    :root { --ink:#1c2733; --muted:#5b6876; --bg:#f3f5f8; --card:#fff; --line:#d9dee5; --red:#d32f2f; --ok:#2e7d32; --pri:#1f4e79; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family: Arial, "Segoe UI", sans-serif; padding-bottom:84px; }
+    .wrap { max-width:1300px; margin:0 auto; padding:12px; }
+    h1 { font-size:1.45rem; margin:6px 0 4px; color:var(--pri); text-align:center; }
+    .help { text-align:center; color:var(--muted); font-size:1.05rem; line-height:1.6; margin:0 0 10px; }
+    .sheetbox { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px; margin-bottom:12px; text-align:center; }
+    .sheetbox img { width:100%; height:auto; border-radius:6px; cursor:zoom-in; display:block; }
+    .sheetbox small { color:var(--muted); display:block; margin-top:4px; }
+    .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    @media (min-width:700px) { .grid { grid-template-columns:repeat(4,1fr); } }
+    @media (min-width:1100px) { .grid { grid-template-columns:repeat(5,1fr); } }
+    .cell { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+    .pic { position:relative; aspect-ratio:4/3; background:#e4e8ee; cursor:pointer; border:4px solid transparent; user-select:none; -webkit-tap-highlight-color:transparent; }
+    .pic img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
+    .num { position:absolute; top:6px; right:6px; background:rgba(20,30,45,.85); color:#fff; font-weight:800; font-size:1.25rem; min-width:46px; text-align:center; padding:3px 9px; border-radius:20px; z-index:2; }
+    .cell.rm .pic { border-color:var(--red); }
+    .cell.rm .pic::after { content:"להוריד"; position:absolute; inset:0; background:rgba(211,47,47,.38); color:#fff; font-weight:900; font-size:1.7rem; display:flex; align-items:center; justify-content:center; text-shadow:0 2px 6px rgba(0,0,0,.6); }
+    .cell .note { display:none; padding:6px; }
+    .cell.rm .note { display:block; }
+    .note input { width:100%; font:inherit; font-size:1rem; padding:8px; border:1px solid var(--line); border-radius:8px; }
+    .st { position:absolute; bottom:6px; left:6px; font-size:.85rem; padding:2px 8px; border-radius:10px; background:#fff; z-index:3; display:none; }
+    .st.ok { display:block; color:var(--ok); }
+    .st.err { display:block; color:var(--red); font-weight:700; cursor:pointer; }
+    .bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:2px solid var(--line); padding:10px 12px; display:flex; gap:10px; align-items:center; justify-content:space-between; z-index:20; box-shadow:0 -4px 14px rgba(0,0,0,.1); }
+    .bar b { font-size:1.15rem; }
+    .btn { font:inherit; font-size:1.1rem; font-weight:800; padding:11px 22px; border:0; border-radius:10px; background:var(--pri); color:#fff; cursor:pointer; }
+    .btn.done { background:var(--ok); }
+    .msg { text-align:center; padding:40px 12px; color:var(--muted); font-size:1.2rem; }
+    .thanks { background:#e8f5e9; border:2px solid var(--ok); color:#1b5e20; border-radius:12px; padding:14px; text-align:center; font-size:1.15rem; font-weight:700; margin-bottom:12px; }
+    .ov { position:fixed; inset:0; background:#000d; z-index:50; display:none; flex-direction:column; }
+    .ov.on { display:flex; }
+    .ov .tools { display:flex; gap:8px; padding:8px; justify-content:center; background:#111; }
+    .ov .tools button { font:inherit; font-size:1.2rem; padding:6px 18px; border-radius:8px; border:0; font-weight:800; }
+    .ov .sc { flex:1; overflow:auto; }
+    .ov img { display:block; max-width:none; }
+  </style>
+</head>
+<body>
+<div class="wrap" id="root"><div class="msg">טוען…</div></div>
+<div class="bar" id="bar" style="display:none"><span><b id="cnt">0</b> תמונות סומנו להורדה<span id="saveall" style="margin-right:10px;color:var(--muted);font-size:.95rem"></span></span><button class="btn" id="done">סיימתי</button></div>
+<div class="ov" id="ov"><div class="tools"><button id="zi">+</button><button id="zo">−</button><button id="zc">סגור</button></div><div class="sc" id="sc"><img id="big" alt=""></div></div>
+<script src="js/asifa-review.js"></script>
+</body>
+</html>
