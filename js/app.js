@@ -23,6 +23,8 @@
     { id: 'passport',      label: 'דרכון',            icon: 'bi-passport',        group: G1, color: '#b7791f' },
     { id: 'students',      label: 'תלמידים',          icon: 'bi-people-fill',     group: G2, color: '#2b7c98' },
     { id: 'medical',       label: 'רפואי',            icon: 'bi-capsule',         group: G2, color: '#d35400' },
+    // כדורים — לשונית נפרדת לרב קליין (ומנהל). הגישה נבדקת ב-Auth.canAccess ובשרת (can_manage_meds).
+    { id: 'meds',          label: 'כדורים',           icon: 'bi-capsule-pill',    group: G2, color: '#c0392b' },
     // אירועים חריגים (תאונות, פציעות, אירועים רפואיים, אלימות) — קבצים לאירוע עצמו (2026-11-12)
     { id: 'incidents',     label: 'אירועים חריגים',   icon: 'bi-exclamation-octagon', group: G2, color: '#b91c1c' },
     { id: 'books',         label: 'הזמנת ספרים',      icon: 'bi-journals',        group: G2, color: '#8a6d3b' },

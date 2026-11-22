@@ -308,6 +308,8 @@
     canAccess: function (id) {
       const u = A.currentUser; if (!u) return false;
       if (u.role === 'מנהל') return true;
+      // כדורים: מנהל, או מי שסומן במפורש (perms ∋ 'meds'). לא לפי ברירת המחדל של התפקיד.
+      if (id === 'meds') return Array.isArray(u.perms) && u.perms.includes('meds');
       const m = (window.MODULES || []).find(x => x.id === id);
       if (m && m.adminOnly) return false;
       if (A.perms) return A.perms.includes(id);
