@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>ישיבת משמרת חיים, אסיפת הורים</title>
+  <link rel="stylesheet" href="vendor/bootstrap-icons.css">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <style>
+    body { background: var(--bg); display: block; }
+    .ya-wrap { max-width: 640px; margin: 0 auto; padding: 14px 12px 40px; }
+    .ya-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 16px; margin-top: 14px; }
+    .ya-card h1 { font-size: 1.5rem; color: var(--primary-dark); font-weight: 800; text-align: center; margin: 0 0 6px; }
+    .ya-when { text-align: center; font-size: 1.15rem; font-weight: 700; color: var(--accent); line-height: 1.5; }
+    .ya-note { text-align: center; color: var(--muted); font-size: 1rem; line-height: 1.6; margin-top: 8px; }
+    .ya-lbl { display: block; font-weight: 800; font-size: 1.1rem; color: var(--primary-dark); margin: 14px 0 6px; }
+    .ya-inp { width: 100%; font-size: 1.25rem; padding: 12px 14px; border: 2px solid var(--line); border-radius: 12px; font-family: inherit; background: var(--card); color: var(--ink); }
+    .ya-inp.ltr { direction: ltr; text-align: center; }
+    .ya-inp:focus { outline: none; border-color: var(--accent); }
+    .ya-cls { display: flex; gap: 8px; }
+    .ya-cls label { flex: 1; position: relative; text-align: center; font-size: 1.2rem; font-weight: 800; border: 2px solid var(--line); border-radius: 12px; cursor: pointer; color: var(--primary-dark); background: var(--card); overflow: hidden; }
+    .ya-cls input { position: absolute; opacity: 0; pointer-events: none; }
+    .ya-cls span { display: block; padding: 12px 6px; }
+    .ya-cls input:checked + span { background: var(--primary-dark); color: #fff; }
+    .ya-cls input:focus + span { outline: 3px solid var(--accent); outline-offset: -3px; }
+    .ya-btn { width: 100%; margin-top: 14px; padding: 15px; font-size: 1.2rem; font-weight: 800; border: none; border-radius: 12px; background: var(--primary-dark); color: #fff; cursor: pointer; font-family: inherit; }
+    .ya-btn.ghost { background: var(--card); color: var(--primary-dark); border: 2px solid var(--line); }
+    .ya-btn.danger { background: var(--card); color: var(--danger); border: 2px solid var(--danger); }
+    .ya-btn.sm { margin-top: 8px; padding: 10px; font-size: 1rem; }
+    .ya-btn:disabled { opacity: .55; }
+    .ya-msg { margin-top: 12px; text-align: center; font-size: 1.05rem; font-weight: 700; color: var(--danger); min-height: 1.2em; line-height: 1.5; }
+    .ya-hello { font-size: 1.25rem; font-weight: 800; color: var(--primary-dark); text-align: center; }
+    .ya-rav { border: 2px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 12px; }
+    .ya-rav.done { border-color: var(--ok); background: rgba(31,138,91,.06); }
+    .ya-rav h3 { margin: 0 0 2px; font-size: 1.2rem; font-weight: 800; color: var(--primary-dark); }
+    .ya-where { color: var(--muted); font-size: .98rem; font-weight: 700; margin-bottom: 8px; }
+    .ya-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+    .ya-slot { padding: 10px 0 8px; font-size: 1.2rem; font-weight: 800; border: 2px solid var(--primary-light); border-radius: 12px; background: var(--card); color: var(--primary-dark); cursor: pointer; font-family: inherit; line-height: 1.25; }
+    .ya-slot small { display: block; font-size: .85rem; font-weight: 700; }
+    .ya-slot:disabled { background: #e9edf1; color: #6d7a86; border-color: #cfd6dd; cursor: not-allowed; }
+    .ya-slot:disabled b { text-decoration: line-through; }
+    .ya-slot.mine:disabled { background: var(--ok); color: #fff; border-color: var(--ok); }
+    .ya-ok { text-align: center; padding: 6px 0; }
+    .ya-ok i { font-size: 3.2rem; color: var(--ok); }
+    .ya-ok .big { font-size: 1.5rem; font-weight: 800; color: var(--primary-dark); margin: 6px 0; }
+    .ya-sum { background: var(--accent-soft); border-radius: 12px; padding: 12px; margin: 10px 0; font-size: 1.2rem; line-height: 1.9; text-align: center; font-weight: 700; color: var(--ink); }
+    .ya-sum .t { font-size: 1.7rem; color: var(--primary-dark); font-weight: 800; }
+    .ya-item { border: 2px solid var(--ok); border-radius: 12px; padding: 10px 12px; margin-top: 10px; background: rgba(31,138,91,.06); line-height: 1.6; }
+    .ya-item b { font-size: 1.15rem; color: var(--primary-dark); }
+    .ya-row { display: flex; gap: 8px; }
+    .ya-sec { font-weight: 800; font-size: 1.15rem; color: var(--primary-dark); text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="ya-wrap">
+    <div id="root"><div class="ya-card"><div class="ya-note">טוען…</div></div></div>
+  </div>
+<script src="js/yeshiva-asifa.js"></script>
+</body>
+</html>

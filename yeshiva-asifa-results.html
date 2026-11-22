@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>ישיבת משמרת חיים, תוצאות אסיפת הורים</title>
+  <link rel="stylesheet" href="css/main.css">
+  <script src="vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <style>
+    body { background: var(--bg); display: block; }
+    .yr-wrap { max-width: 1200px; margin: 0 auto; padding: 14px 12px 40px; }
+    .yr-top { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+    .yr-top h1 { font-size: 1.5rem; color: var(--primary-dark); font-weight: 800; }
+    .yr-sub { color: var(--muted); font-weight: 700; }
+    .yr-btn { padding: 10px 18px; font-size: 1.05rem; font-weight: 800; border: 2px solid var(--primary-dark); border-radius: 10px; background: var(--primary-dark); color: #fff; cursor: pointer; font-family: inherit; }
+    .yr-sums { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+    .yr-sum { flex: 1; min-width: 200px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+    .yr-sum b { display: block; color: var(--primary-dark); }
+    .yr-sum span { color: var(--muted); font-weight: 700; }
+    table.yr { width: 100%; border-collapse: collapse; background: var(--card); table-layout: fixed; }
+    .yr th, .yr td { border: 1px solid #b9c3cd; padding: 8px 8px; vertical-align: top; text-align: right; line-height: 1.5; overflow-wrap: anywhere; }
+    .yr th { background: var(--accent-soft); color: var(--primary-dark); font-size: 1.05rem; }
+    .yr th small { display: block; font-weight: 700; color: var(--muted); }
+    .yr td.t { width: 78px; text-align: center; font-weight: 800; font-size: 1.15rem; direction: ltr; background: #f3f6f9; }
+    .yr td.free { color: #8a96a2; text-align: center; }
+    .yr .ph { direction: ltr; unicode-bidi: embed; display: inline-block; }
+    .yr .stu { font-weight: 800; }
+    .yr .cl { color: var(--muted); }
+    .yr-msg { text-align: center; padding: 40px 0; font-size: 1.2rem; color: var(--muted); }
+    @page { size: A4 landscape; margin: 10mm; }
+    @media print {
+      body { background: #fff; }
+      .yr-wrap { padding: 0; max-width: none; }
+      .no-print { display: none !important; }
+      .yr th, .yr td { padding: 4px 6px; font-size: 11pt; }
+      .yr tr { break-inside: avoid; }
+      .yr-sum { padding: 4px 8px; }
+      .yr-top h1 { font-size: 16pt; }
+    }
+  </style>
+</head>
+<body>
+  <div class="yr-wrap" id="root"><div class="yr-msg">טוען…</div></div>
+<script>
+(function () {
+  'use strict';
+  const C = window.CV3 || {};
+  const root = document.getElementById('root');
+  const key = new URLSearchParams(location.search).get('k');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sb = (C.SUPABASE_URL && C.SUPABASE_ANON_KEY && window.supabase)
+    ? window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY) : null;
+
+  function hm2min(t) { const p = String(t).split(':'); return (+p[0]) * 60 + (+p[1]); }
+  function min2hm(n) { return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); }
+  function fmtPhone(p) {
+    const d = String(p || '').replace(/\D/g, '');
+    if (!d) return '';
+    const n = d.length === 9 ? '0' + d : d;
+    return n.length === 10 ? n.slice(0, 3) + '-' + n.slice(3) : n;
+  }
+  function dateText(iso) {
+    try { return new Date(iso + 'T12:00:00').toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+    catch (_) { return iso; }
+  }
+
+  function render(d) {
+    const rabs = d.rabbis || [];
+    // כל השעות שמופיעות אצל אחד הרבנים
+    const times = [];
+    rabs.forEach(r => { for (let t = hm2min(r.start); t + d.slot_minutes <= hm2min(r.end); t += d.slot_minutes) { const h = min2hm(t); if (times.indexOf(h) < 0) times.push(h); } });
+    rabs.forEach(r => (r.bookings || []).forEach(b => { if (times.indexOf(b.time) < 0) times.push(b.time); }));
+    times.sort();
+    let total = 0, taken = 0;
+    const cap = r => { let n = 0; for (let t = hm2min(r.start); t + d.slot_minutes <= hm2min(r.end); t += d.slot_minutes) n++; return n; };
+
+    let sums = '<div class="yr-sums">';
+    rabs.forEach(r => {
+      const c = cap(r), t = (r.bookings || []).length; total += c; taken += t;
+      sums += '<div class="yr-sum"><b>' + esc(r.name) + '</b><span>תפוסים ' + t + ' · פנויים ' + Math.max(0, c - t) + ' (מתוך ' + c + ')</span></div>';
+    });
+    sums += '<div class="yr-sum"><b>סך הכול</b><span>תפוסים ' + taken + ' · פנויים ' + Math.max(0, total - taken) + ' (מתוך ' + total + ')</span></div></div>';
+
+    let tb = '<table class="yr"><thead><tr><th style="width:78px">שעה</th>' +
+      rabs.map(r => '<th>' + esc(r.name) + (r.where ? '<small>' + esc(r.where) + '</small>' : '') + '</th>').join('') + '</tr></thead><tbody>';
+    times.forEach(t => {
+      tb += '<tr><td class="t">' + t + '</td>';
+      rabs.forEach(r => {
+        const b = (r.bookings || []).find(x => x.time === t);
+        const inRange = hm2min(t) >= hm2min(r.start) && hm2min(t) + d.slot_minutes <= hm2min(r.end);
+        if (b) tb += '<td><span class="stu">' + esc(b.student) + '</span> <span class="cl">(' + esc(b.class_name) + ')</span><br>' +
+          esc(b.parent) + '<br><span class="ph">' + esc(fmtPhone(b.phone)) + '</span></td>';
+        else tb += '<td class="free">' + (inRange ? 'פנוי' : '—') + '</td>';
+      });
+      tb += '</tr>';
+    });
+    tb += '</tbody></table>';
+
+    const now = new Date();
+    root.innerHTML = '<div class="yr-top"><div><h1>' + esc(d.title) + ' · תוצאות</h1><div class="yr-sub">' + esc(dateText(d.date)) +
+      ' · עודכן ' + now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + '</div></div>' +
+      '<button class="yr-btn no-print" id="pr">הדפסה</button></div>' + sums + tb;
+    document.getElementById('pr').addEventListener('click', () => window.print());
+  }
+
+  async function load(first) {
+    try {
+      const { data, error } = await sb.rpc('yeshiva_asifa_results', { p_key: key });
+      if (error) throw error;
+      if (!data) { root.innerHTML = '<div class="yr-msg">הקישור אינו תקין.</div>'; return false; }
+      render(data); return true;
+    } catch (e) { if (first) root.innerHTML = '<div class="yr-msg">שגיאה בחיבור. נסו לרענן.</div>'; return true; }
+  }
+
+  (async function init() {
+    if (!key || !sb) { root.innerHTML = '<div class="yr-msg">הקישור אינו תקין.</div>'; return; }
+    const ok = await load(true);
+    if (ok) setInterval(() => { if (!document.hidden) load(false); }, 60000);
+  })();
+})();
+</script>
+</body>
+</html>
