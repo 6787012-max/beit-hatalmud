@@ -47,6 +47,9 @@ window.cv3MedsInfo = [
       { t: 'DailyMed — עלון Concerta', u: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=1a88218c-5b18-4220-8f56-526de1a276cd' },
       { t: 'DailyMed — עלון מתילפנידאט LA (גנרי של ריטלין LA)', u: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=d8c14df4-ac05-d69d-9308-58a51d568329' }
     ],
+    images: [
+      { t: 'ריטלין 10 מ"ג — קופסה (תווית)', u: 'img/meds/ritalin-10-box.jpg', kind: 'box', brand: 'ריטלין', strength: '10', src: 'DailyMed (המאגר הרשמי של ארה"ב), תווית היצרן Sandoz', srcUrl: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=d6fb2750-cdab-4749-ba0d-7534840a5892', il: false }
+    ],
     checked: '2026-11-26'
   },
   {
@@ -85,6 +88,10 @@ window.cv3MedsInfo = [
     sources: [
       { t: 'MedlinePlus — Dexmethylphenidate', u: 'https://medlineplus.gov/druginfo/meds/a603014.html' },
       { t: 'DailyMed — עלון Focalin (טבליות)', u: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=2016f5c2-95d2-4655-af65-c588c2bf5e6d' }
+    ],
+    images: [
+      { t: 'פוקלין 10 מ"ג — קופסה (תווית)', u: 'img/meds/focalin-10-box.jpg', kind: 'box', brand: 'פוקלין', strength: '10', src: 'DailyMed (המאגר הרשמי של ארה"ב), תווית היצרן Sandoz', srcUrl: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=2016f5c2-95d2-4655-af65-c588c2bf5e6d', il: false },
+      { t: 'פוקלין 5 מ"ג — קופסה (תווית)', u: 'img/meds/focalin-5-box.jpg', kind: 'box', brand: 'פוקלין', strength: '5', src: 'DailyMed (המאגר הרשמי של ארה"ב), תווית היצרן Sandoz', srcUrl: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=2016f5c2-95d2-4655-af65-c588c2bf5e6d', il: false }
     ],
     checked: '2026-11-26'
   },
@@ -126,6 +133,7 @@ window.cv3MedsInfo = [
       { t: 'תקציר מאפייני תכשיר אטנט (עלון לרופא, אושר במשרד הבריאות)', u: 'https://pharmaline.co.il/wp-content/uploads/2024/09/Attent-10-20-30-mg-1.9D.pdf' },
       { t: 'משרד הבריאות — מסמכי אטנט XR (לא נקרא במלואו, רק כותרת)', u: 'https://mohpublic.z6.web.core.windows.net/IsraelDrugs/Rishum01_7_171022423.pdf' }
     ],
+    images: [],
     checked: '2026-11-26'
   },
   {
@@ -169,6 +177,11 @@ window.cv3MedsInfo = [
       { t: 'MedlinePlus — Lisdexamfetamine', u: 'https://medlineplus.gov/druginfo/meds/a607047.html' },
       { t: 'FDA — תווית Vyvanse', u: 'https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/208510s009lbl.pdf' }
     ],
+    images: [
+      { t: 'ויואנס 30 מ"ג — קופסה (תווית)', u: 'img/meds/vyvanse-30-box.jpg', kind: 'box', brand: 'ויואנס', strength: '30', src: 'DailyMed (המאגר הרשמי של ארה"ב), תווית של מפיץ משני', srcUrl: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=a310fc51-2743-4755-8398-fed5402283f6', il: false },
+      { t: 'ויואנס 50 מ"ג — קופסה (תווית)', u: 'img/meds/vyvanse-50-box.jpg', kind: 'box', brand: 'ויואנס', strength: '50', src: 'DailyMed (המאגר הרשמי של ארה"ב), תווית של מפיץ משני', srcUrl: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=a310fc51-2743-4755-8398-fed5402283f6', il: false },
+      { t: 'ויואנס 70 מ"ג — קופסה (תווית)', u: 'img/meds/vyvanse-70-box.jpg', kind: 'box', brand: 'ויואנס', strength: '70', src: 'DailyMed (המאגר הרשמי של ארה"ב), תווית של מפיץ משני', srcUrl: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=a310fc51-2743-4755-8398-fed5402283f6', il: false }
+    ],
     checked: '2026-11-26'
   },
   {
@@ -184,6 +197,7 @@ window.cv3MedsInfo = [
     side: [],
     warn: [],
     sources: [],
+    images: [],
     checked: '2026-11-26'
   }
 ];

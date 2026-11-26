@@ -183,6 +183,12 @@
     const ul = arr => (arr && arr.length) ? '<ul style="margin:0;padding-right:20px">' + arr.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : p('');
     const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '#';
     let html = '<div class="mds-banner">מידע כללי מעלון התרופה הרשמי. לא תחליף להוראות הרופא.</div>';
+    const imgs = it && Array.isArray(it.images) ? it.images : [];
+    if (imgs.length) {
+      html += sec('תמונות', '<p style="margin:0 0 8px;font-size:13px">' + esc(IMG_NOTE) + '</p><div class="mds-imgs">' +
+        imgs.map((x, i) => '<button type="button" class="mds-imgb" data-lb="' + i + '"><img src="' + esc(x.u) + '" alt="' + esc(x.t) + '" loading="lazy"><span>' + esc(x.t) + '</span></button>').join('') +
+        '</div>');
+    }
     if (it) {
       if (it.brands && it.brands.length) html += '<p style="margin:0 0 10px"><b>שמות מסחריים:</b> ' + it.brands.map(x => esc(x)).join(', ') + '</p>';
       html += sec('מה זה', p(it.what)) + sec('למה נותנים', p(it.why)) + sec('איך זה פועל', p(it.how)) +
@@ -199,7 +205,79 @@
         '<p><a href="https://israeldrugs.health.gov.il/#!/byDrug" target="_blank" rel="noopener">חיפוש במאגר התרופות של משרד הבריאות</a></p>';
     }
     body.innerHTML = html;
+    body.querySelectorAll('[data-lb]').forEach(b => b.addEventListener('click', () => openLightbox(imgs, Number(b.dataset.lb))));
     return close;
+  }
+
+  // תמונות תרופה (כדור וקופסה) מתוך cv3MedsInfo[].images. לזיהוי בלבד.
+  const IMG_NOTE = 'לזיהוי בלבד. תמיד לבדוק את השם והמינון על האריזה.';
+  const okUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '#';
+  function medImgs(medName) {
+    const list = Array.isArray(window.cv3MedsInfo) ? window.cv3MedsInfo : [];
+    const n = normName(medName);
+    const it = list.find(x => (x.match || []).some(mm => n.includes(normName(mm))));
+    return it && Array.isArray(it.images) ? it.images : [];
+  }
+  // תמונת הכדור שמוצגת ממוזערת בטבלה: לפי מינון השורה, אחרת הראשונה של המותג, אחרת הראשונה של הרשומה
+  function thumbFor(m) {
+    const n = normName(m.name);
+    const pills = medImgs(m.name).filter(x => x.kind === 'pill');
+    if (!pills.length) return null;
+    const ofBrand = pills.filter(x => x.brand && n.includes(normName(x.brand)));
+    const dose = String(m.dose || '');
+    const byDose = ofBrand.find(x => new RegExp('(^|[^0-9])' + String(x.strength) + '([^0-9]|$)').test(dose));
+    return byDose || ofBrand[0] || pills[0];
+  }
+  function thumbBtn(m) {
+    const t = thumbFor(m);
+    return t ? '<button type="button" class="mds-thumb" data-thumb="' + m.id + '" title="הגדלת התמונה"><img src="' + esc(t.u) + '" alt="' + esc(t.t) + '" loading="lazy"></button>' : '';
+  }
+  // הגדלה: חלון כהה עם התמונה, התווית, דפדוף בין תמונות התרופה וסגירה (Esc, רקע או X)
+  function openLightbox(list, start) {
+    if (!list || !list.length) return;
+    let i = Math.max(0, Math.min(start || 0, list.length - 1));
+    const lb = document.createElement('div');
+    lb.className = 'mds-lb';
+    lb.innerHTML = '<div class="mds-lb-in" role="dialog" aria-modal="true" aria-label="תמונה מוגדלת">' +
+      '<button type="button" class="mds-lb-x" aria-label="סגירה">×</button>' +
+      '<div class="mds-lb-note">' + esc(IMG_NOTE) + '</div>' +
+      '<img class="mds-lb-img" alt="">' +
+      '<div class="mds-lb-cap"></div>' +
+      '<div class="mds-lb-nav"><button type="button" class="mds-lb-prev">התמונה הקודמת</button><span class="mds-lb-cnt"></span><button type="button" class="mds-lb-next">התמונה הבאה</button></div>' +
+      '</div>';
+    document.body.appendChild(lb);
+    const img = lb.querySelector('.mds-lb-img');
+    const cap = lb.querySelector('.mds-lb-cap');
+    const cnt = lb.querySelector('.mds-lb-cnt');
+    const prevB = lb.querySelector('.mds-lb-prev');
+    const nextB = lb.querySelector('.mds-lb-next');
+    const show = () => {
+      const x = list[i];
+      img.src = x.u;
+      img.alt = x.t;
+      cap.innerHTML = '<b>' + esc(x.t) + '</b><br>' + (x.kind === 'pill' ? 'כדור' : 'קופסה') + ' · ' +
+        (x.il === false ? '<span class="mds-lb-warn">אריזה אמריקאית — בארץ עשויה להיראות אחרת</span>' : 'אריזה ישראלית') +
+        '<br>מקור: <a href="' + esc(okUrl(x.srcUrl)) + '" target="_blank" rel="noopener">' + esc(x.src || '') + '</a>';
+      cnt.textContent = (i + 1) + ' / ' + list.length;
+      prevB.hidden = nextB.hidden = list.length < 2;
+      cnt.hidden = list.length < 2;
+    };
+    const go = d => { i = (i + d + list.length) % list.length; show(); };
+    const close = () => { lb.remove(); window.removeEventListener('keydown', onKey, true); };
+    const onKey = e => {
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') go(1);
+      else if (e.key === 'ArrowRight') go(-1);
+      else return;
+      e.stopPropagation(); e.preventDefault();
+    };
+    // בשלב capture על window: לא מפעיל גם את סגירת חלון ההסבר שמתחתיו
+    window.addEventListener('keydown', onKey, true);
+    lb.querySelector('.mds-lb-x').addEventListener('click', close);
+    prevB.addEventListener('click', () => go(-1));
+    nextB.addEventListener('click', () => go(1));
+    lb.addEventListener('click', e => { if (e.target === lb) close(); });
+    show();
   }
 
   // פענוח הדבקה מאקסל: שם תלמיד, תרופה, מינון, זמן נטילה, הערות (מופרדים בטאב)
@@ -230,7 +308,8 @@
   .mds-chip{border:1px solid var(--line,#d1d5db);background:var(--card,#fff);border-radius:999px;padding:6px 14px;cursor:pointer;font:inherit;color:inherit}
   .mds-chip.on{background:var(--primary,#003048);color:#fff;border-color:var(--primary,#003048)}
   .mds-tbl{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;min-width:0 !important}
-  .mds-tbl th{position:sticky;top:0;background:var(--card,#fff);text-align:right;padding:6px 5px;border-bottom:2px solid var(--line,#d1d5db);white-space:normal;font-size:13px;overflow:hidden;z-index:1}
+  .mds-tbl thead{position:sticky;top:var(--appbar-h,64px);z-index:5;box-shadow:0 2px 0 var(--line,#d1d5db)}
+  .mds-tbl th{background:var(--card,#fff);text-align:right;padding:6px 5px;border-bottom:2px solid var(--line,#d1d5db);white-space:normal;font-size:13px;overflow:hidden}
   .mds-tbl td{padding:6px 5px;border-bottom:1px solid var(--line,#e5e7eb);vertical-align:middle;overflow:hidden;height:38px}
   .mds-tbl tr.mds-first td{border-top:2px solid var(--line,#cbd5e1)}
   .mds-sortable{cursor:pointer;user-select:none}
@@ -250,6 +329,22 @@
   .mds-nwrap{display:flex;align-items:center;gap:4px;min-width:0}
   .mds-nwrap .mds-1{flex:1;min-width:0}
   .mds-more{flex:none;border:0;background:#e0f2fe;color:#075985;border-radius:6px;padding:1px 6px;font:inherit;font-size:12px;cursor:pointer}
+  .mds-thumb{flex:none;border:0;background:none;padding:0;margin-left:6px;vertical-align:middle;cursor:zoom-in;line-height:0}
+  .mds-thumb img{height:24px;width:auto;max-width:40px;border-radius:50%;object-fit:cover;border:1px solid var(--line,#d1d5db);background:#fff}
+  .mds-imgs{display:flex;flex-wrap:wrap;gap:10px}
+  .mds-imgb{border:1px solid var(--line,#d1d5db);background:var(--card,#fff);border-radius:10px;padding:6px;width:150px;cursor:zoom-in;font:inherit;color:inherit;text-align:center}
+  .mds-imgb img{width:100%;height:90px;object-fit:contain;display:block;background:#fff}
+  .mds-imgb span{display:block;font-size:12px;margin-top:4px;line-height:1.3}
+  .mds-lb{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:270;display:flex;align-items:center;justify-content:center;padding:12px;overflow:auto}
+  .mds-lb-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;text-align:center;font-size:14px;max-width:100%;padding-top:10px}
+  .mds-lb-img{max-width:90vw;max-height:72vh;object-fit:contain;background:#fff;border-radius:8px}
+  .mds-lb-x{position:absolute;top:0;left:0;border:0;background:#fff;color:#111;width:36px;height:36px;border-radius:50%;font-size:22px;line-height:1;cursor:pointer}
+  .mds-lb-note{background:#fef3c7;color:#78350f;padding:4px 12px;border-radius:8px;font-size:13px}
+  .mds-lb-cap{line-height:1.6}
+  .mds-lb-cap a{color:#bae6fd}
+  .mds-lb-warn{background:#b45309;color:#fff;padding:1px 8px;border-radius:6px}
+  .mds-lb-nav{display:flex;gap:12px;align-items:center}
+  .mds-lb-nav button{border:1px solid #94a3b8;background:transparent;color:#fff;border-radius:999px;padding:6px 16px;font:inherit;cursor:pointer}
   td.mds-open .mds-1{white-space:pre-line}
   .mds-tbl td.mds-editing{position:relative;overflow:visible}
   .mds-ta{position:absolute;top:3px;right:2px;z-index:40;resize:none;overflow:auto;white-space:pre-wrap;word-break:break-word;
@@ -447,6 +542,12 @@
       '<div class="mds-hint"><i class="bi bi-pencil"></i> לוחצים על תא כדי לערוך. Tab ו-Shift+Tab עוברים לתא הבא והקודם, החצים למעלה ולמטה עוברים לשורה, וכולם שומרים. Enter שומר, Esc מבטל. לחיצה על כותרת עמודה ממיינת.</div>' +
       '<div class="table-wrap mds-wrap"><table class="mds-tbl"><thead id="mdsHead"></thead><tbody id="mdsBody"></tbody></table></div>' +
       '<datalist id="mdsNames"></datalist>';
+    // גובה הפס העליון (appbar) כדי שכותרת הטבלה תיצמד מתחתיו
+    try {
+      const syncBarH = () => { const b = document.querySelector('.appbar'); if (b) document.documentElement.style.setProperty('--appbar-h', b.offsetHeight + 'px'); };
+      syncBarH();
+      if (!window.__mdsBarHook) { window.__mdsBarHook = 1; window.addEventListener('resize', syncBarH); }
+    } catch (e) {}
 
     let D = null, filter = 'הכל', cls = '', q = '', probOnly = false, hideStopped = false;
     // מיון וקיבוץ: נשמרים ב-localStorage (try/catch)
@@ -613,7 +714,7 @@
           switch (c.k) {
             case 'name': return nameCell;
             case 'status': return stCell;
-            case 'med': return '<td class="mds-ed" data-ed="name" data-id="' + m.id + '" title="' + esc(m.purpose || '') + '"><div class="mds-nwrap"><div class="mds-1">' + esc(m.name) +
+            case 'med': return '<td class="mds-ed" data-ed="name" data-id="' + m.id + '" title="' + esc(m.purpose || '') + '"><div class="mds-nwrap">' + thumbBtn(m) + '<div class="mds-1">' + esc(m.name) +
               (m.active ? '' : ' <span class="mds-chip-s mds-off">הופסק</span>') +
               (mIss.length ? ' <span class="mds-warnm" title="' + esc(mIss.map(x => x.text).join('\n')) + '">⚠</span>' : '') +
               '</div><button class="mds-more" data-info="' + m.id + '" title="הסבר על התרופה">ⓘ</button></div></td>';
@@ -1084,6 +1185,12 @@
       if (more) { const id = Number(more.dataset.more); openNotes.has(id) ? openNotes.delete(id) : openNotes.add(id); draw(); return; }
       const add = t.closest('[data-add]');
       if (add) { openStudent(Number(add.dataset.add), true); return; }
+      const thumb = t.closest('[data-thumb]');
+      if (thumb) {
+        const m = D.meds.find(x => x.id == thumb.dataset.thumb);
+        if (m) { const imgs = medImgs(m.name); openLightbox(imgs, Math.max(0, imgs.indexOf(thumbFor(m)))); }
+        return;
+      }
       const info = t.closest('[data-info]');
       if (info) { const m = D.meds.find(x => x.id == info.dataset.info); if (m) openInfo(m.name); return; }
       const open = t.closest('[data-open]');
