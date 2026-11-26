@@ -16,6 +16,9 @@
     { id: 'attendance',    label: 'נוכחות',           icon: 'bi-calendar-check',  group: G1, color: '#1f8a5b' },
     { id: 'tests',         label: 'מבחנים',           icon: 'bi-card-checklist',  group: G1, color: '#d68910' },
     { id: 'readassess',    label: 'מעקב קריאה',       icon: 'bi-book-half',       group: G1, color: '#7d3c98' },
+    // מעקב כתיבה — סוג כתיבה, לחץ, אחיזה, צורת אותיות וכו' (בקשת הרב יודלוב, 26/11/2026).
+    // js/writing-track.js נטען לפי דרישה (ראו בסוף הקובץ), בלי שורת script ב-index.html.
+    { id: 'writetrack',    label: 'מעקב כתיבה',       icon: 'bi-pencil-square',   group: G1, color: '#0e7490' },
     // סיכום שבועי — כל ר"מ מדווח מה נלמד והוסבר בכל תחום, וההנהלה רואה ריכוז
     // שבועי של כולם במסך אחד (בקשת צבי וינברג, 30/08/2026).
     { id: 'weekly',        label: 'סיכום שבועי',      icon: 'bi-calendar-week',   group: G1, color: '#1d6fa5' },
@@ -348,6 +351,21 @@
   // המסך שהתבקש בכתובת נתפס כאן, לפני שמסך הכניסה או showPage('home') מנקים
   // את ה-hash — אחרת קישור ישיר כמו index.html#lobby תמיד נחת בבית.
   window.__wantPage = String(location.hash || '').replace('#', '');
+
+  // מעקב כתיבה: הסקריפט נטען בפעם הראשונה שנכנסים למסך. אם index.html כבר
+  // טוען אותו ישירות (שורת script), הרנדרר האמיתי כבר רשום וה-stub לא נוצר.
+  window.PAGE_RENDERERS = window.PAGE_RENDERERS || {};
+  if (!window.PAGE_RENDERERS.writetrack) {
+    window.PAGE_RENDERERS.writetrack = function (target) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'js/writing-track.js'; s.onload = resolve;
+        s.onerror = () => reject(new Error('טעינת מסך מעקב הכתיבה נכשלה. בדוק חיבור ורענן.'));
+        document.head.appendChild(s);
+      }).then(() => window.cv3WriteTrack.render(target))
+        .catch(e => { target.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-triangle"></i><div>' + String(e && e.message || e) + '</div></div>'; });
+    };
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     const cfg = window.CV3 || {};
