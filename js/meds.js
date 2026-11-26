@@ -127,6 +127,7 @@
   .mds-stop{text-decoration:line-through;color:#94a3b8}
   .mds-stale{background:#fff5f5}
   .mds-tbl{table-layout:fixed}
+  #main:has(#page-meds.active){max-width:none;padding-left:16px;padding-right:16px}
   .mds-wrap{overflow-x:hidden !important;width:100%}
   .mds-tbl{min-width:0 !important}
   .mds-tbl th:nth-child(1){width:15%} .mds-tbl th:nth-child(2){width:10%} .mds-tbl th:nth-child(3){width:14%}
