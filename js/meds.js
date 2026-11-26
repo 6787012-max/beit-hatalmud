@@ -117,11 +117,11 @@
   // ───────── עמודות ─────────
   // fixed = לא ניתן להסתיר. def = ברירת מחדל (ברירת מחדל: מוצג). w = משקל רוחב.
   const COLS = [
-    { k: 'name', t: 'תלמיד', sort: 'name', w: 13, fixed: true },
+    { k: 'name', t: 'תלמיד', sort: 'family', w: 13, fixed: true },
     { k: 'status', t: 'סטטוס', sort: 'status', w: 10 },
     { k: 'med', t: 'תרופה', sort: 'med', w: 14, fixed: true },
     { k: 'dose', t: 'מינון', sort: 'dose', w: 8 },
-    { k: 'take_time', t: 'זמן נטילה', sort: 'take_time', w: 9 },
+    { k: 'take_time', t: 'זמן נטילה', sort: 'take', w: 9 },
     { k: 'hours', t: 'שעות השפעה', sort: 'hours', w: 8 },
     { k: 'updated', t: 'עודכן', sort: 'updated', w: 8 },
     { k: 'notes', t: 'הערות', w: 16, fixed: true },
@@ -260,6 +260,13 @@
   .mds-warnm{color:#b45309;font-weight:700;cursor:help}
   .mds-empty{color:#94a3b8}
   .mds-hint{font-size:12px;color:#64748b;margin:4px 2px 6px}
+  .mds-sortbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:#f8fafc;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:14px}
+  .mds-sortbar label{display:flex;gap:6px;align-items:center;white-space:nowrap}
+  .mds-sortbar select{width:auto;max-width:100%}
+  .mds-sb-lbl{font-weight:600;color:#334155}
+  .mds-group td{background:#eef2f7;font-weight:600;cursor:pointer;border-top:2px solid var(--line,#cbd5e1);white-space:normal}
+  .mds-gc{font-weight:400;color:#64748b;font-size:12px}
+  .mds-gt{color:#475569;display:inline-block;width:14px}
   .mds-menu-wrap{position:relative}
   .mds-menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--card,#fff);border:1px solid var(--line,#d1d5db);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:8px 10px;z-index:250;min-width:200px;display:flex;flex-direction:column;gap:6px}
   .mds-menu[hidden]{display:none}
@@ -294,18 +301,125 @@
     const s = document.createElement('style'); s.id = 'mdsStyle'; s.textContent = CSS; document.head.appendChild(s);
   }
 
-  // מיון: ערך של שורה (ln = {r, m}) לפי מפתח המיון
-  function sortVal(ln, k) {
-    const { r, m } = ln;
-    if (k === 'name') return nm(r.s);
-    if (k === 'status') return r.st.status;
-    if (!m) return null;
-    if (k === 'med') return m.name;
-    if (k === 'dose') return m.dose;
-    if (k === 'take_time') return m.take_time;
-    if (k === 'hours') return m.hours;
-    if (k === 'updated') return m.updated_on;
-    return null;
+  // ───────── מיון וקיבוץ ─────────
+  const STATUS_ORDER = ['לוקח', 'אמור לקחת ועדיין לא', 'לבדוק', 'לא לוקח'];
+  const TAKE_ORDER = ['בוקר (עד 11:00)', 'צהריים (11:00-14:00)', 'אחה"צ ואילך', 'לא ידוע'];
+  // lvl: 's' = ברמת התלמיד, 'm' = ברמת הכדור (לתלמיד — לפי הכדור המוביל)
+  const SORT_KEYS = {
+    first: { t: 'שם פרטי', lvl: 's', def: 1 },
+    family: { t: 'שם משפחה', lvl: 's', def: 1 },
+    class: { t: 'שיעור', lvl: 's', def: 1 },
+    status: { t: 'סטטוס', lvl: 's', def: 1 },
+    med: { t: 'תרופה', lvl: 'm', def: 1 },
+    take: { t: 'זמן נטילה', lvl: 'm', def: 1 },
+    dose: { t: 'מינון', lvl: 'm', def: 1 },
+    hours: { t: 'שעות השפעה', lvl: 'm', def: 1 },
+    updated: { t: 'עודכן לאחרונה', lvl: 'm', def: -1 },
+    stale: { t: 'הכי פחות מעודכן', lvl: 's', def: -1 },
+    issues: { t: 'מספר בעיות ברישום', lvl: 's', def: -1 },
+    count: { t: 'מספר כדורים לתלמיד', lvl: 's', def: -1 },
+  };
+  const SORT_DEFAULT = { s1: 'class', s2: 'family', dir: 1, grp: '' };
+  const GROUP_OPTS = [['', 'ללא'], ['class', 'שיעור'], ['status', 'סטטוס'], ['med', 'תרופה'], ['take', 'זמן נטילה']];
+  const sortOpts = withNone => (withNone ? '<option value="">ללא</option>' : '') +
+    Object.keys(SORT_KEYS).map(k => '<option value="' + k + '">' + esc(SORT_KEYS[k].t) + '</option>').join('');
+
+  // זמן נטילה: "08:00", "8:30", "7", "בוקר", "צהריים", "אחה\"צ", "ערב". לא מזוהה = null
+  function parseTime(s) {
+    const t = String(s == null ? '' : s).trim();
+    if (!t) return null;
+    const mm = /(\d{1,2})[:.](\d{2})/.exec(t);
+    let h, min = 0;
+    if (mm) { h = +mm[1]; min = +mm[2]; }
+    else {
+      const bare = /(\d{1,2})/.exec(t);
+      if (bare) h = +bare[1];
+      else if (/בוקר/.test(t)) return 7 * 60 + 30;
+      else if (/ערב/.test(t)) return 19 * 60;
+      else if (/אחה|אחר הצהריים|אחרי הצהריים/.test(t)) return 15 * 60;
+      else if (/צהריים|צהרים/.test(t)) return 12 * 60 + 30;
+      else return null;
+    }
+    if (!mm && h < 12 && /ערב|אחה|אחר הצהריים|אחרי הצהריים/.test(t)) h += 12;
+    if (h > 23 || min > 59) return null;
+    return h * 60 + min;
+  }
+  function bucketOf(t) {
+    const mins = parseTime(t);
+    if (mins == null) return 'לא ידוע';
+    if (mins < 11 * 60) return TAKE_ORDER[0];
+    if (mins < 14 * 60) return TAKE_ORDER[1];
+    return TAKE_ORDER[2];
+  }
+  // המספר הראשון בטקסט ("10 מ\"ג" = 10, "5+5" = 5). אין = null
+  function firstNum(s) {
+    const x = /\d+(?:[.,]\d+)?/.exec(String(s == null ? '' : s));
+    return x ? parseFloat(x[0].replace(',', '.')) : null;
+  }
+  // השוואה: ריק תמיד בסוף (בכל כיוון). מספרים מספרית, טקסט בעברית
+  function cmpV(a, b, dir) {
+    const ea = a == null || a === '', eb = b == null || b === '';
+    if (ea || eb) return ea === eb ? 0 : (ea ? 1 : -1);
+    if (typeof a === 'number' && typeof b === 'number') return dir * (a - b);
+    return dir * String(a).localeCompare(String(b), 'he', { numeric: true });
+  }
+  function lastDays(r) {
+    const ds = r.meds.map(m => daysSince(m.updated_on)).filter(x => x != null);
+    return ds.length ? Math.min.apply(null, ds) : null;
+  }
+  // ערך ברמת התלמיד
+  function sv(k, r, iss) {
+    switch (k) {
+      case 'first': return r.s.name || '';
+      case 'family': return r.s.family || '';
+      case 'class': return r.cls || '';
+      case 'status': { const i = STATUS_ORDER.indexOf(r.st.status); return i < 0 ? 99 : i; }
+      case 'stale': { const d = lastDays(r); return d == null ? 99999 : d; }
+      case 'issues': return iss[r.s.id].length;
+      case 'count': return r.meds.length;
+      default: return null;
+    }
+  }
+  // ערך ברמת הכדור
+  function mv(k, m) {
+    switch (k) {
+      case 'med': return m.name || '';
+      case 'take': return parseTime(m.take_time);
+      case 'dose': return firstNum(m.dose);
+      case 'hours': return firstNum(m.hours);
+      case 'updated': return m.updated_on || null;
+      default: return null;
+    }
+  }
+  // ערך של תלמיד לפי כדור מוביל: הכדור הפעיל הראשון לפי השדה (או מתוך כל הכדורים אם אין פעילים)
+  function leadVal(k, r, dir) {
+    const act = r.meds.filter(m => m.active);
+    const pool = act.length ? act : r.meds;
+    let bv = null, first = true;
+    pool.forEach(m => { const v = mv(k, m); if (first || cmpV(v, bv, dir) < 0) { bv = v; first = false; } });
+    return bv;
+  }
+  function orderStudents(list, iss, S) {
+    const val = (k, r, dir) => (SORT_KEYS[k].lvl === 's' ? sv(k, r, iss) : leadVal(k, r, dir));
+    const rows = list.map((r, i) => ({ r, i, a: val(S.s1, r, S.dir), b: S.s2 ? val(S.s2, r, 1) : null }));
+    rows.sort((x, y) => cmpV(x.a, y.a, S.dir) || cmpV(x.b, y.b, 1) || (x.i - y.i));
+    return rows.map(x => x.r);
+  }
+  // כדורים של תלמיד: לפי המיון אם הוא ברמת הכדור, אחרת פעילים קודם
+  function orderMeds(meds, S) {
+    const k1 = SORT_KEYS[S.s1].lvl === 'm' ? S.s1 : null;
+    const k2 = S.s2 && SORT_KEYS[S.s2] && SORT_KEYS[S.s2].lvl === 'm' ? S.s2 : null;
+    return meds.slice().sort((a, b) => {
+      if (k1) { const c = cmpV(mv(k1, a), mv(k1, b), S.dir); if (c) return c; }
+      if (k2) { const c = cmpV(mv(k2, a), mv(k2, b), 1); if (c) return c; }
+      return (b.active - a.active) || (a.id - b.id);
+    });
+  }
+  function orderGroups(groups, S) {
+    if (S.grp === 'take') return groups.slice().sort((a, b) => TAKE_ORDER.indexOf(a.key) - TAKE_ORDER.indexOf(b.key));
+    if (S.grp === 'status') return groups.slice().sort((a, b) => STATUS_ORDER.indexOf(a.key) - STATUS_ORDER.indexOf(b.key));
+    return groups.slice().sort((a, b) => ((a.key === '~none') - (b.key === '~none')) ||
+      (S.dir * String(a.label).localeCompare(String(b.label), 'he', { numeric: true })));
   }
 
   async function render(page) {
@@ -315,6 +429,12 @@
       '<button class="btn-ghost sm" id="mdsXls"><i class="bi bi-download"></i> ייצוא לאקסל</button></div></div>' +
       '<div class="demo-note" style="margin:0 2px 10px"><i class="bi bi-shield-lock"></i> מידע רפואי — גישה למנהל ולמי שמורשה לנהל כדורים. כל שינוי נרשם ביומן.</div>' +
       '<div class="mds-filters" id="mdsChips"></div>' +
+      '<div class="mds-sortbar" id="mdsSortBar"><span class="mds-sb-lbl">סדר ותצוגה:</span>' +
+      '<label>מיין לפי <select class="inp mb0" id="mdsS1">' + sortOpts(false) + '</select></label>' +
+      '<button class="btn-ghost sm" id="mdsDir" type="button" title="כיוון המיון">↑</button>' +
+      '<label>ואחר כך לפי <select class="inp mb0" id="mdsS2">' + sortOpts(true) + '</select></label>' +
+      '<label>קבץ לפי <select class="inp mb0" id="mdsG">' + GROUP_OPTS.map(o => '<option value="' + o[0] + '">' + esc(o[1]) + '</option>').join('') + '</select></label>' +
+      '<button class="btn-ghost sm" id="mdsReset" type="button">איפוס</button></div>' +
       '<div class="mds-filters"><select class="inp mb0" id="mdsCls"><option value="">כל השיעורים</option></select>' +
       '<input type="search" class="inp mb0" id="mdsQ" placeholder="חיפוש תלמיד / תרופה…">' +
       '<div class="mds-menu-wrap"><button class="btn-ghost sm" id="mdsColsBtn"><i class="bi bi-layout-three-columns"></i> עמודות</button>' +
@@ -325,7 +445,25 @@
       '<div class="table-wrap mds-wrap"><table class="mds-tbl"><thead id="mdsHead"></thead><tbody id="mdsBody"></tbody></table></div>' +
       '<datalist id="mdsNames"></datalist>';
 
-    let D = null, filter = 'הכל', cls = '', q = '', sortKey = null, sortDir = 1, probOnly = false, hideStopped = false;
+    let D = null, filter = 'הכל', cls = '', q = '', probOnly = false, hideStopped = false;
+    // מיון וקיבוץ: נשמרים ב-localStorage (try/catch)
+    let S = Object.assign({}, SORT_DEFAULT);
+    try {
+      const x = JSON.parse(localStorage.getItem('cv3.mdsSort') || 'null');
+      if (x && SORT_KEYS[x.s1]) {
+        S.s1 = x.s1; S.s2 = x.s2 && SORT_KEYS[x.s2] ? x.s2 : '';
+        S.dir = x.dir === -1 ? -1 : 1;
+        S.grp = GROUP_OPTS.some(o => o[0] === x.grp) ? x.grp : '';
+      }
+    } catch (_) { S = Object.assign({}, SORT_DEFAULT); }
+    const collapsed = new Set();
+    const saveSort = () => { try { localStorage.setItem('cv3.mdsSort', JSON.stringify({ s1: S.s1, s2: S.s2, dir: S.dir, grp: S.grp })); } catch (_) { /* בלי שמירה — הכל עדיין עובד */ } };
+    const syncBar = () => {
+      if (!$('#mdsS1')) return;
+      $('#mdsS1').value = S.s1; $('#mdsS2').value = S.s2; $('#mdsG').value = S.grp;
+      const d = $('#mdsDir'); d.textContent = S.dir === 1 ? '↑' : '↓';
+      d.title = S.dir === 1 ? 'סדר עולה (לחצו להפוך)' : 'סדר יורד (לחצו להפוך)';
+    };
     const flags = { stale: false, week: false };
     const openNotes = new Set();
     const selected = new Set();
@@ -405,31 +543,35 @@
       const has = k => vis.some(c => c.k === k);
       const total = SEL_W + vis.reduce((a, c) => a + c.w, 0);
       const pct = w => (Math.round(w / total * 1000) / 10) + '%';
-      const sortCol = sortKey && vis.some(c => c.sort === sortKey) ? sortKey : null;
-
       $('#mdsHead').innerHTML = '<tr><th class="mds-selc" style="width:' + pct(SEL_W) + '"></th>' + vis.map(c => {
-        const arrow = sortCol === c.sort ? (sortDir === 1 ? ' <span class="mds-arr">▲</span>' : ' <span class="mds-arr">▼</span>') : '';
+        const arrow = c.sort && c.sort === S.s1 ? (S.dir === 1 ? ' <span class="mds-arr">▲</span>' : ' <span class="mds-arr">▼</span>') : '';
         return '<th' + (c.sort ? ' class="mds-sortable" data-sort="' + c.sort + '"' : '') + ' style="width:' + pct(c.w) + '">' + esc(c.t) + arrow + '</th>';
       }).join('') + '</tr>';
 
-      // שורה לכל כדור (או שורה ריקה לתלמיד בלי כדורים)
-      let lines = [];
-      list.forEach(r => {
-        const meds = hideStopped ? r.meds.filter(m => m.active) : r.meds;
-        if (!meds.length) lines.push({ r, m: null });
+      // סדר התלמידים לפי מיון ראשי ומשני; ואז שורה לכל כדור (או שורה ריקה לתלמיד בלי כדורים)
+      const ordered = orderStudents(list, iss, S);
+      const lines = [];
+      ordered.forEach(r => {
+        const meds = orderMeds(hideStopped ? r.meds.filter(m => m.active) : r.meds, S);
+        if (!r.meds.length) lines.push({ r, m: null });
+        else if (!meds.length) lines.push({ r, m: null, hidden: true });
         else meds.forEach(m => lines.push({ r, m }));
       });
-      if (sortCol) {
-        const idx = lines.map((ln, i) => ({ ln, i }));
-        idx.sort((x, y) => {
-          const a = sortVal(x.ln, sortCol), b = sortVal(y.ln, sortCol);
-          const ea = a == null || a === '', eb = b == null || b === '';
-          if (ea || eb) return ea === eb ? x.i - y.i : (ea ? 1 : -1);
-          const c = sortDir * String(a).localeCompare(String(b), 'he', { numeric: true });
-          return c || (x.i - y.i);
-        });
-        lines = idx.map(x => x.ln);
-      }
+      // קיבוץ: כל כדור הולך לקבוצה שלו (תלמיד עם שתי תרופות מופיע בשתי הקבוצות)
+      const gOf = ln => {
+        if (S.grp === 'class') return { key: ln.r.cls, label: ln.r.cls };
+        if (S.grp === 'status') return { key: ln.r.st.status, label: ln.r.st.status };
+        if (S.grp === 'med') return ln.m ? { key: normName(ln.m.name), label: ln.m.name } : { key: '~none', label: 'ללא כדור פעיל' };
+        if (S.grp === 'take') { const b = ln.m ? bucketOf(ln.m.take_time) : 'לא ידוע'; return { key: b, label: b }; }
+        return { key: '', label: '' };
+      };
+      const gmap = new Map();
+      lines.forEach(ln => {
+        const g = gOf(ln);
+        if (!gmap.has(g.key)) gmap.set(g.key, { key: g.key, label: g.label, lines: [] });
+        gmap.get(g.key).lines.push(ln);
+      });
+      const groups = orderGroups(Array.from(gmap.values()), S);
 
       function rowHtml(ln, occ) {
         const { r, m } = ln;
@@ -487,17 +629,28 @@
         return '<tr class="' + trCls + staleCls + (m.active ? '' : ' mds-stop') + '">' + selCell + cells + '</tr>';
       }
 
-      const seen = {};
-      const body = lines.map(ln => {
-        const sid = ln.r.s.id;
-        const occ = !seen[sid]; seen[sid] = true;
-        return rowHtml(ln, occ);
-      }).join('');
+      let body = '';
+      groups.forEach(g => {
+        if (S.grp) {
+          const shut = collapsed.has(S.grp + '|' + g.key);
+          const nStud = new Set(g.lines.map(l => l.r.s.id)).size;
+          const nMeds = g.lines.filter(l => l.m).length;
+          body += '<tr class="mds-group" data-grp="' + esc(g.key) + '"><td colspan="' + (vis.length + 1) + '"><span class="mds-gt">' + (shut ? '▸' : '▾') + '</span> <b>' + esc(g.label) + '</b> <span class="mds-gc">· ' + nStud + (nStud === 1 ? ' תלמיד' : ' תלמידים') + ' · ' + nMeds + (nMeds === 1 ? ' כדור' : ' כדורים') + '</span></td></tr>';
+          if (shut) return;
+        }
+        const seen = {};
+        g.lines.forEach(ln => {
+          const sid = ln.r.s.id;
+          const occ = !seen[sid]; seen[sid] = true;
+          body += rowHtml(ln, occ);
+        });
+      });
       $('#mdsBody').innerHTML = body || '<tr><td colspan="' + (vis.length + 1) + '" style="text-align:center;color:#94a3b8;padding:20px">אין תלמידים מתאימים</td></tr>';
 
       $('#mdsColsMenu').innerHTML = COLS.filter(c => !c.fixed).map(c =>
         '<label class="mds-mi"><input type="checkbox" data-col="' + c.k + '"' + (isOn(c) ? ' checked' : '') + '> ' + esc(c.t) + '</label>').join('');
       updateBulk();
+      syncBar();
     }
 
     function updateBulk() {
@@ -819,6 +972,9 @@
     // ───────── אירועים ─────────
     page.addEventListener('change', async e => {
       const t = e.target;
+      if (t.id === 'mdsS1') { S.s1 = t.value; S.dir = SORT_KEYS[t.value].def; saveSort(); draw(); return; }
+      if (t.id === 'mdsS2') { S.s2 = t.value; saveSort(); draw(); return; }
+      if (t.id === 'mdsG') { S.grp = t.value; saveSort(); draw(); return; }
       if (t.matches('input[data-col]')) { prefs[t.dataset.col] = t.checked; savePrefs(); draw(); return; }
       if (t.matches('input[data-sel]')) { const sid = Number(t.dataset.sel); if (t.checked) selected.add(sid); else selected.delete(sid); updateBulk(); return; }
       if (t.matches('select[data-bulk]')) { if (t.value) await applyBulk(t.value); return; }
@@ -845,8 +1001,13 @@
       if (t.closest('[data-hide]')) { hideStopped = !hideStopped; draw(); return; }
       if (t.closest('#mdsColsBtn')) { const mn = $('#mdsColsMenu'); mn.hidden = !mn.hidden; return; }
       if (t.closest('[data-bulkclear]')) { selected.clear(); draw(); return; }
+      const grpRow = t.closest('tr.mds-group');
+      if (grpRow) { const ck = S.grp + '|' + grpRow.dataset.grp; collapsed.has(ck) ? collapsed.delete(ck) : collapsed.add(ck); draw(); return; }
+      if (t.closest('#mdsDir')) { S.dir = -S.dir; saveSort(); draw(); return; }
+      if (t.closest('#mdsReset')) { S = Object.assign({}, SORT_DEFAULT); collapsed.clear(); saveSort(); draw(); return; }
+      // כותרת עמודה מעדכנת את "מיין לפי" (סנכרון דו-כיווני)
       const th = t.closest('th[data-sort]');
-      if (th) { const k = th.dataset.sort; if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; } draw(); return; }
+      if (th) { const k = th.dataset.sort; if (S.s1 === k) S.dir = -S.dir; else { if (S.s2 === k) S.s2 = ''; S.s1 = k; S.dir = SORT_KEYS[k].def; } saveSort(); draw(); return; }
       const more = t.closest('[data-more]');
       if (more) { const id = Number(more.dataset.more); openNotes.has(id) ? openNotes.delete(id) : openNotes.add(id); draw(); return; }
       const add = t.closest('[data-add]');
