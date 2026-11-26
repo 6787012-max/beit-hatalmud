@@ -356,10 +356,11 @@
     return '<div class="qr-card tla-goal"><h3><i class="bi bi-bullseye"></i> ' + esc(g.domain || 'תחום') +
       '<span class="head-actions"><button class="btn-ghost sm" data-ged="' + g.id + '"><i class="bi bi-pencil"></i></button>' +
       '<button class="btn-ghost sm danger" data-gdel="' + g.id + '"><i class="bi bi-trash"></i></button></span></h3>' +
-      line('קו בסיס', g.baseline) + line('מטרת על', g.top_goal) +
+      line('קו בסיס', g.baseline) +
+      (roleRows ? '<div class="tla-roles"><div class="det-lbl" style="margin:6px 0 2px">אנשי צוות המשתתפים ביישום התכנית</div>' + roleRows + '</div>' : '') +
+      line('מטרת על', g.top_goal) +
       (gl.length ? '<div class="det-row"><span class="det-lbl">יעדים</span><span class="det-val">' +
         '<ol style="margin:0;padding-inline-start:18px">' + gl.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol></span></div>' : '') +
-      (roleRows ? '<div class="tla-roles"><div class="det-lbl" style="margin:6px 0 2px">הזדמנויות עבודה ואמצעים להשגתם</div>' + roleRows + '</div>' : '') +
       line('הערכה מעצבת', g.eval_form) + line('הערכה מסכמת', g.eval_sum) +
       line('המלצות', g.recommendations) +
       line('הערות ושינויים משמעותיים במהלך השנה', g.notes) +
@@ -393,15 +394,22 @@
           '<datalist id="tlaDomains"><option>לימודי</option><option>רגשי</option><option>חברתי</option><option>התנהגותי</option><option>תפקודי</option></datalist></label>' +
         '<label class="fld"><span>סדר תצוגה</span><input type="number" class="inp mb0" id="g_ord" value="' + (g.sort_order || 0) + '"></label>' +
         ta('g_base', 'קו בסיס (מצב קיים)', g.baseline, 'תיאור המצב היום — נקודת הפתיחה') +
+      '</div>' +
+      // יוסף 26/11: אנשי הצוות עברו למעלה, מיד מתחת לקו הבסיס
+      '<h4 class="tla-sub">אנשי צוות המשתתפים ביישום התכנית</h4>' +
+      '<p class="login-hint" style="margin:0 0 6px">כל שורה = איש צוות, ומה הוא עושה. אפשר לבחור מהרשימה או לכתוב חופשי.</p>' +
+      '<div id="g_opps">' + (op.length ? op.map(o => oppRow(o.who, o.what)).join('') : oppRow('', '')) + '</div>' +
+      '<button class="btn-ghost sm" id="g_addopp" type="button"><i class="bi bi-plus-lg"></i> איש צוות נוסף</button>' +
+      // יוסף 26/11: הצעה אוטומטית על סמך קו הבסיס — מטרת על, 3-4 יעדים, וחלוקת העבודה בין אנשי הצוות
+      '<div style="margin:12px 0 4px"><button class="btn-ghost sm" id="g_suggest" type="button">' +
+        '<i class="bi bi-magic"></i> הצעה אוטומטית: מטרת על, יעדים וחלוקת עבודה</button>' +
+        '<span class="login-hint" id="g_sugmsg" style="margin-inline-start:8px">לפי דף ההכנה, קו הבסיס ואנשי הצוות. ההצעה נכנסת לשדות לעריכה, ונשמרת רק בלחיצה על שמירה.</span></div>' +
+      '<div class="form-grid" style="margin-top:6px">' +
         ta('g_top', 'מטרת על', g.top_goal) +
       '</div>' +
       '<h4 class="tla-sub">יעדים</h4>' +
       '<div id="g_goals">' + (gl.length ? gl.map(goalRow).join('') : goalRow('')) + '</div>' +
       '<button class="btn-ghost sm" id="g_addgoal" type="button"><i class="bi bi-plus-lg"></i> יעד נוסף</button>' +
-      '<h4 class="tla-sub">הזדמנויות עבודה ואמצעים להשגתם</h4>' +
-      '<p class="login-hint" style="margin:0 0 6px">כל שורה = איש צוות שותף ביישום, ומה שהוא עושה. אפשר לבחור מהרשימה או לכתוב חופשי.</p>' +
-      '<div id="g_opps">' + (op.length ? op.map(o => oppRow(o.who, o.what)).join('') : oppRow('', '')) + '</div>' +
-      '<button class="btn-ghost sm" id="g_addopp" type="button"><i class="bi bi-plus-lg"></i> איש צוות נוסף</button>' +
       '<h4 class="tla-sub">מעקב והערכה</h4><div class="form-grid">' +
         ta('g_evf', 'הערכה מעצבת', g.eval_form, 'הערכה במהלך השנה') +
         ta('g_evs', 'הערכה מסכמת', g.eval_sum, 'הערכה בסוף התקופה') +
@@ -452,6 +460,63 @@
     el.querySelector('#g_addopp').addEventListener('click', () => {
       el.querySelector('#g_opps').insertAdjacentHTML('beforeend', oppRow('', ''));
       rewire();
+    });
+    el.querySelector('#g_suggest').addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget, msg = el.querySelector('#g_sugmsg');
+      const base = el.querySelector('#g_base').value.trim();
+      if (!base) { window.UI.toast('קודם למלא את קו הבסיס', 'err'); return; }
+      const topEl = el.querySelector('#g_top');
+      const hasGoals = [...el.querySelectorAll('.g-goal-t')].some(t => t.value.trim());
+      if ((topEl.value.trim() || hasGoals) && !confirm('ההצעה תחליף את מטרת העל והיעדים שכבר כתובים. להמשיך?')) return;
+      let who = [...el.querySelectorAll('.g-opp-who')].map(i => i.value.trim()).filter(Boolean);
+      if (!who.length) who = DEFAULT_ROLES.slice();
+      const domain = el.querySelector('#g_dom').value.trim();
+      // נשלח: דף ההכנה, התחום, קו הבסיס ותפקידי הצוות. בלי שם התלמיד, ומוחקים ת"ז וטלפונים.
+      const scrub = s => String(s || '').replace(/\b\d{9}\b/g, '[ת"ז]').replace(/\b0\d{1,2}-?\d{7}\b/g, '[טלפון]').trim();
+      const pr = profOf(plan);
+      const prep = PROF_FIELDS.filter(f => scrub(pr[f.k])).map(f => f.label + ': ' + scrub(pr[f.k])).join('\n');
+      const prompt = 'את/ה יועץ/ת חינוכי/ת במכינה תורנית לנערים.\n' +
+        (prep ? 'דף ההכנה של התלמיד:\n"""' + prep + '"""\n\n' : '') +
+        'קו בסיס (מצב קיים)' + (domain ? ' בתחום "' + domain + '"' : '') + ':\n"""' + scrub(base) + '"""\n\n' +
+        'המטרה והיעדים צריכים להישען גם על דף ההכנה (מוקדי הכח, המוקדים לחיזוק והרקע) וגם על קו הבסיס.\n' +
+        'אנשי הצוות שעובדים עם התלמיד: ' + who.join(', ') + '.\n\n' +
+        'כתוב/י בעברית פשוטה:\n' +
+        '1. מטרת על אחת לשנה: כללית, אבל מדויקת וממוקדת בקו הבסיס. משפט אחד.\n' +
+        '2. שלושה או ארבעה יעדים ישימים במהלך השנה, שמפרקים את מטרת העל. כל יעד קונקרטי וניתן למדידה.\n' +
+        '3. חלוקת העבודה: לכל איש צוות מהרשימה, מה הוא עושה כדי לקדם את היעדים (2-3 פעולות קצרות). להשתמש בשמות בדיוק כפי שנכתבו.\n' +
+        'החזר JSON בלבד בצורה: {"top_goal":"...","goals":["...","..."],"staff":[{"who":"...","what":"..."}]}';
+      btn.disabled = true; msg.textContent = 'חושב…';
+      try {
+        const r = await window.cv3call('gemini-2.5-flash', {
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.4 },
+        });
+        const j = await r.json();
+        const txt = (((j.candidates || [])[0] || {}).content || {}).parts?.map(p => p.text || '').join('') || '';
+        const out = JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+        if (!out || !out.top_goal) throw new Error('לא התקבלה תשובה מהמודל');
+        topEl.value = String(out.top_goal).trim();
+        const goals = (out.goals || []).map(x => String(x || '').trim()).filter(Boolean).slice(0, 4);
+        if (goals.length) el.querySelector('#g_goals').innerHTML = goals.map(goalRow).join('');
+        const sm = {};
+        (out.staff || []).forEach(s => { if (s && s.who) sm[String(s.who).trim()] = String(s.what || '').trim(); });
+        const rows = [...el.querySelectorAll('.g-opp')];
+        const named = rows.filter(rw => rw.querySelector('.g-opp-who').value.trim());
+        if (named.length) {
+          // ממלאים רק שורות ריקות, כדי לא למחוק מה שאיש צוות כבר כתב
+          named.forEach(rw => {
+            const w = rw.querySelector('.g-opp-who').value.trim(), t = rw.querySelector('.g-opp-what');
+            if (!t.value.trim() && sm[w]) t.value = sm[w];
+          });
+        } else {
+          el.querySelector('#g_opps').innerHTML = who.map(w => oppRow(w, sm[w] || '')).join('');
+        }
+        rewire();
+        el.querySelectorAll('textarea').forEach(t => window.UI.autoGrow && window.UI.autoGrow(t));
+        msg.textContent = 'ההצעה מולאה. כדאי לעבור עליה ולתקן לפני השמירה.';
+      } catch (e) {
+        msg.textContent = 'ההצעה לא הצליחה: ' + (e && e.message || e);
+      } finally { btn.disabled = false; }
     });
     rewire();
   }
@@ -710,23 +775,24 @@
     goals.forEach(g => {
       const op = oppsArr(g);
       const gl = goalsArr(g);
-      const oppCols = op.length || 1;
+      // יוסף 26/11: אנשי הצוות עברו מעמודות הטבלה לטבלה משלהם, מיד מתחת לקו הבסיס
+      const staffRows = (op.length ? op : [{ who: '', what: '' }, { who: '', what: '' }])
+        .map(o => '<tr><td>' + esc(o.who) + '</td><td>' + esc(o.what) + '</td></tr>').join('');
       h += '<section class="page">' + hdr('תלי"א אינטגרטיבי — תכנית לימודים אישית') + meta +
         '<div class="band">תחום: <b>' + esc(g.domain || '') + '</b></div>' +
         '<div class="para"><b>קו בסיס:</b> ' + esc(g.baseline || '') + '</div>' +
+        '<table class="grid" style="margin-bottom:3mm"><thead><tr><th colspan="2">אנשי צוות המשתתפים ביישום התכנית</th></tr>' +
+          '<tr><th class="sub" style="width:25%">איש צוות</th><th class="sub">מה הוא עושה</th></tr></thead>' +
+          '<tbody>' + staffRows + '</tbody></table>' +
         '<div class="para"><b>מטרת על:</b> ' + esc(g.top_goal || '') + '</div>' +
         '<table class="grid"><thead>' +
-          '<tr><th rowspan="2" style="width:30%">יעדים</th>' +
-              '<th colspan="' + oppCols + '">הזדמנויות עבודה ואמצעים להשגתם</th>' +
-              '<th colspan="2" style="width:26%">מעקב והערכה</th></tr>' +
-          '<tr>' +
-              (op.length ? op.map(o => '<th class="sub">' + esc(o.who) + '</th>').join('') : '<th class="sub"></th>') +
-              '<th class="sub">הערכה מעצבת</th><th class="sub">הערכה מסכמת</th></tr>' +
+          '<tr><th rowspan="2" style="width:50%">יעדים</th>' +
+              '<th colspan="2">מעקב והערכה</th></tr>' +
+          '<tr><th class="sub">הערכה מעצבת</th><th class="sub">הערכה מסכמת</th></tr>' +
         '</thead><tbody><tr>' +
           '<td class="tall">' + (gl.length
             ? '<ol style="margin:0;padding-inline-start:5mm">' + gl.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>'
             : '') + '</td>' +
-          (op.length ? op.map(o => '<td class="tall">' + esc(o.what) + '</td>').join('') : '<td class="tall"></td>') +
           '<td class="tall">' + esc(g.eval_form || '') + '</td>' +
           '<td class="tall">' + esc(g.eval_sum || '') + '</td>' +
         '</tr></tbody></table>' +
