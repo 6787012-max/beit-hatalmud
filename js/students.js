@@ -216,6 +216,9 @@
       const ph = (photoRows || [])[0];
       const bigPhoto = ph && ph.photo ? 'data:' + (ph.mime || 'image/jpeg') + ';base64,' + ph.photo : '';
       const canTla = !window.Auth || window.Auth.canAccess('tla');
+      // כדורים בכרטיס: רק למי שיש לו הרשאת כדורים (perms ∋ 'meds'). בלי Auth (דמו) — לא מוצג.
+      const medsOk = !!(window.Auth && window.Auth.canAccess('meds') && window.cv3Meds && window.cv3Meds.cardData);
+      const medsCard = medsOk ? await window.cv3Meds.cardData(s.id) : null;
       if (window.cv3Behavior) await window.cv3Behavior.types();   // סוג אירוע (גרסה 2) לפני הקטגוריה הישנה
       const catName = id => { const c = cats.find(x => x.id == id); return c ? c.name : ''; };
       const row = (lbl, val) => val ? '<div class="det-row"><span class="det-lbl">' + lbl + '</span><span class="det-val">' + esc(val) + '</span></div>' : '';
@@ -255,6 +258,25 @@
           '<span class="di-meta">' + esc(hebDate(c.comment_date) || c.comment_date || '') +
           ' · ' + (window.Author ? window.Author.cell(c.created_by) : '') + '</span></div>').join('') + '</div>';
       };
+      // ── כדורים: סטטוס נוכחי, הכדורים (פעילים ואז מופסקים), והיסטוריה מלאה ──
+      const medsSecHtml = !medsCard ? '' : (() => {
+        const meds = med.filter(x => (x.category || 'תרופה') === 'תרופה');
+        const act = meds.filter(x => x.active), stop = meds.filter(x => !x.active);
+        const stText = medsCard.status ? medsCard.status.status : (act.length ? 'לוקח' : 'לא לוקח');
+        const stNote = medsCard.status && medsCard.status.note ? medsCard.status.note : '';
+        const stCls = stText === 'לוקח' ? 'ok' : stText === 'לא לוקח' ? 'off' : 'mid';
+        const fmtTsC = v => { const d = new Date(v); return isNaN(d) ? '' : d.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }); };
+        const medLine = x => '<div class="det-item"><span class="di-main"><strong' + (x.active ? '' : ' class="mds-stop"') + '>' + esc(x.name) + '</strong>' +
+          (x.active ? '' : ' <span class="chip off">הופסק</span>') + '</span><span class="di-meta">' +
+          esc([x.dose && ('מינון ' + x.dose), x.take_time && ('זמן ' + x.take_time), x.hours && (x.hours + ' שעות')].filter(Boolean).join(' · ') || '—') + '</span></div>';
+        const histItem = h => '<div class="det-item"><span class="di-main">' + window.cv3Meds.describe(h) + '</span><span class="di-meta">' +
+          esc(h.changed_by_name || 'מערכת') + ' · ' + esc(fmtTsC(h.changed_at)) + '</span></div>';
+        return '<div class="det-sec"><h4><i class="bi bi-capsule"></i> כדורים <span class="chip ' + stCls + '">' + esc(stText) + '</span></h4>' +
+          (stNote ? '<div class="tl-note" style="padding:0 2px 6px">הערת סטטוס: ' + esc(stNote) + '</div>' : '') +
+          (act.concat(stop).length ? act.concat(stop).map(medLine).join('') : '<div class="tl-note" style="padding:6px 2px;font-size:.84rem">אין רישום כדור</div>') +
+          '<button class="btn-ghost sm" data-meds-open="' + s.id + '" style="margin-top:8px"><i class="bi bi-box-arrow-up-right"></i> פתח בדף הכדורים</button></div>' +
+          sec('היסטוריית כדורים', 'bi-clock-history', medsCard.hist.slice().reverse(), histItem);
+      })();
       const behSec = '<div class="det-sec"><h4><i class="bi bi-clipboard-check"></i> התנהגות ומעקב ' +
         '<span class="det-badge">' + beh.length + '</span>' +
         (beh.length ? '<button class="btn-ghost sm" id="behPattern" style="margin-inline-start:auto"><i class="bi bi-graph-up"></i> כרטיס דפוסים</button>' : '') +
@@ -404,6 +426,7 @@
           return li('<strong>' + esc(x.name) + '</strong>' + (parts.length ? ' — ' + esc(parts.join(' · ')) : '') +
             ' <span class="chip ' + f.cls + '">' + esc(f.txt) + '</span>', '', 'hi');
         }) +
+        medsSecHtml +
         behSec +
         attSec +
         (window.cv3Passport ? window.cv3Passport.cardSection(psp) : '') +
@@ -494,6 +517,7 @@
       const photoBtn = m.el.querySelector('#detPhotoBtn');
       if (photoBtn) photoBtn.addEventListener('click', () => openPhoto(bigPhoto, window.UI.fullName ? window.UI.fullName(s) : s.name));
       const rab = m.el.querySelector('[data-reading]'); if (rab && window.cv3ReadAssess) rab.addEventListener('click', () => window.cv3ReadAssess.openAssessment(s, () => { m.close(); openDetail(s); }));
+      const mob = m.el.querySelector('[data-meds-open]'); if (mob && window.cv3Meds) mob.addEventListener('click', () => { m.close(); window.cv3Meds.openStudentById(s.id); });
       const ctb = m.el.querySelector('[data-cert]'); if (ctb && window.cv3Cert) ctb.addEventListener('click', () => window.cv3Cert.openCertificate(s));
       const tlb = m.el.querySelector('[data-tla]'); if (tlb && window.cv3Tla) tlb.addEventListener('click', () => { m.close(); window.cv3Tla.openForStudent(s); });
       if (window.cv3Call) window.cv3Call.wire(m.el, s);
