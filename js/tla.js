@@ -43,6 +43,19 @@
     } catch (_) { _staffCache = []; }
     return _staffCache;
   }
+  // שותפים בלמידה: אנשי צוות שמלווים את התלמיד הזה (טבלת student_partners).
+  // השם מגיע מ-staff_names, והתפקיד נשמר בשותפות עצמה.
+  const ROLE_OPTIONS = ['מחנך', 'מטפל רגשי', 'מורה לקריאה', 'מורה פרטי', 'סייעת', 'מנהל חינוכי', 'יועצת'];
+  const roleDatalist = id => '<datalist id="' + id + '">' + ROLE_OPTIONS.map(r => '<option value="' + esc(r) + '"></option>').join('') + '</datalist>';
+  async function partnersOf(sid) {
+    if (!sid) return [];
+    const names = await staffNames();
+    const rows = (await S.list('student_partners', { eq: { student_id: sid } })) || [];
+    return rows.map(r => {
+      const n = names.find(x => x.id == r.staff_id);
+      return n ? { id: r.id, staff_id: r.staff_id, name: n.name, role: r.role || '' } : null;
+    }).filter(Boolean);
+  }
   // יוסף 26/11: יעד הוא אובייקט {text, acts, eval_form, eval_sum, notes}.
   // acts = מה כל איש צוות עושה ליעד הזה: [{who, what}]. מחרוזת ישנה ב-goals_list נקראת כ-{text} בלבד.
   const hasGoalContent = x => !!(x.text || (x.acts && x.acts.length) || x.eval_form || x.eval_sum || x.notes);
@@ -64,11 +77,25 @@
   const goalsArr = g => goalsObj(g).map(x => x.text).filter(Boolean);
   // מה איש צוות מסוים עושה ליעד (ריק אם לא נכתב)
   const actOf = (x, who) => ((x.acts || []).find(a => a.who === who) || {}).what || '';
+  // כותרת עמודה: "שם — תפקיד" (בלי תפקיד — רק השם)
+  const colLabel = o => o.role ? o.who + ' — ' + o.role : o.who;
+  // תווית לשליחה להצעה האוטומטית: לפי תפקיד בלבד, בלי שמות. שני אנשים באותו תפקיד: "מחנך 1", "מחנך 2"
+  function roleLabels(rows) {
+    const base = rows.map(r => r.role || (DEFAULT_ROLES.indexOf(r.who) > -1 ? r.who : 'איש צוות'));
+    const total = {};
+    base.forEach(b => { total[b] = (total[b] || 0) + 1; });
+    const seen = {};
+    return rows.map((r, i) => {
+      const b = base[i];
+      seen[b] = (seen[b] || 0) + 1;
+      return Object.assign({}, r, { label: total[b] > 1 ? b + ' ' + seen[b] : b });
+    });
+  }
   // סדר עמודות הצוות נשמר במערך `opps` — ב-jsonb סדר מפתחות של אובייקט אובד,
   // ולכן `roles` הישן משמש רק כנפילה אחורה לרשומות שטרם הוגרו.
   function oppsArr(g) {
     if (Array.isArray(g && g.opps) && g.opps.length) {
-      return g.opps.filter(o => o && String(o.who || '').trim()).map(o => ({ who: String(o.who).trim(), what: String(o.what || '').trim() }));
+      return g.opps.filter(o => o && String(o.who || '').trim()).map(o => ({ who: String(o.who).trim(), what: String(o.what || '').trim(), role: String(o.role || '').trim() }));
     }
     const r = (g && g.roles && typeof g.roles === 'object') ? g.roles : {};
     return roleKeysOf(r).map(k => ({ who: k, what: r[k] }));
@@ -297,6 +324,52 @@
     { k: 'strengths', label: 'מוקדי כח', ph: 'תחומי חוזק, כישרונות, נקודות אור…' },
     { k: 'focus', label: 'מוקדים לחיזוק', ph: 'תפקודים אקדמיים, רגשיים וחברתיים הדורשים חיזוק…' },
   ];
+  // שותפים בלמידה: מנהלים כאן את אנשי הצוות שמלווים את התלמיד ואת תפקידם.
+  // זו הרשימה שמוצגת בעורך היעדים (ראה partnersOf).
+  async function drawPartners(host, plan) {
+    ensureGoalCss();
+    const box = host.querySelector('#tpPartnersBox');
+    if (!box || !plan.student_id) return;
+    const names = await staffNames();
+    const cur = await partnersOf(plan.student_id);
+    const free = names.filter(n => !cur.some(c => c.staff_id == n.id));
+    box.innerHTML = '<h3><i class="bi bi-people"></i> שותפים בלמידה</h3>' +
+      '<p class="login-hint" style="margin:0 0 8px">אנשי הצוות שמלווים את התלמיד הזה ותפקיד כל אחד. בעורך היעדים יופיעו לבחירה רק השותפים האלה.</p>' +
+      (cur.length
+        ? '<div class="tla-plist">' + cur.map(c => '<div class="tla-prow" data-pid="' + c.id + '"><span class="tla-pname">' + esc(c.name) + '</span>' +
+            '<input class="inp mb0 tla-prole" list="tlaRolesP" value="' + esc(c.role) + '" placeholder="תפקיד">' +
+            '<button type="button" class="mini danger tla-pdel" title="הסר שותף"><i class="bi bi-trash"></i></button></div>').join('') + '</div>'
+        : '<p class="login-hint">עדיין לא הוגדרו שותפים בלמידה לתלמיד.</p>') +
+      '<div class="tla-srow" style="margin-top:8px"><select class="inp mb0" id="tpPick"><option value="">בחירת איש צוות…</option>' +
+        free.map(n => '<option value="' + n.id + '">' + esc(n.name) + (n.role_label ? ' — ' + esc(n.role_label) : '') + '</option>').join('') +
+      '</select><input class="inp mb0" list="tlaRolesP" id="tpPickRole" placeholder="תפקיד בתכנית">' +
+      '<button class="btn-ghost sm" id="tpAddP" type="button"><i class="bi bi-plus-lg"></i> הוספה</button></div>' +
+      roleDatalist('tlaRolesP');
+    box.querySelector('#tpAddP').addEventListener('click', async () => {
+      const sid = +box.querySelector('#tpPick').value;
+      if (!sid) { window.UI.toast('בוחרים איש צוות מהרשימה', 'err'); return; }
+      const role = box.querySelector('#tpPickRole').value.trim() || null;
+      const r = await S.add('student_partners', {
+        student_id: plan.student_id, staff_id: sid, role: role,
+        created_by: (window.currentUser && window.currentUser.id) || null,
+      });
+      if (!r.ok) { window.UI.toast('לא נשמר: ' + (r.error || 'כבר שותף לתלמיד'), 'err'); return; }
+      window.UI.toast('נוסף'); drawPartners(host, plan);
+    });
+    box.querySelectorAll('.tla-prole').forEach(inp => inp.addEventListener('change', async () => {
+      const pid = +inp.closest('.tla-prow').dataset.pid;
+      const r = await S.update('student_partners', pid, { role: inp.value.trim() || null });
+      window.UI.toast(r.ok ? 'נשמר' : 'לא נשמר', r.ok ? undefined : 'err');
+    }));
+    box.querySelectorAll('.tla-pdel').forEach(b => b.addEventListener('click', async () => {
+      const pid = +b.closest('.tla-prow').dataset.pid;
+      if (!await window.UI.confirm('להסיר את השותף הזה מהתלמיד?')) return;
+      const r = await S.remove('student_partners', pid);
+      if (!r.ok) { window.UI.toast('לא הוסר', 'err'); return; }
+      drawPartners(host, plan);
+    }));
+  }
+
   async function tabProfile(host, plan, stud) {
     const pr = profOf(plan);
     host.innerHTML = '<div class="tla-grid2">' + PROF_FIELDS.map(f =>
@@ -307,7 +380,9 @@
       '<label class="fld"><span>שם החותם</span><input class="inp mb0" id="tp_sgn" value="' + esc(plan.signed_by || '') + '"></label>' +
       '<label class="fld"><span>תאריך</span><input type="date" class="inp mb0" id="tp_sgd" value="' + esc(plan.signed_at || '') + '"></label>' +
       '</div></div>' +
+      '<div class="qr-card" style="margin-top:12px" id="tpPartnersBox"></div>' +
       '<div class="tla-save"><button class="btn-primary sm" id="tpSave"><i class="bi bi-check-lg"></i> שמירת דף ההכנה</button></div>';
+    drawPartners(host, plan).catch(() => {});
     // "הזמנת נתונים אוטומטית" — קורא את האבחונים ומציע תוכן כטיוטה בלבד.
     // השמירה לתיק נשארת בידי המשתמש, דרך "שמירת דף ההכנה" שלמטה.
     // "תיק מסמכים" — נעמי ביקשה שיהיה אפשר לראות כאן, ליד הכפתור האוטומטי,
@@ -386,9 +461,13 @@
       '.tla-gv th,.tla-gv td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:right}' +
       '.tla-gv th{background:#eef2f6;color:var(--primary,#003048);font-weight:600}' +
       '#g_staff{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px}' +
-      '.tla-staffrow{width:250px}' +
+      '.tla-staffrow{width:340px}' +
       '.tla-srow{display:flex;gap:6px;align-items:center}' +
-      '.tla-srow input{flex:1;min-width:0}' +
+      '.tla-srow input,.tla-srow select{flex:1;min-width:0}' +
+      '.tla-plist{display:flex;flex-direction:column;gap:6px;margin:6px 0}' +
+      '.tla-prow{display:flex;gap:6px;align-items:center}' +
+      '.tla-pname{width:170px;font-weight:600}' +
+      '.tla-prow input{flex:1;min-width:0}' +
       '.tla-sdesc{font-size:.78rem;color:var(--muted);margin-top:2px}';
     document.head.appendChild(st);
   }
@@ -397,7 +476,7 @@
   // טבלת היעדים בתצוגת קריאה: אותה טבלה כמו בעורך ובהדפסה
   function gridView(op, gl) {
     const head = '<thead><tr><th rowspan="2" style="width:22%">יעדים</th>' +
-      op.map(o => '<th rowspan="2">' + esc(o.who) + '</th>').join('') +
+      op.map(o => '<th rowspan="2">' + esc(colLabel(o)) + '</th>').join('') +
       '<th colspan="2">מעקב והערכה</th><th rowspan="2">הערות ליעד</th></tr>' +
       '<tr><th>הערכה מעצבת</th><th>הערכה מסכמת</th></tr></thead>';
     const body = gl.length ? gl.map(x => '<tr><td>' + esc(x.text) + '</td>' +
@@ -413,7 +492,7 @@
     const gl = goalsObj(g);
     const line = (lbl, v) => v ? '<div class="det-row"><span class="det-lbl">' + esc(lbl) + '</span><span class="det-val">' + esc(v) + '</span></div>' : '';
     const staffLine = op.length ? '<div class="tla-roles"><div class="det-lbl" style="margin:6px 0 2px">אנשי צוות המשתתפים ביישום התכנית</div>' +
-      '<div class="det-val">' + op.map(o => esc(o.who)).join(' · ') + '</div></div>' : '';
+      '<div class="det-val">' + op.map(o => esc(colLabel(o))).join(' · ') + '</div></div>' : '';
     return '<div class="qr-card tla-goal"><h3><i class="bi bi-bullseye"></i> ' + esc(g.domain || 'תחום') +
       '<span class="head-actions"><button class="btn-ghost sm" data-ged="' + g.id + '"><i class="bi bi-pencil"></i></button>' +
       '<button class="btn-ghost sm danger" data-gdel="' + g.id + '"><i class="bi bi-trash"></i></button></span></h3>' +
@@ -430,9 +509,10 @@
   async function editGoal(plan, g, onDone) {
     ensureGoalCss();
     g = g || {};
-    const staff = await staffNames();
-    const staffOpts = staff.map(x => '<option value="' + esc(x.name) + '">' +
-      (x.role_label ? ' — ' + esc(x.role_label) : '') + '</option>').join('');
+    // רק השותפים בלמידה של התלמיד מוצגים לבחירה. בלי שותפים — כתיבה חופשית.
+    const partners = await partnersOf(plan.student_id);
+    const staffOpts = partners.map(x => '<option value="' + esc(x.name) + '">' +
+      (x.role ? ' — ' + esc(x.role) : '') + '</option>').join('');
     const ta = (id, lbl, v, ph, rows) => '<label class="fld fld-wide"><span>' + esc(lbl) + '</span>' +
       '<textarea class="inp mb0" id="' + id + '" rows="' + (rows || 2) + '" placeholder="' + esc(ph || '') + '">' + esc(v || '') + '</textarea></label>';
     const taCell = (f, v, sid) => '<textarea class="inp mb0 tla-c" data-f="' + f + '"' +
@@ -440,12 +520,12 @@
 
     // בניית המצב מהנתונים השמורים. מי שמופיע ב-acts אבל לא ב-opps נוסף לרשימה, כדי לא לאבד אותו
     let nextSid = 1;
-    const staffM = oppsArr(g).map(o => ({ sid: nextSid++, who: o.who, what: o.what || '' }));
+    const staffM = oppsArr(g).map(o => ({ sid: nextSid++, who: o.who, what: o.what || '', role: o.role || '' }));
     const goalsM = goalsObj(g).map(x => {
       const acts = {};
       x.acts.forEach(a => {
         let s = staffM.find(q => q.who === a.who);
-        if (!s) { s = { sid: nextSid++, who: a.who, what: '' }; staffM.push(s); }
+        if (!s) { s = { sid: nextSid++, who: a.who, what: '', role: '' }; staffM.push(s); }
         acts[s.sid] = a.what;
       });
       return { text: x.text, acts: acts, eval_form: x.eval_form, eval_sum: x.eval_sum, notes: x.notes };
@@ -460,7 +540,7 @@
       : '';
 
     const body =
-      '<datalist id="tlaStaff">' + staffOpts + DEFAULT_ROLES.map(r => '<option value="' + esc(r) + '"></option>').join('') + '</datalist>' +
+      '<datalist id="tlaStaff">' + staffOpts + '</datalist>' + roleDatalist('tlaRoles') +
       '<div class="form-grid">' +
         '<label class="fld"><span>תחום</span><input class="inp mb0" id="g_dom" list="tlaDomains" value="' + esc(g.domain || '') + '" placeholder="לימודי / רגשי / חברתי…">' +
           '<datalist id="tlaDomains"><option>לימודי</option><option>רגשי</option><option>חברתי</option><option>התנהגותי</option><option>תפקודי</option></datalist></label>' +
@@ -468,7 +548,8 @@
         ta('g_base', 'קו בסיס (מצב קיים)', g.baseline, 'תיאור המצב היום — נקודת הפתיחה') +
       '</div>' +
       '<h4 class="tla-sub">אנשי צוות המשתתפים ביישום התכנית</h4>' +
-      '<p class="login-hint" style="margin:0 0 6px">כל איש צוות מקבל עמודה בטבלת היעדים למטה. אפשר לבחור מהרשימה או לכתוב חופשי.</p>' +
+      (partners.length ? '' : '<p class="login-hint" style="margin:0 0 6px">עדיין לא הוגדרו שותפים בלמידה לתלמיד. אפשר לכתוב חופשי, ואפשר להגדיר שותפים בלשונית דף ההכנה.</p>') +
+      '<p class="login-hint" style="margin:0 0 6px">כל איש צוות מקבל עמודה בטבלת היעדים למטה. בוחרים מהשותפים בלמידה ומציינים תפקיד, או כותבים חופשי.</p>' +
       '<div id="g_staff"></div>' +
       '<button class="btn-ghost sm" id="g_addstaff" type="button"><i class="bi bi-plus-lg"></i> איש צוות נוסף</button>' +
       '<div style="margin:12px 0 4px"><button class="btn-ghost sm" id="g_suggest" type="button">' +
@@ -492,7 +573,7 @@
       M.staff = [...el.querySelectorAll('.tla-staffrow')].map(r => {
         const sid = +r.dataset.sid;
         const old = prev.find(s => s.sid === sid) || {};
-        return { sid: sid, who: r.querySelector('.g-staff-who').value.trim(), what: old.what || '' };
+        return { sid: sid, who: r.querySelector('.g-staff-who').value.trim(), what: old.what || '', role: r.querySelector('.g-staff-role').value.trim() };
       });
       M.goals = [...el.querySelectorAll('#g_grid tr.tla-grow')].map(tr => {
         const x = { text: '', acts: {}, eval_form: '', eval_sum: '', notes: '' };
@@ -507,6 +588,7 @@
       el.querySelector('#g_staff').innerHTML = M.staff.length ? M.staff.map(s =>
         '<div class="tla-staffrow" data-sid="' + s.sid + '"><div class="tla-srow">' +
         '<input class="inp mb0 g-staff-who" list="tlaStaff" placeholder="איש צוות" value="' + esc(s.who) + '">' +
+        '<input class="inp mb0 g-staff-role" list="tlaRoles" placeholder="תפקיד" value="' + esc(s.role || '') + '">' +
         '<button type="button" class="mini danger g-staff-del" title="הסר איש צוות"><i class="bi bi-trash"></i></button></div>' +
         (s.what ? '<div class="tla-sdesc">תיאור כללי (מהגרסה הקודמת): ' + esc(s.what) + '</div>' : '') + '</div>').join('')
         : '<p class="login-hint">עדיין אין אנשי צוות. מוסיפים כאן, ואז כל אחד מקבל עמודה בטבלה.</p>';
@@ -514,7 +596,7 @@
     function drawGrid() {
       const staffNow = M.staff;
       const head = '<thead><tr><th rowspan="2" style="width:22%">יעד</th>' +
-        staffNow.map(s => '<th rowspan="2" style="min-width:150px"><span data-hname="' + s.sid + '">' + esc(s.who || 'איש צוות') + '</span></th>').join('') +
+        staffNow.map(s => '<th rowspan="2" style="min-width:150px"><span data-hname="' + s.sid + '">' + esc(s.who ? colLabel(s) : 'איש צוות') + '</span></th>').join('') +
         '<th colspan="2">מעקב והערכה</th><th rowspan="2" style="width:17%">הערות ליעד</th>' +
         '<th rowspan="2" style="width:44px"></th></tr>' +
         '<tr><th style="width:15%">הערכה מעצבת</th><th style="width:15%">הערכה מסכמת</th></tr></thead>';
@@ -544,7 +626,8 @@
       const hasGoals = M.goals.some(x => x.text.trim());
       if ((topEl.value.trim() || hasGoals) && !confirm('ההצעה תחליף את מטרת העל והיעדים שכבר כתובים. ההערכות וההערות נשארות לפי סדר היעדים. להמשיך?')) return;
       const usingDefault = !M.staff.some(s => s.who);
-      const who = usingDefault ? DEFAULT_ROLES.slice() : M.staff.filter(s => s.who).map(s => s.who);
+      // ההצעה עובדת לפי תפקיד בלבד (בלי שמות). שני אנשים באותו תפקיד: "מחנך 1", "מחנך 2"
+      const who = roleLabels(usingDefault ? DEFAULT_ROLES.map(w => ({ who: w, role: '' })) : M.staff.filter(s => s.who)).map(x => x.label);
       const domain = el.querySelector('#g_dom').value.trim();
       // נשלח: דף ההכנה, התחום, קו הבסיס ותפקידי הצוות. בלי שם התלמיד, ומוחקים ת"ז וטלפונים.
       const scrub = s => String(s || '').replace(/\b\d{9}\b/g, '[ת"ז]').replace(/\b0\d{1,2}-?\d{7}\b/g, '[טלפון]').trim();
@@ -554,11 +637,11 @@
         (prep ? 'דף ההכנה של התלמיד:\n"""' + prep + '"""\n\n' : '') +
         'קו בסיס (מצב קיים)' + (domain ? ' בתחום "' + domain + '"' : '') + ':\n"""' + scrub(base) + '"""\n\n' +
         'המטרה והיעדים צריכים להישען גם על דף ההכנה (מוקדי הכח, המוקדים לחיזוק והרקע) וגם על קו הבסיס.\n' +
-        'אנשי הצוות שעובדים עם התלמיד: ' + who.join(', ') + '.\n\n' +
+        'אנשי הצוות שעובדים עם התלמיד (לפי תפקיד): ' + who.join(', ') + '.\n\n' +
         'כתוב/י בעברית פשוטה:\n' +
         '1. מטרת על אחת לשנה: כללית, אבל מדויקת וממוקדת בקו הבסיס. משפט אחד.\n' +
         '2. שלושה או ארבעה יעדים ישימים במהלך השנה, שמפרקים את מטרת העל. כל יעד קונקרטי וניתן למדידה.\n' +
-        '3. לכל יעד: מה כל אחד מאנשי הצוות מהרשימה עושה כדי לקדם אותו (פעולה קצרה אחת או שתיים). להשתמש בשמות בדיוק כפי שנכתבו. אם איש צוות לא רלוונטי ליעד, אפשר להשאיר אותו ריק.\n' +
+        '3. לכל יעד: מה כל אחד מאנשי הצוות מהרשימה עושה כדי לקדם אותו (פעולה קצרה אחת או שתיים). להשתמש בתפקידים בדיוק כפי שנכתבו ברשימה. אם תפקיד לא רלוונטי ליעד ליעד, אפשר להשאיר אותו ריק.\n' +
         '4. אל תכתוב הערכות.\n' +
         'החזר JSON בלבד בצורה: {"top_goal":"...","goals":[{"text":"...","acts":[{"who":"...","what":"..."}]}]}';
       btn.disabled = true; msg.textContent = 'חושב…';
@@ -576,14 +659,15 @@
           : { text: String(x && x.text || '').trim(), acts: Array.isArray(x && x.acts) ? x.acts : [] }).filter(x => x.text);
         if (!goals.length) throw new Error('לא התקבלו יעדים');
         topEl.value = String(out.top_goal).trim();
-        if (usingDefault) M.staff = DEFAULT_ROLES.map(w => ({ sid: M.nextSid++, who: w, what: '' }));
+        if (usingDefault) M.staff = DEFAULT_ROLES.map(w => ({ sid: M.nextSid++, who: w, what: '', role: '' }));
+        const pairs = roleLabels(M.staff.filter(s => s.who));
         // הערכות והערות נשארות לפי סדר היעדים, כדי שלא יאבדו
         const oldGoals = M.goals;
         M.goals = goals.map((x, i) => {
           const o = oldGoals[i] || {};
           const acts = {};
           x.acts.forEach(a => {
-            const s = M.staff.find(q => q.who === String(a && a.who || '').trim());
+            const s = pairs.find(q => q.label === String(a && a.who || '').trim());
             const w = String(a && a.what || '').trim();
             if (s && w) acts[s.sid] = w;
           });
@@ -601,7 +685,7 @@
       onSave: async () => {
         readDom();
         const staffOk = M.staff.filter(s => s.who);
-        const opps = staffOk.map(s => ({ who: s.who, what: s.what || '' }));
+        const opps = staffOk.map(s => ({ who: s.who, what: s.what || '', role: s.role || null }));
         const goalsOut = M.goals.map(x => ({
           text: x.text.trim(),
           acts: staffOk.map(s => ({ who: s.who, what: String(x.acts[s.sid] || '').trim() })).filter(a => a.what),
@@ -632,9 +716,17 @@
     el.addEventListener('input', e => {
       const t = e.target;
       if (t.tagName === 'TEXTAREA') growArea(t);
-      if (t.classList && t.classList.contains('g-staff-who')) {
-        const sid = t.closest('.tla-staffrow').dataset.sid;
-        el.querySelectorAll('[data-hname="' + sid + '"]').forEach(s => { s.textContent = t.value.trim() || 'איש צוות'; });
+      if (t.classList && (t.classList.contains('g-staff-who') || t.classList.contains('g-staff-role'))) {
+        const row = t.closest('.tla-staffrow');
+        const wv = row.querySelector('.g-staff-who').value.trim();
+        const rv = row.querySelector('.g-staff-role');
+        // שם של שותף שנבחר מהרשימה ממלא את התפקיד שלו, אם עוד לא הוקלד תפקיד
+        if (t.classList.contains('g-staff-who')) {
+          const p = partners.find(x => x.name === wv);
+          if (p && !rv.value.trim()) rv.value = p.role || '';
+        }
+        const lbl = wv ? (rv.value.trim() ? wv + ' — ' + rv.value.trim() : wv) : 'איש צוות';
+        el.querySelectorAll('[data-hname="' + row.dataset.sid + '"]').forEach(s => { s.textContent = lbl; });
       }
     });
     el.addEventListener('click', async e => {
@@ -939,7 +1031,7 @@
       const headTop = '<tr><th rowspan="2" style="width:' + (op.length ? '24%' : '40%') + '">יעדים</th>' +
         (op.length ? '<th colspan="' + op.length + '">הזדמנויות עבודה ואמצעים להשגתם</th>' : '') +
         '<th colspan="2">מעקב והערכה</th><th rowspan="2" style="width:16%">הערות</th></tr>';
-      const headSub = '<tr>' + op.map(o => '<th class="sub">' + esc(o.who) +
+      const headSub = '<tr>' + op.map(o => '<th class="sub">' + esc(colLabel(o)) +
           (o.what ? '<div class="nt">' + esc(o.what) + '</div>' : '') + '</th>').join('') +
         '<th class="sub" style="width:14%">הערכה מעצבת</th><th class="sub" style="width:14%">הערכה מסכמת</th></tr>';
       h += '<section class="page">' + hdr('תלי"א אינטגרטיבי — תכנית לימודים אישית') + meta +
