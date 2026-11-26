@@ -43,7 +43,27 @@
     } catch (_) { _staffCache = []; }
     return _staffCache;
   }
-  const goalsArr = g => Array.isArray(g && g.goals_list) ? g.goals_list.filter(x => String(x || '').trim()) : [];
+  // יוסף 26/11: יעד הוא אובייקט {text, acts, eval_form, eval_sum, notes}.
+  // acts = מה כל איש צוות עושה ליעד הזה: [{who, what}]. מחרוזת ישנה ב-goals_list נקראת כ-{text} בלבד.
+  const hasGoalContent = x => !!(x.text || (x.acts && x.acts.length) || x.eval_form || x.eval_sum || x.notes);
+  function goalsObj(g) {
+    const raw = Array.isArray(g && g.goals_list) ? g.goals_list : [];
+    return raw.map(x => {
+      if (typeof x === 'string') return { text: x.trim(), acts: [], eval_form: '', eval_sum: '', notes: '' };
+      if (!x || typeof x !== 'object') return null;
+      const acts = (Array.isArray(x.acts) ? x.acts : [])
+        .map(a => ({ who: String(a && a.who || '').trim(), what: String(a && a.what || '').trim() }))
+        .filter(a => a.who && a.what);
+      return {
+        text: String(x.text || '').trim(), acts: acts,
+        eval_form: String(x.eval_form || '').trim(), eval_sum: String(x.eval_sum || '').trim(), notes: String(x.notes || '').trim(),
+      };
+    }).filter(x => x && hasGoalContent(x));
+  }
+  // נשמר לתאימות: מי שקורא goalsArr מקבל מחרוזות בלבד, כמו קודם
+  const goalsArr = g => goalsObj(g).map(x => x.text).filter(Boolean);
+  // מה איש צוות מסוים עושה ליעד (ריק אם לא נכתב)
+  const actOf = (x, who) => ((x.acts || []).find(a => a.who === who) || {}).what || '';
   // סדר עמודות הצוות נשמר במערך `opps` — ב-jsonb סדר מפתחות של אובייקט אובד,
   // ולכן `roles` הישן משמש רק כנפילה אחורה לרשומות שטרם הוגרו.
   function oppsArr(g) {
@@ -328,6 +348,7 @@
 
   // ── לשונית 2: תכנית היעדים ──
   async function tabGoals(host, plan) {
+    ensureGoalCss();
     const goals = await goalsOf(plan.id);
     host.innerHTML =
       '<div class="tla-bar"><button class="btn-primary sm" id="tgAdd"><i class="bi bi-plus-lg"></i> תחום / יעד חדש</button>' +
@@ -348,45 +369,96 @@
     const first = DEFAULT_ROLES.filter(k => keys.indexOf(k) > -1);
     return first.concat(keys.filter(k => DEFAULT_ROLES.indexOf(k) === -1));
   }
+
+  // יוסף 26/11: סגנונות העורך והכרטיס. מוזרקים פעם אחת, בלי לגעת ב-main.css
+  function ensureGoalCss() {
+    if (document.getElementById('tlaGoalCss')) return;
+    const st = document.createElement('style');
+    st.id = 'tlaGoalCss';
+    st.textContent =
+      '.modal-card.tla-wide{width:min(96vw,1400px)!important;max-width:96vw!important}' +
+      '.tla-gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin:6px 0}' +
+      '.tla-egrid{width:100%;border-collapse:collapse;min-width:820px;font-size:.9rem}' +
+      '.tla-egrid th,.tla-egrid td{border:1px solid var(--line);padding:6px;vertical-align:top;text-align:right}' +
+      '.tla-egrid th{background:#eef2f6;color:var(--primary,#003048);font-weight:600}' +
+      '.tla-egrid textarea{width:100%;min-height:56px;resize:vertical;box-sizing:border-box;font-size:.88rem}' +
+      '.tla-gv{width:100%;border-collapse:collapse;font-size:.92rem;margin-top:6px}' +
+      '.tla-gv th,.tla-gv td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:right}' +
+      '.tla-gv th{background:#eef2f6;color:var(--primary,#003048);font-weight:600}' +
+      '#g_staff{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px}' +
+      '.tla-staffrow{width:250px}' +
+      '.tla-srow{display:flex;gap:6px;align-items:center}' +
+      '.tla-srow input{flex:1;min-width:0}' +
+      '.tla-sdesc{font-size:.78rem;color:var(--muted);margin-top:2px}';
+    document.head.appendChild(st);
+  }
+  function growArea(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
+
+  // טבלת היעדים בתצוגת קריאה: אותה טבלה כמו בעורך ובהדפסה
+  function gridView(op, gl) {
+    const head = '<thead><tr><th rowspan="2" style="width:22%">יעדים</th>' +
+      op.map(o => '<th rowspan="2">' + esc(o.who) + '</th>').join('') +
+      '<th colspan="2">מעקב והערכה</th><th rowspan="2">הערות ליעד</th></tr>' +
+      '<tr><th>הערכה מעצבת</th><th>הערכה מסכמת</th></tr></thead>';
+    const body = gl.length ? gl.map(x => '<tr><td>' + esc(x.text) + '</td>' +
+      op.map(o => '<td>' + esc(actOf(x, o.who)) + '</td>').join('') +
+      '<td>' + esc(x.eval_form) + '</td><td>' + esc(x.eval_sum) + '</td><td>' + esc(x.notes) + '</td></tr>').join('')
+      : '<tr><td colspan="' + (op.length + 4) + '" style="color:var(--muted)">אין יעדים עדיין</td></tr>';
+    return '<div class="tla-gridwrap"><table class="tla-gv">' + head + '<tbody>' + body + '</tbody></table></div>';
+  }
+
+  // כרטיס התחום: קריאה בלבד, באותה טבלה של העורך
   function goalCard(g) {
-    const roleRows = oppsArr(g).map(o =>
-      '<div class="det-row"><span class="det-lbl">' + esc(o.who) + '</span><span class="det-val">' + esc(o.what) + '</span></div>').join('');
+    const op = oppsArr(g);
+    const gl = goalsObj(g);
     const line = (lbl, v) => v ? '<div class="det-row"><span class="det-lbl">' + esc(lbl) + '</span><span class="det-val">' + esc(v) + '</span></div>' : '';
-    const gl = goalsArr(g);
+    const staffLine = op.length ? '<div class="tla-roles"><div class="det-lbl" style="margin:6px 0 2px">אנשי צוות המשתתפים ביישום התכנית</div>' +
+      '<div class="det-val">' + op.map(o => esc(o.who)).join(' · ') + '</div></div>' : '';
     return '<div class="qr-card tla-goal"><h3><i class="bi bi-bullseye"></i> ' + esc(g.domain || 'תחום') +
       '<span class="head-actions"><button class="btn-ghost sm" data-ged="' + g.id + '"><i class="bi bi-pencil"></i></button>' +
       '<button class="btn-ghost sm danger" data-gdel="' + g.id + '"><i class="bi bi-trash"></i></button></span></h3>' +
-      line('קו בסיס', g.baseline) +
-      (roleRows ? '<div class="tla-roles"><div class="det-lbl" style="margin:6px 0 2px">אנשי צוות המשתתפים ביישום התכנית</div>' + roleRows + '</div>' : '') +
-      line('מטרת על', g.top_goal) +
-      (gl.length ? '<div class="det-row"><span class="det-lbl">יעדים</span><span class="det-val">' +
-        '<ol style="margin:0;padding-inline-start:18px">' + gl.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol></span></div>' : '') +
-      line('הערכה מעצבת', g.eval_form) + line('הערכה מסכמת', g.eval_sum) +
+      line('קו בסיס', g.baseline) + staffLine + line('מטרת על', g.top_goal) +
+      gridView(op, gl) +
+      line('הערכה מעצבת (כללי, מהגרסה הקודמת)', g.eval_form) + line('הערכה מסכמת (כללי, מהגרסה הקודמת)', g.eval_sum) +
       line('המלצות', g.recommendations) +
       line('הערות ושינויים משמעותיים במהלך השנה', g.notes) +
       '</div>';
   }
 
-  // עורך התחום — לפי הטבלה הרשמית: יעדים (רשימה) → הזדמנויות עבודה לפי איש
-  // צוות נבחר → מעקב והערכה (מעצבת/מסכמת) → המלצות והערות.
+  // עורך התחום: הכול פתוח בעמוד אחד, בלי לשוניות. הטבלה: יעד | עמודה לכל איש צוות | מעצבת | מסכמת | הערות.
+  // מצב העריכה נמצא ב-M. לפני כל ציור מחדש קוראים את ה-DOM אל M (readDom), כך שלא הולך מידע.
   async function editGoal(plan, g, onDone) {
+    ensureGoalCss();
     g = g || {};
-    const op = oppsArr(g);
     const staff = await staffNames();
     const staffOpts = staff.map(x => '<option value="' + esc(x.name) + '">' +
       (x.role_label ? ' — ' + esc(x.role_label) : '') + '</option>').join('');
     const ta = (id, lbl, v, ph, rows) => '<label class="fld fld-wide"><span>' + esc(lbl) + '</span>' +
       '<textarea class="inp mb0" id="' + id + '" rows="' + (rows || 2) + '" placeholder="' + esc(ph || '') + '">' + esc(v || '') + '</textarea></label>';
+    const taCell = (f, v, sid) => '<textarea class="inp mb0 tla-c" data-f="' + f + '"' +
+      (sid != null ? ' data-sid="' + sid + '"' : '') + ' rows="3">' + esc(v || '') + '</textarea>';
 
-    const goalRow = v => '<div class="g-goal" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">' +
-      '<textarea class="inp mb0 g-goal-t" rows="2" placeholder="יעד…" style="flex:1">' + esc(v || '') + '</textarea>' +
-      '<button type="button" class="mini danger g-goal-del" title="הסר"><i class="bi bi-trash"></i></button></div>';
-    const oppRow = (who, what) => '<div class="g-opp" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">' +
-      '<input class="inp mb0 g-opp-who" list="tlaStaff" placeholder="איש צוות" value="' + esc(who || '') + '" style="max-width:190px">' +
-      '<textarea class="inp mb0 g-opp-what" rows="2" placeholder="מה הוא עושה — הזדמנויות עבודה ואמצעים" style="flex:1">' + esc(what || '') + '</textarea>' +
-      '<button type="button" class="mini danger g-opp-del" title="הסר"><i class="bi bi-trash"></i></button></div>';
+    // בניית המצב מהנתונים השמורים. מי שמופיע ב-acts אבל לא ב-opps נוסף לרשימה, כדי לא לאבד אותו
+    let nextSid = 1;
+    const staffM = oppsArr(g).map(o => ({ sid: nextSid++, who: o.who, what: o.what || '' }));
+    const goalsM = goalsObj(g).map(x => {
+      const acts = {};
+      x.acts.forEach(a => {
+        let s = staffM.find(q => q.who === a.who);
+        if (!s) { s = { sid: nextSid++, who: a.who, what: '' }; staffM.push(s); }
+        acts[s.sid] = a.what;
+      });
+      return { text: x.text, acts: acts, eval_form: x.eval_form, eval_sum: x.eval_sum, notes: x.notes };
+    });
+    const M = { staff: staffM, goals: goalsM, nextSid: nextSid };
 
-    const gl = goalsArr(g);
+    // הערכה כללית מהגרסה הקודמת: מוצגת רק אם יש בה תוכן, כדי שלא תאבד
+    const legacy = (g.eval_form || g.eval_sum)
+      ? '<div class="tla-legacy"><p class="login-hint" style="margin:8px 0 4px">הערכה כללית מהגרסה הקודמת (לא שייכת ליעד מסוים). אפשר לערוך או למחוק.</p>' +
+        '<div class="form-grid">' + ta('g_legevf', 'הערכה מעצבת (כללי)', g.eval_form) +
+        ta('g_legevs', 'הערכה מסכמת (כללי)', g.eval_sum) + '</div></div>'
+      : '';
+
     const body =
       '<datalist id="tlaStaff">' + staffOpts + DEFAULT_ROLES.map(r => '<option value="' + esc(r) + '"></option>').join('') + '</datalist>' +
       '<div class="form-grid">' +
@@ -395,81 +467,84 @@
         '<label class="fld"><span>סדר תצוגה</span><input type="number" class="inp mb0" id="g_ord" value="' + (g.sort_order || 0) + '"></label>' +
         ta('g_base', 'קו בסיס (מצב קיים)', g.baseline, 'תיאור המצב היום — נקודת הפתיחה') +
       '</div>' +
-      // יוסף 26/11: אנשי הצוות עברו למעלה, מיד מתחת לקו הבסיס
       '<h4 class="tla-sub">אנשי צוות המשתתפים ביישום התכנית</h4>' +
-      '<p class="login-hint" style="margin:0 0 6px">כל שורה = איש צוות, ומה הוא עושה. אפשר לבחור מהרשימה או לכתוב חופשי.</p>' +
-      '<div id="g_opps">' + (op.length ? op.map(o => oppRow(o.who, o.what)).join('') : oppRow('', '')) + '</div>' +
-      '<button class="btn-ghost sm" id="g_addopp" type="button"><i class="bi bi-plus-lg"></i> איש צוות נוסף</button>' +
-      // יוסף 26/11: הצעה אוטומטית על סמך קו הבסיס — מטרת על, 3-4 יעדים, וחלוקת העבודה בין אנשי הצוות
+      '<p class="login-hint" style="margin:0 0 6px">כל איש צוות מקבל עמודה בטבלת היעדים למטה. אפשר לבחור מהרשימה או לכתוב חופשי.</p>' +
+      '<div id="g_staff"></div>' +
+      '<button class="btn-ghost sm" id="g_addstaff" type="button"><i class="bi bi-plus-lg"></i> איש צוות נוסף</button>' +
       '<div style="margin:12px 0 4px"><button class="btn-ghost sm" id="g_suggest" type="button">' +
         '<i class="bi bi-magic"></i> הצעה אוטומטית: מטרת על, יעדים וחלוקת עבודה</button>' +
         '<span class="login-hint" id="g_sugmsg" style="margin-inline-start:8px">לפי דף ההכנה, קו הבסיס ואנשי הצוות. ההצעה נכנסת לשדות לעריכה, ונשמרת רק בלחיצה על שמירה.</span></div>' +
-      '<div class="form-grid" style="margin-top:6px">' +
-        ta('g_top', 'מטרת על', g.top_goal) +
-      '</div>' +
-      '<h4 class="tla-sub">יעדים</h4>' +
-      '<div id="g_goals">' + (gl.length ? gl.map(goalRow).join('') : goalRow('')) + '</div>' +
+      '<div class="form-grid" style="margin-top:6px">' + ta('g_top', 'מטרת על', g.top_goal) + '</div>' +
+      '<h4 class="tla-sub">יעדים, חלוקת עבודה והערכה</h4>' +
+      '<div class="tla-gridwrap"><table class="tla-egrid" id="g_grid"></table></div>' +
       '<button class="btn-ghost sm" id="g_addgoal" type="button"><i class="bi bi-plus-lg"></i> יעד נוסף</button>' +
-      '<h4 class="tla-sub">מעקב והערכה</h4><div class="form-grid">' +
-        ta('g_evf', 'הערכה מעצבת', g.eval_form, 'הערכה במהלך השנה') +
-        ta('g_evs', 'הערכה מסכמת', g.eval_sum, 'הערכה בסוף התקופה') +
-      '</div>' +
+      legacy +
       '<div class="form-grid" style="margin-top:10px">' +
         ta('g_rec', 'המלצות', g.recommendations) +
         ta('g_notes', 'הערות ושינויים משמעותיים במהלך השנה', g.notes) +
       '</div>';
 
-    const m = window.UI.modal({
-      title: g.id ? 'עריכת תחום' : 'תחום חדש', bodyHTML: body, saveLabel: 'שמירה',
-      onSave: async (card) => {
-        const list = [...card.querySelectorAll('.g-goal-t')].map(t => t.value.trim()).filter(Boolean);
-        const opps = [];
-        card.querySelectorAll('.g-opp').forEach(row => {
-          const who = row.querySelector('.g-opp-who').value.trim();
-          const what = row.querySelector('.g-opp-what').value.trim();
-          if (who) opps.push({ who: who, what: what });
+    let el = null;
+    // קורא את מה שמוקלד בעמוד אל M
+    function readDom() {
+      if (!el) return;
+      const prev = M.staff;
+      M.staff = [...el.querySelectorAll('.tla-staffrow')].map(r => {
+        const sid = +r.dataset.sid;
+        const old = prev.find(s => s.sid === sid) || {};
+        return { sid: sid, who: r.querySelector('.g-staff-who').value.trim(), what: old.what || '' };
+      });
+      M.goals = [...el.querySelectorAll('#g_grid tr.tla-grow')].map(tr => {
+        const x = { text: '', acts: {}, eval_form: '', eval_sum: '', notes: '' };
+        tr.querySelectorAll('textarea').forEach(t => {
+          if (t.dataset.f === 'act') x.acts[t.dataset.sid] = t.value;
+          else x[t.dataset.f] = t.value;
         });
-        const row = {
-          plan_id: plan.id,
-          domain: card.querySelector('#g_dom').value.trim() || null,
-          sort_order: +card.querySelector('#g_ord').value || 0,
-          baseline: card.querySelector('#g_base').value.trim() || null,
-          top_goal: card.querySelector('#g_top').value.trim() || null,
-          goals_list: list,
-          opps: opps,
-          eval_form: card.querySelector('#g_evf').value.trim() || null,
-          eval_sum: card.querySelector('#g_evs').value.trim() || null,
-          recommendations: card.querySelector('#g_rec').value.trim() || null,
-          notes: card.querySelector('#g_notes').value.trim() || null,
-        };
-        const r = g.id ? await S.update('tla_goals', g.id, row) : await S.add('tla_goals', row);
-        if (!r.ok) { window.UI.toast('שגיאה: ' + (r.error || ''), 'err'); return false; }
-        window.UI.toast('נשמר'); if (onDone) onDone(); return true;
-      },
-    });
-    const el = m.el;
-    const wireDel = (sel, cls) => el.querySelectorAll(sel).forEach(b => b.addEventListener('click', () => {
-      const wrap = b.closest(cls), host = wrap.parentElement;
-      if (host.children.length > 1) wrap.remove(); else host.querySelectorAll('input,textarea').forEach(x => { x.value = ''; });
-    }));
-    const rewire = () => { wireDel('.g-goal-del', '.g-goal'); wireDel('.g-opp-del', '.g-opp'); };
-    el.querySelector('#g_addgoal').addEventListener('click', () => {
-      el.querySelector('#g_goals').insertAdjacentHTML('beforeend', goalRow(''));
-      rewire();
-    });
-    el.querySelector('#g_addopp').addEventListener('click', () => {
-      el.querySelector('#g_opps').insertAdjacentHTML('beforeend', oppRow('', ''));
-      rewire();
-    });
-    el.querySelector('#g_suggest').addEventListener('click', async (ev) => {
-      const btn = ev.currentTarget, msg = el.querySelector('#g_sugmsg');
+        return x;
+      });
+    }
+    function drawStaff() {
+      el.querySelector('#g_staff').innerHTML = M.staff.length ? M.staff.map(s =>
+        '<div class="tla-staffrow" data-sid="' + s.sid + '"><div class="tla-srow">' +
+        '<input class="inp mb0 g-staff-who" list="tlaStaff" placeholder="איש צוות" value="' + esc(s.who) + '">' +
+        '<button type="button" class="mini danger g-staff-del" title="הסר איש צוות"><i class="bi bi-trash"></i></button></div>' +
+        (s.what ? '<div class="tla-sdesc">תיאור כללי (מהגרסה הקודמת): ' + esc(s.what) + '</div>' : '') + '</div>').join('')
+        : '<p class="login-hint">עדיין אין אנשי צוות. מוסיפים כאן, ואז כל אחד מקבל עמודה בטבלה.</p>';
+    }
+    function drawGrid() {
+      const staffNow = M.staff;
+      const head = '<thead><tr><th rowspan="2" style="width:22%">יעד</th>' +
+        staffNow.map(s => '<th rowspan="2" style="min-width:150px"><span data-hname="' + s.sid + '">' + esc(s.who || 'איש צוות') + '</span></th>').join('') +
+        '<th colspan="2">מעקב והערכה</th><th rowspan="2" style="width:17%">הערות ליעד</th>' +
+        '<th rowspan="2" style="width:44px"></th></tr>' +
+        '<tr><th style="width:15%">הערכה מעצבת</th><th style="width:15%">הערכה מסכמת</th></tr></thead>';
+      const body = M.goals.length ? M.goals.map((x, i) => '<tr class="tla-grow" data-gi="' + i + '">' +
+        '<td>' + taCell('text', x.text) + '</td>' +
+        staffNow.map(s => '<td>' + taCell('act', x.acts[s.sid], s.sid) + '</td>').join('') +
+        '<td>' + taCell('eval_form', x.eval_form) + '</td><td>' + taCell('eval_sum', x.eval_sum) + '</td>' +
+        '<td>' + taCell('notes', x.notes) + '</td>' +
+        '<td><button type="button" class="mini danger g-goal-del" title="מחק יעד"><i class="bi bi-trash"></i></button></td></tr>').join('')
+        : '<tr><td colspan="' + (staffNow.length + 5) + '" class="login-hint">אין יעדים עדיין. מוסיפים יעד בכפתור שמתחת לטבלה.</td></tr>';
+      const tb = el.querySelector('#g_grid');
+      tb.innerHTML = head + '<tbody>' + body + '</tbody>';
+      tb.querySelectorAll('textarea').forEach(growArea);
+    }
+    function focusLast(sel) {
+      const all = el.querySelectorAll(sel);
+      if (all.length) all[all.length - 1].focus();
+    }
+
+    // הצעה אוטומטית: מחזירה מטרת על, 3-4 יעדים, ולכל יעד מה כל איש צוות עושה
+    async function suggest(btn) {
+      const msg = el.querySelector('#g_sugmsg');
       const base = el.querySelector('#g_base').value.trim();
       if (!base) { window.UI.toast('קודם למלא את קו הבסיס', 'err'); return; }
       const topEl = el.querySelector('#g_top');
-      const hasGoals = [...el.querySelectorAll('.g-goal-t')].some(t => t.value.trim());
-      if ((topEl.value.trim() || hasGoals) && !confirm('ההצעה תחליף את מטרת העל והיעדים שכבר כתובים. להמשיך?')) return;
-      let who = [...el.querySelectorAll('.g-opp-who')].map(i => i.value.trim()).filter(Boolean);
-      if (!who.length) who = DEFAULT_ROLES.slice();
+      readDom();
+      const hasGoals = M.goals.some(x => x.text.trim());
+      if ((topEl.value.trim() || hasGoals) && !confirm('ההצעה תחליף את מטרת העל והיעדים שכבר כתובים. ההערכות וההערות נשארות לפי סדר היעדים. להמשיך?')) return;
+      const usingDefault = !M.staff.some(s => s.who);
+      const who = usingDefault ? DEFAULT_ROLES.slice() : M.staff.filter(s => s.who).map(s => s.who);
       const domain = el.querySelector('#g_dom').value.trim();
       // נשלח: דף ההכנה, התחום, קו הבסיס ותפקידי הצוות. בלי שם התלמיד, ומוחקים ת"ז וטלפונים.
       const scrub = s => String(s || '').replace(/\b\d{9}\b/g, '[ת"ז]').replace(/\b0\d{1,2}-?\d{7}\b/g, '[טלפון]').trim();
@@ -483,8 +558,9 @@
         'כתוב/י בעברית פשוטה:\n' +
         '1. מטרת על אחת לשנה: כללית, אבל מדויקת וממוקדת בקו הבסיס. משפט אחד.\n' +
         '2. שלושה או ארבעה יעדים ישימים במהלך השנה, שמפרקים את מטרת העל. כל יעד קונקרטי וניתן למדידה.\n' +
-        '3. חלוקת העבודה: לכל איש צוות מהרשימה, מה הוא עושה כדי לקדם את היעדים (2-3 פעולות קצרות). להשתמש בשמות בדיוק כפי שנכתבו.\n' +
-        'החזר JSON בלבד בצורה: {"top_goal":"...","goals":["...","..."],"staff":[{"who":"...","what":"..."}]}';
+        '3. לכל יעד: מה כל אחד מאנשי הצוות מהרשימה עושה כדי לקדם אותו (פעולה קצרה אחת או שתיים). להשתמש בשמות בדיוק כפי שנכתבו. אם איש צוות לא רלוונטי ליעד, אפשר להשאיר אותו ריק.\n' +
+        '4. אל תכתוב הערכות.\n' +
+        'החזר JSON בלבד בצורה: {"top_goal":"...","goals":[{"text":"...","acts":[{"who":"...","what":"..."}]}]}';
       btn.disabled = true; msg.textContent = 'חושב…';
       try {
         const r = await window.cv3call('gemini-2.5-flash', {
@@ -495,30 +571,109 @@
         const txt = (((j.candidates || [])[0] || {}).content || {}).parts?.map(p => p.text || '').join('') || '';
         const out = JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, ''));
         if (!out || !out.top_goal) throw new Error('לא התקבלה תשובה מהמודל');
+        const goals = (Array.isArray(out.goals) ? out.goals : []).slice(0, 4).map(x => (typeof x === 'string')
+          ? { text: x.trim(), acts: [] }
+          : { text: String(x && x.text || '').trim(), acts: Array.isArray(x && x.acts) ? x.acts : [] }).filter(x => x.text);
+        if (!goals.length) throw new Error('לא התקבלו יעדים');
         topEl.value = String(out.top_goal).trim();
-        const goals = (out.goals || []).map(x => String(x || '').trim()).filter(Boolean).slice(0, 4);
-        if (goals.length) el.querySelector('#g_goals').innerHTML = goals.map(goalRow).join('');
-        const sm = {};
-        (out.staff || []).forEach(s => { if (s && s.who) sm[String(s.who).trim()] = String(s.what || '').trim(); });
-        const rows = [...el.querySelectorAll('.g-opp')];
-        const named = rows.filter(rw => rw.querySelector('.g-opp-who').value.trim());
-        if (named.length) {
-          // ממלאים רק שורות ריקות, כדי לא למחוק מה שאיש צוות כבר כתב
-          named.forEach(rw => {
-            const w = rw.querySelector('.g-opp-who').value.trim(), t = rw.querySelector('.g-opp-what');
-            if (!t.value.trim() && sm[w]) t.value = sm[w];
+        if (usingDefault) M.staff = DEFAULT_ROLES.map(w => ({ sid: M.nextSid++, who: w, what: '' }));
+        // הערכות והערות נשארות לפי סדר היעדים, כדי שלא יאבדו
+        const oldGoals = M.goals;
+        M.goals = goals.map((x, i) => {
+          const o = oldGoals[i] || {};
+          const acts = {};
+          x.acts.forEach(a => {
+            const s = M.staff.find(q => q.who === String(a && a.who || '').trim());
+            const w = String(a && a.what || '').trim();
+            if (s && w) acts[s.sid] = w;
           });
-        } else {
-          el.querySelector('#g_opps').innerHTML = who.map(w => oppRow(w, sm[w] || '')).join('');
-        }
-        rewire();
-        el.querySelectorAll('textarea').forEach(t => window.UI.autoGrow && window.UI.autoGrow(t));
+          return { text: x.text, acts: acts, eval_form: o.eval_form || '', eval_sum: o.eval_sum || '', notes: o.notes || '' };
+        });
+        drawStaff(); drawGrid();
         msg.textContent = 'ההצעה מולאה. כדאי לעבור עליה ולתקן לפני השמירה.';
       } catch (e) {
         msg.textContent = 'ההצעה לא הצליחה: ' + (e && e.message || e);
       } finally { btn.disabled = false; }
+    }
+
+    const m = window.UI.modal({
+      title: g.id ? 'עריכת תחום' : 'תחום חדש', bodyHTML: body, saveLabel: 'שמירה',
+      onSave: async () => {
+        readDom();
+        const staffOk = M.staff.filter(s => s.who);
+        const opps = staffOk.map(s => ({ who: s.who, what: s.what || '' }));
+        const goalsOut = M.goals.map(x => ({
+          text: x.text.trim(),
+          acts: staffOk.map(s => ({ who: s.who, what: String(x.acts[s.sid] || '').trim() })).filter(a => a.what),
+          eval_form: x.eval_form.trim(), eval_sum: x.eval_sum.trim(), notes: x.notes.trim(),
+        })).filter(hasGoalContent);
+        const lf = el.querySelector('#g_legevf'), ls = el.querySelector('#g_legevs');
+        const row = {
+          plan_id: plan.id,
+          domain: el.querySelector('#g_dom').value.trim() || null,
+          sort_order: +el.querySelector('#g_ord').value || 0,
+          baseline: el.querySelector('#g_base').value.trim() || null,
+          top_goal: el.querySelector('#g_top').value.trim() || null,
+          goals_list: goalsOut,
+          opps: opps,
+          eval_form: lf ? (lf.value.trim() || null) : null,
+          eval_sum: ls ? (ls.value.trim() || null) : null,
+          recommendations: el.querySelector('#g_rec').value.trim() || null,
+          notes: el.querySelector('#g_notes').value.trim() || null,
+        };
+        const r = g.id ? await S.update('tla_goals', g.id, row) : await S.add('tla_goals', row);
+        if (!r.ok) { window.UI.toast('שגיאה: ' + (r.error || ''), 'err'); return false; }
+        window.UI.toast('נשמר'); if (onDone) onDone(); return true;
+      },
     });
-    rewire();
+    el = m.el;
+    el.classList.add('tla-wide');
+
+    el.addEventListener('input', e => {
+      const t = e.target;
+      if (t.tagName === 'TEXTAREA') growArea(t);
+      if (t.classList && t.classList.contains('g-staff-who')) {
+        const sid = t.closest('.tla-staffrow').dataset.sid;
+        el.querySelectorAll('[data-hname="' + sid + '"]').forEach(s => { s.textContent = t.value.trim() || 'איש צוות'; });
+      }
+    });
+    el.addEventListener('click', async e => {
+      const t = e.target;
+      if (t.closest('#g_addstaff')) {
+        readDom(); M.staff.push({ sid: M.nextSid++, who: '', what: '' });
+        drawStaff(); drawGrid(); focusLast('.g-staff-who'); return;
+      }
+      const sd = t.closest('.g-staff-del');
+      if (sd) {
+        readDom();
+        const sid = +sd.closest('.tla-staffrow').dataset.sid;
+        // יוסף 26/11: לא למחוק בטעות עמודה שכבר כתוב בה משהו
+        const hasText = M.goals.some(gg => gg.acts && String(gg.acts[sid] || '').trim());
+        if (hasText && !confirm('בעמודה של איש הצוות הזה כבר כתובות פעולות. להסיר אותו ואת מה שכתוב בעמודה?')) return;
+        M.staff = M.staff.filter(s => s.sid !== sid);
+        drawStaff(); drawGrid(); return;
+      }
+      if (t.closest('#g_addgoal')) {
+        readDom(); M.goals.push({ text: '', acts: {}, eval_form: '', eval_sum: '', notes: '' });
+        drawGrid(); focusLast('#g_grid tr.tla-grow [data-f="text"]'); return;
+      }
+      const gd = t.closest('.g-goal-del');
+      if (gd) {
+        readDom();
+        const i = +gd.closest('tr').dataset.gi;
+        const x = M.goals[i];
+        const filled = x && (x.text.trim() || Object.values(x.acts).some(v => String(v).trim()) ||
+          x.eval_form.trim() || x.eval_sum.trim() || x.notes.trim());
+        if (filled && !await window.UI.confirm('למחוק את היעד הזה?')) return;
+        M.goals.splice(i, 1);
+        drawGrid(); return;
+      }
+      const sg = t.closest('#g_suggest');
+      if (sg) suggest(sg);
+    });
+
+    drawStaff();
+    drawGrid();
   }
 
   // ── לשונית 3: מערכת שעות אישית ──
@@ -772,30 +927,30 @@
     // ── הטבלה הרשמית: יעדים | הזדמנויות עבודה (עמודה לכל איש צוות) | מעקב והערכה ──
     // הסדר מימין לשמאל, ומתחת שורת המלצות + הערות ושינויים. זה בדיוק המבנה
     // שבטופס של המכינה (משוב נעמי לוי, 20/08).
-    goals.forEach(g => {
+    // יוסף 26/11: עמוד לכל תחום, לפי הטבלה של היועצת (A4 לרוחב). בלי תחומים — עמוד ריק להשלמה.
+    (goals.length ? goals : [{}]).forEach(g => {
       const op = oppsArr(g);
-      const gl = goalsArr(g);
-      // יוסף 26/11: אנשי הצוות עברו מעמודות הטבלה לטבלה משלהם, מיד מתחת לקו הבסיס
-      const staffRows = (op.length ? op : [{ who: '', what: '' }, { who: '', what: '' }])
-        .map(o => '<tr><td>' + esc(o.who) + '</td><td>' + esc(o.what) + '</td></tr>').join('');
+      const gl = goalsObj(g);
+      const blank = '<td style="height:12mm"></td>';
+      const rowsHtml = (gl.length ? gl : [null, null, null, null]).map(x => x
+        ? '<tr><td>' + esc(x.text) + '</td>' + op.map(o => '<td>' + esc(actOf(x, o.who)) + '</td>').join('') +
+          '<td>' + esc(x.eval_form) + '</td><td>' + esc(x.eval_sum) + '</td><td>' + esc(x.notes) + '</td></tr>'
+        : '<tr>' + blank + op.map(() => blank).join('') + blank + blank + blank + '</tr>').join('');
+      const headTop = '<tr><th rowspan="2" style="width:' + (op.length ? '24%' : '40%') + '">יעדים</th>' +
+        (op.length ? '<th colspan="' + op.length + '">הזדמנויות עבודה ואמצעים להשגתם</th>' : '') +
+        '<th colspan="2">מעקב והערכה</th><th rowspan="2" style="width:16%">הערות</th></tr>';
+      const headSub = '<tr>' + op.map(o => '<th class="sub">' + esc(o.who) +
+          (o.what ? '<div class="nt">' + esc(o.what) + '</div>' : '') + '</th>').join('') +
+        '<th class="sub" style="width:14%">הערכה מעצבת</th><th class="sub" style="width:14%">הערכה מסכמת</th></tr>';
       h += '<section class="page">' + hdr('תלי"א אינטגרטיבי — תכנית לימודים אישית') + meta +
         '<div class="band">תחום: <b>' + esc(g.domain || '') + '</b></div>' +
         '<div class="para"><b>קו בסיס:</b> ' + esc(g.baseline || '') + '</div>' +
-        '<table class="grid" style="margin-bottom:3mm"><thead><tr><th colspan="2">אנשי צוות המשתתפים ביישום התכנית</th></tr>' +
-          '<tr><th class="sub" style="width:25%">איש צוות</th><th class="sub">מה הוא עושה</th></tr></thead>' +
-          '<tbody>' + staffRows + '</tbody></table>' +
         '<div class="para"><b>מטרת על:</b> ' + esc(g.top_goal || '') + '</div>' +
-        '<table class="grid"><thead>' +
-          '<tr><th rowspan="2" style="width:50%">יעדים</th>' +
-              '<th colspan="2">מעקב והערכה</th></tr>' +
-          '<tr><th class="sub">הערכה מעצבת</th><th class="sub">הערכה מסכמת</th></tr>' +
-        '</thead><tbody><tr>' +
-          '<td class="tall">' + (gl.length
-            ? '<ol style="margin:0;padding-inline-start:5mm">' + gl.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>'
-            : '') + '</td>' +
-          '<td class="tall">' + esc(g.eval_form || '') + '</td>' +
-          '<td class="tall">' + esc(g.eval_sum || '') + '</td>' +
-        '</tr></tbody></table>' +
+        '<table class="grid"><thead>' + headTop + headSub + '</thead><tbody>' + rowsHtml + '</tbody></table>' +
+        ((g.eval_form || g.eval_sum)
+          ? '<div class="para" style="margin-top:2mm"><b>הערכה כללית (מהגרסה הקודמת):</b> ' +
+            (g.eval_form ? 'מעצבת: ' + esc(g.eval_form) + ' ' : '') + (g.eval_sum ? 'מסכמת: ' + esc(g.eval_sum) : '') + '</div>'
+          : '') +
         '<table class="grid" style="margin-top:3mm"><tr><th style="width:50%">המלצות</th>' +
         '<th>הערות ושינויים משמעותיים במהלך השנה</th></tr>' +
         '<tr><td class="tall">' + esc(g.recommendations || '') + '</td>' +
