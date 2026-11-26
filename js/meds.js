@@ -250,7 +250,7 @@
   .mds-nwrap{display:flex;align-items:center;gap:4px;min-width:0}
   .mds-nwrap .mds-1{flex:1;min-width:0}
   .mds-more{flex:none;border:0;background:#e0f2fe;color:#075985;border-radius:6px;padding:1px 6px;font:inherit;font-size:12px;cursor:pointer}
-  td.mds-open .mds-1{white-space:normal}
+  td.mds-open .mds-1{white-space:pre-line}
   td.mds-open .mds-nwrap{align-items:flex-start}
   .mds-ed{cursor:text} .mds-ed:hover{background:#f1f5f9;outline:1px dashed #94a3b8;outline-offset:-2px}
   .mds-in{width:100%;padding:4px 6px;font:inherit}
@@ -715,12 +715,61 @@
       if (td) startEdit(td);
     }
 
+    // עריכת הערות: חלון עם תיבת טקסט גדולה. הטקסט הקיים נשאר, הסמן בסוף,
+    // ואפשר ללחוץ בכל מקום בטקסט ולשנות שם. "הוספת הערה" מוסיפה שורה חדשה עם תאריך.
+    function editNotes(m) {
+      const { body, close } = makeOverlay('הערות — ' + sName(m.student_id) + ' · ' + (m.name || ''));
+      const oldV = m.notes == null ? '' : String(m.notes);
+      const extra = [m.take_how && 'אופן: ' + m.take_how, m.second && ('כדור בצהריים: ' + (m.dose2 || '') + ' ' + (m.hours2 || '')).trim(),
+        (m.side_during || m.side_after) && 'תופעות: ' + [m.side_during, m.side_after].filter(Boolean).join(' / ')].filter(Boolean);
+      body.innerHTML =
+        '<textarea class="inp mb0" id="mdsNotesTa" rows="8" style="width:100%;font-family:inherit;line-height:1.6;resize:vertical"></textarea>' +
+        '<p class="mds-hint">אפשר ללחוץ בכל מקום בטקסט ולשנות. Ctrl+Enter שומר, Esc סוגר בלי לשמור.</p>' +
+        (extra.length ? '<div class="mds-hint" style="background:#f8fafc;border-radius:8px;padding:6px 8px">' + extra.map(esc).join('<br>') +
+          '<br><i>(את אלה משנים בחלון התלמיד)</i></div>' : '') +
+        '<div class="mds-row" style="margin-top:12px"><button class="btn-primary sm" id="mdsNSave">שמירה</button>' +
+        '<button class="btn-ghost sm" id="mdsNAdd"><i class="bi bi-plus-lg"></i> הוספת הערה</button>' +
+        '<button class="btn-ghost sm" id="mdsNCancel">ביטול</button></div>';
+      const ta = body.querySelector('#mdsNotesTa');
+      ta.value = oldV;
+      const toEnd = () => { ta.focus(); const n = ta.value.length; ta.setSelectionRange(n, n); ta.scrollTop = ta.scrollHeight; };
+      setTimeout(toEnd, 30);
+      body.querySelector('#mdsNAdd').addEventListener('click', () => {
+        // חותמת: תאריך עברי + לועזי, למשל "ה' כסלו תשפ"ז · 26/11/2026: "
+        const d = new Date();
+        let heb = '';
+        try { heb = (window.UI && window.UI.hebDate) ? window.UI.hebDate(d) : ''; } catch (_) {}
+        if (!heb) { try { heb = d.toLocaleDateString('he-IL-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) {} }
+        const greg = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+        const stamp = (heb ? heb + ' · ' : '') + greg + ': ';
+        ta.value = ta.value.replace(/\s+$/, '') + (ta.value.trim() ? '\n' : '') + stamp;
+        toEnd();
+      });
+      const doSave = async () => {
+        const v = ta.value.replace(/\s+$/, '');
+        if (v === oldV.replace(/\s+$/, '')) { close(); return; }
+        const before = fullRow(m);
+        const row = fullRow(m); row.notes = v || null; row.updated_on = today();
+        try {
+          await save('update', m.student_id, m.id, row, null);
+          applyMed(m.id, row);
+          pushUndo('עודכנו הערות ב' + sName(m.student_id), async () => { await save('update', m.student_id, m.id, before, null); });
+          close(); draw();
+        } catch (e) { window.UI.toast(e.message || 'השמירה נכשלה', 'err'); }
+      };
+      body.querySelector('#mdsNSave').addEventListener('click', doSave);
+      body.querySelector('#mdsNCancel').addEventListener('click', close);
+      ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSave(); } });
+    }
+
     function startEdit(td) {
       if (td.querySelector('input')) return;
       const m = D.meds.find(x => x.id == td.dataset.id); if (!m) return;
+      if (td.dataset.ed === 'notes') return editNotes(m);
       const k = td.dataset.ed, oldV = m[k] == null ? '' : String(m[k]);
       td.innerHTML = '<input class="inp mb0 mds-in"' + (k === 'name' ? ' list="mdsNames"' : '') + ' value="' + esc(oldV) + '">';
-      const inp = td.querySelector('input'); inp.focus(); inp.select();
+      // בלי לסמן הכול: הסמן בסוף, ואפשר ללחוץ באמצע הטקסט ולשנות שם
+      const inp = td.querySelector('input'); inp.focus(); const L = inp.value.length; inp.setSelectionRange(L, L);
       let done = false;
       const finish = async (ok, dir) => {
         if (done) return; done = true;
