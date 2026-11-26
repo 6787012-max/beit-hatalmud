@@ -6,6 +6,7 @@
 // הכתיבה עוברת דרך RPC `med_save` — השינוי והערת העדכון נשמרים יחד ביומן.
 (function () {
   'use strict';
+  const imgSrc = u => (window.cv3MedsImg && window.cv3MedsImg[u]) || u;   // תמונה מוטמעת (נטפרי חוסם קבצי תמונה)
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const nm = s => (window.UI && window.UI.fullName) ? window.UI.fullName(s) : (s && s.name) || '';
   const today = () => new Date().toISOString().slice(0, 10);
@@ -186,7 +187,7 @@
     const imgs = it && Array.isArray(it.images) ? it.images : [];
     if (imgs.length) {
       html += sec('תמונות', '<p style="margin:0 0 8px;font-size:13px">' + esc(IMG_NOTE) + '</p><div class="mds-imgs">' +
-        imgs.map((x, i) => '<button type="button" class="mds-imgb" data-lb="' + i + '"><img src="' + esc(x.u) + '" alt="' + esc(x.t) + '" loading="lazy"><span>' + esc(x.t) + '</span></button>').join('') +
+        imgs.map((x, i) => '<button type="button" class="mds-imgb" data-lb="' + i + '"><img src="' + esc(imgSrc(x.u)) + '" alt="' + esc(x.t) + '" loading="lazy"><span>' + esc(x.t) + '</span></button>').join('') +
         '</div>');
     }
     if (it) {
@@ -230,7 +231,7 @@
   }
   function thumbBtn(m) {
     const t = thumbFor(m);
-    return t ? '<button type="button" class="mds-thumb" data-thumb="' + m.id + '" title="הגדלת התמונה"><img src="' + esc(t.u) + '" alt="' + esc(t.t) + '" loading="lazy"></button>' : '';
+    return t ? '<button type="button" class="mds-thumb" data-thumb="' + m.id + '" title="הגדלת התמונה"><img src="' + esc(imgSrc(t.u)) + '" alt="' + esc(t.t) + '" loading="lazy"></button>' : '';
   }
   // הגדלה: חלון כהה עם התמונה, התווית, דפדוף בין תמונות התרופה וסגירה (Esc, רקע או X)
   function openLightbox(list, start) {
@@ -253,7 +254,7 @@
     const nextB = lb.querySelector('.mds-lb-next');
     const show = () => {
       const x = list[i];
-      img.src = x.u;
+      img.src = imgSrc(x.u);
       img.alt = x.t;
       cap.innerHTML = '<b>' + esc(x.t) + '</b><br>' + (x.kind === 'pill' ? 'כדור' : 'קופסה') + ' · ' +
         (x.il === false ? '<span class="mds-lb-warn">אריזה אמריקאית — בארץ עשויה להיראות אחרת</span>' : 'אריזה ישראלית') +
