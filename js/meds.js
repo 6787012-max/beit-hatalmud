@@ -126,6 +126,30 @@
   .mds-note{display:block;font-size:12px;color:#64748b;margin-top:3px;max-width:200px}
   .mds-stop{text-decoration:line-through;color:#94a3b8}
   .mds-stale{background:#fff5f5}
+  .mds-tbl{table-layout:fixed}
+  .mds-wrap{overflow-x:hidden !important;width:100%}
+  .mds-tbl{min-width:0 !important}
+  .mds-tbl th:nth-child(1){width:15%} .mds-tbl th:nth-child(2){width:10%} .mds-tbl th:nth-child(3){width:14%}
+  .mds-tbl th:nth-child(4){width:9%} .mds-tbl th:nth-child(5){width:11%} .mds-tbl th:nth-child(6){width:9%}
+  .mds-tbl th:nth-child(7){width:9%} .mds-tbl th:nth-child(8){width:23%}
+  .mds-tbl th,.mds-tbl td{padding:6px 5px;overflow:hidden}
+  .mds-tbl th{white-space:normal;font-size:13px}
+  .mds-tbl td{height:38px;vertical-align:middle}
+  .mds-nwrap{display:flex;align-items:center;gap:4px}
+  .mds-nwrap .mds-1{flex:1;min-width:0}
+  .mds-more{flex:none;border:0;background:#e0f2fe;color:#075985;border-radius:6px;padding:1px 7px;font:inherit;font-size:12px;cursor:pointer}
+  td.mds-open .mds-1{white-space:normal}
+  td.mds-open .mds-nwrap{align-items:flex-start}
+  .mds-ssel{max-width:100%}
+  @media (max-width:700px){ .mds-tbl{font-size:12px} }
+  .mds-1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mds-ed{cursor:text} .mds-ed:hover{background:#f1f5f9;outline:1px dashed #94a3b8;outline-offset:-2px}
+  .mds-in{width:100%;padding:4px 6px;font:inherit}
+  .mds-ssel{border:0;border-radius:999px;padding:3px 8px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .mds-add{border:1px solid var(--line,#cbd5e1);background:transparent;border-radius:6px;width:22px;height:22px;line-height:18px;padding:0;cursor:pointer;color:var(--primary,#003048)}
+  .mds-same{color:#cbd5e1}
+  tr.mds-stop td{color:#94a3b8}
+  .mds-hint{font-size:12px;color:#64748b;margin:4px 2px 6px}
   .mds-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:260;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px}
   .mds-card{background:var(--card,#fff);color:inherit;border-radius:14px;width:min(760px,100%);box-shadow:0 20px 50px rgba(0,0,0,.3)}
   .mds-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line,#e5e7eb)}
@@ -159,12 +183,14 @@
       '<div class="mds-filters"><select class="inp mb0" id="mdsCls"><option value="">כל השיעורים</option></select>' +
       '<input type="search" class="inp mb0" id="mdsQ" placeholder="חיפוש תלמיד / תרופה…"></div>' +
       '<div class="count-line" id="mdsCount"></div>' +
-      '<div class="table-wrap"><table class="mds-tbl"><thead><tr>' +
-      '<th>תלמיד</th><th>סטטוס</th><th>תרופה</th><th>מינון</th><th>זמן נטילה</th><th>אופן</th><th>שעות השפעה</th>' +
-      '<th>כדור בצהריים</th><th>תופעות לוואי</th><th>הערות הורים</th><th>עודכן</th>' +
+      '<div class="mds-hint"><i class="bi bi-pencil"></i> לוחצים על תא כדי לערוך אותו. Enter שומר, Esc מבטל. מעבר עם העכבר מראה טקסט ארוך במלואו.</div>' +
+      '<div class="table-wrap mds-wrap"><table class="mds-tbl"><thead><tr>' +
+      '<th>תלמיד</th><th>סטטוס</th><th>תרופה</th><th>מינון</th><th>זמן נטילה</th><th>שעות השפעה</th>' +
+      '<th>עודכן</th><th>הערות</th>' +
       '</tr></thead><tbody id="mdsBody"></tbody></table></div>';
 
     let D = null, filter = 'הכל', cls = '', q = '';
+    const openNotes = new Set();
     const $ = sel => page.querySelector(sel);
 
     async function reload() {
@@ -210,39 +236,81 @@
       });
       $('#mdsCount').textContent = 'מוצגים ' + list.length + ' מתוך ' + all.length + ' תלמידים';
 
+      // תא שאפשר לערוך: שורה אחת, טקסט ארוך נחתך ומוצג במלואו במעבר עכבר
+      const ed = (m, k, text) => '<td class="mds-ed" data-ed="' + k + '" data-id="' + m.id + '" title="' + esc(text || '') + '"><div class="mds-1">' + esc(text || '—') + '</div></td>';
+      const statusSel = r => '<select class="mds-ssel ' + STATUS_CLS[r.st.status] + '" data-st="' + r.s.id + '" title="' + esc(r.st.note || '') + '">' +
+        STATUSES.map(x => '<option' + (x === r.st.status ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select>';
+
       const body = list.map(r => {
         const meds = r.meds.length ? r.meds : [null];
         return meds.map((m, i) => {
           const first = i === 0;
-          const sCell = first ? '<td rowspan="' + meds.length + '"><span class="mds-chip-s ' + STATUS_CLS[r.st.status] + '">' + esc(r.st.status) + '</span>' +
-            (r.st.note ? '<span class="mds-note">' + esc(r.st.note) + '</span>' : '') + '</td>' : '';
-          const sCellName = first ? '<td rowspan="' + meds.length + '"><span class="mds-stu" data-open="' + r.s.id + '">' + esc(nm(r.s)) + '</span>' +
-            '<span class="mds-cls">' + esc(r.cls) + '</span></td>' : '';
-          if (!m) return '<tr class="mds-first">' + sCellName + sCell + '<td colspan="9" style="color:#94a3b8">אין רישום כדור</td></tr>';
+          // שם וסטטוס חוזרים בכל שורה (בלי מיזוג תאים) כדי שהטבלה תישאר ישרה
+          const nameCell = '<td><div class="mds-1"><span class="mds-stu" data-open="' + r.s.id + '" title="' + esc(r.cls) + '">' + esc(nm(r.s)) + '</span>' +
+            (first ? ' <button class="mds-add" data-add="' + r.s.id + '" title="הוספת כדור">+</button>' : '') + '</div></td>';
+          const stCell = '<td>' + (first ? statusSel(r) : '<span class="mds-same">〃</span>') + '</td>';
+          if (!m) return '<tr class="mds-first">' + nameCell + stCell + '<td colspan="6" style="color:#94a3b8">אין רישום כדור. לחיצה על + מוסיפה</td></tr>';
           const stale = daysSince(m.updated_on);
           const cls2 = (m.active && (stale == null || stale > STALE_DAYS)) ? ' mds-stale' : '';
-          const name = '<span class="' + (m.active ? '' : 'mds-stop') + '">' + esc(m.name) + '</span>' +
-            (m.active ? '' : ' <span class="mds-chip-s mds-off">הופסק</span>');
-          return '<tr class="' + (first ? 'mds-first' : '') + cls2 + '">' + sCellName + sCell +
-            '<td>' + name + (m.purpose ? '<span class="mds-cls">' + esc(m.purpose) + '</span>' : '') + '</td>' +
-            '<td>' + esc(shown('dose', m.dose)) + '</td>' +
-            '<td>' + esc(shown('take_time', m.take_time)) + '</td>' +
-            '<td>' + esc(shown('take_how', m.take_how)) + '</td>' +
-            '<td>' + esc(shown('hours', m.hours)) + '</td>' +
-            '<td>' + (m.second ? esc((m.dose2 || '—') + ' · ' + (m.hours2 || '')) : '—') + '</td>' +
-            '<td>' + esc([m.side_during, m.side_after].filter(Boolean).join(' / ') || '—') + '</td>' +
-            '<td>' + esc(m.notes || '—') + '</td>' +
-            '<td>' + (m.updated_on ? esc(fmtDate(m.updated_on)) : '—') + '</td></tr>';
+          const extra = [m.take_how && 'אופן: ' + m.take_how, m.second && ('כדור בצהריים: ' + (m.dose2 || '') + ' ' + (m.hours2 || '')).trim(),
+            (m.side_during || m.side_after) && 'תופעות: ' + [m.side_during, m.side_after].filter(Boolean).join(' / ')].filter(Boolean).join(' · ');
+          const noteText = [m.notes, extra].filter(Boolean).join(' · ');
+          return '<tr class="' + (first ? 'mds-first' : '') + cls2 + (m.active ? '' : ' mds-stop') + '">' + nameCell + stCell +
+            '<td class="mds-ed" data-ed="name" data-id="' + m.id + '" title="' + esc(m.purpose || '') + '"><div class="mds-1">' + esc(m.name) +
+              (m.active ? '' : ' <span class="mds-chip-s mds-off">הופסק</span>') + '</div></td>' +
+            ed(m, 'dose', m.dose) + ed(m, 'take_time', m.take_time) + ed(m, 'hours', m.hours) +
+            '<td><div class="mds-1">' + (m.updated_on ? esc(fmtDate(m.updated_on).slice(0, 6) + String(m.updated_on).slice(2, 4)) : '—') + '</div></td>' +
+            '<td class="mds-ed mds-notes' + (openNotes.has(m.id) ? ' mds-open' : '') + '" data-ed="notes" data-id="' + m.id + '" title="' + esc(noteText) + '"><div class="mds-nwrap"><div class="mds-1">' + esc(noteText || '—') + '</div>' +
+              (noteText.length > 25 ? '<button class="mds-more" data-more="' + m.id + '">' + (openNotes.has(m.id) ? 'סגור' : 'המשך') + '</button>' : '') + '</div></td></tr>';
         }).join('');
       }).join('');
-      $('#mdsBody').innerHTML = body || '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:20px">אין תלמידים מתאימים</td></tr>';
+      $('#mdsBody').innerHTML = body || '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px">אין תלמידים מתאימים</td></tr>';
     }
+
+    // ───────── עריכה ישר בטבלה ─────────
+    const fullRow = m => ({ name: m.name, purpose: m.purpose, dose: m.dose, hours: m.hours, take_time: m.take_time, take_how: m.take_how,
+      side_during: m.side_during, side_after: m.side_after, second: !!m.second, dose2: m.dose2, hours2: m.hours2, notes: m.notes,
+      active: !!m.active, updated_on: m.updated_on, category: 'תרופה' });
+
+    function startEdit(td) {
+      if (td.querySelector('input')) return;
+      const m = D.meds.find(x => x.id == td.dataset.id); if (!m) return;
+      const k = td.dataset.ed, oldV = m[k] == null ? '' : String(m[k]);
+      td.innerHTML = '<input class="inp mb0 mds-in" value="' + esc(oldV) + '">';
+      const inp = td.querySelector('input'); inp.focus(); inp.select();
+      let done = false;
+      const finish = async ok => {
+        if (done) return; done = true;
+        const v = inp.value.trim();
+        if (!ok || v === oldV.trim()) { draw(); return; }
+        if (k === 'name' && !v) { window.UI.toast('חובה שם תרופה', 'err'); draw(); return; }
+        const row = fullRow(m); row[k] = v || null; row.updated_on = today();
+        try { await save('update', m.student_id, m.id, row, null); window.UI.toast('נשמר'); await reload(); }
+        catch (e) { window.UI.toast(e.message || 'השמירה נכשלה', 'err'); draw(); }
+      };
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') finish(false); });
+      inp.addEventListener('blur', () => finish(true));
+    }
+
+    page.addEventListener('change', async e => {
+      const sel = e.target.closest('[data-st]'); if (!sel) return;
+      const sid = Number(sel.dataset.st);
+      const cur = statusOf(sid, D.statuses, D.meds);
+      try { await save('status', sid, null, { status: sel.value, note: cur.note || '' }, null); window.UI.toast('הסטטוס נשמר'); await reload(); }
+      catch (err) { window.UI.toast(err.message || 'השמירה נכשלה', 'err'); draw(); }
+    });
 
     page.addEventListener('click', e => {
       const chip = e.target.closest('[data-f]');
       if (chip) { filter = chip.dataset.f; draw(); return; }
+      const more = e.target.closest('[data-more]');
+      if (more) { const id = Number(more.dataset.more); openNotes.has(id) ? openNotes.delete(id) : openNotes.add(id); draw(); return; }
+      const add = e.target.closest('[data-add]');
+      if (add) { openStudent(Number(add.dataset.add), true); return; }
       const open = e.target.closest('[data-open]');
-      if (open) openStudent(Number(open.dataset.open));
+      if (open) { openStudent(Number(open.dataset.open)); return; }
+      const cell = e.target.closest('.mds-ed');
+      if (cell && !e.target.closest('input')) startEdit(cell);
     });
     $('#mdsCls').addEventListener('change', e => { cls = e.target.value; draw(); });
     $('#mdsQ').addEventListener('input', e => { q = (e.target.value || '').trim(); draw(); });
@@ -266,7 +334,7 @@
     }
 
     // ───────── חלונית תלמיד ─────────
-    async function openStudent(sid) {
+    async function openStudent(sid, addNew) {
       const s = D.studs.find(x => x.id == sid);
       if (!s) return;
       const ov = document.createElement('div'); ov.className = 'mds-ov';
@@ -402,7 +470,7 @@
         act(kind, b.dataset.id);
       });
 
-      viewMode();
+      if (addNew) formMode(null); else viewMode();
     }
 
     await reload();
