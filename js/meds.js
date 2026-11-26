@@ -122,10 +122,10 @@
     { k: 'med', t: 'תרופה', sort: 'med', w: 14, fixed: true },
     { k: 'dose', t: 'מינון', sort: 'dose', w: 8 },
     { k: 'take_time', t: 'זמן נטילה', sort: 'take', w: 9 },
+    { k: 'take_how', t: 'אופן נטילה', w: 10 },   // ליד זמן הנטילה, מוצג כברירת מחדל (יוסף 26/11)
     { k: 'hours', t: 'שעות השפעה', sort: 'hours', w: 8 },
     { k: 'updated', t: 'עודכן', sort: 'updated', w: 8 },
     { k: 'notes', t: 'הערות', w: 16, fixed: true },
-    { k: 'take_how', t: 'אופן נטילה', w: 9, def: false },
     { k: 'noon', t: 'כדור בצהריים', w: 9, def: false },
     { k: 'side', t: 'תופעות לוואי', w: 12, def: false },
     { k: 'purpose', t: 'מטרה', w: 10, def: false },
@@ -251,6 +251,9 @@
   .mds-nwrap .mds-1{flex:1;min-width:0}
   .mds-more{flex:none;border:0;background:#e0f2fe;color:#075985;border-radius:6px;padding:1px 6px;font:inherit;font-size:12px;cursor:pointer}
   td.mds-open .mds-1{white-space:pre-line}
+  .mds-tbl td.mds-editing{position:relative;overflow:visible}
+  .mds-ta{position:absolute;top:3px;right:2px;z-index:40;resize:none;overflow:auto;white-space:pre-wrap;word-break:break-word;
+    font:inherit;line-height:1.5;padding:4px 6px;min-height:30px;box-shadow:0 6px 18px rgba(0,0,0,.18);background:var(--card,#fff)}
   td.mds-open .mds-nwrap{align-items:flex-start}
   .mds-ed{cursor:text} .mds-ed:hover{background:#f1f5f9;outline:1px dashed #94a3b8;outline-offset:-2px}
   .mds-in{width:100%;padding:4px 6px;font:inherit}
@@ -619,7 +622,7 @@
             case 'hours': return ed('hours', m.hours);
             case 'updated': return '<td><div class="mds-1">' + (m.updated_on ? esc(fmtDate(m.updated_on).slice(0, 6) + String(m.updated_on).slice(2, 4)) : '—') + '</div></td>';
             case 'notes': return notesCell;
-            case 'take_how': return '<td><div class="mds-1">' + esc(m.take_how || '—') + '</div></td>';
+            case 'take_how': return ed('take_how', m.take_how);
             case 'noon': return '<td><div class="mds-1">' + (m.second ? esc((m.dose2 || '—') + ' · ' + (m.hours2 || '—')) : '—') + '</div></td>';
             case 'side': return '<td><div class="mds-1">' + esc([m.side_during, m.side_after].filter(Boolean).join(' / ') || '—') + '</div></td>';
             case 'purpose': return '<td><div class="mds-1">' + esc(m.purpose || '—') + '</div></td>';
@@ -763,13 +766,33 @@
     }
 
     function startEdit(td) {
-      if (td.querySelector('input')) return;
+      if (td.querySelector('input, textarea')) return;
       const m = D.meds.find(x => x.id == td.dataset.id); if (!m) return;
       if (td.dataset.ed === 'notes') return editNotes(m);
       const k = td.dataset.ed, oldV = m[k] == null ? '' : String(m[k]);
-      td.innerHTML = '<input class="inp mb0 mds-in"' + (k === 'name' ? ' list="mdsNames"' : '') + ' value="' + esc(oldV) + '">';
+      // שם תרופה: שורת קלט עם השלמה. שאר השדות: תיבה שגדלה לפי הטקסט ומראה את כל התוכן מיד,
+      // גם כשהוא ארוך מהתא (נפתחת מעל התא, רחבה יותר, בלי לשנות את גובה השורה).
+      let inp;
+      if (k === 'name') {
+        td.innerHTML = '<input class="inp mb0 mds-in" list="mdsNames" value="' + esc(oldV) + '">';
+        inp = td.querySelector('input');
+      } else {
+        td.classList.add('mds-editing');
+        td.innerHTML = '<textarea class="inp mb0 mds-ta" rows="1"></textarea>';
+        inp = td.querySelector('textarea');
+        inp.value = oldV;
+        const r = td.getBoundingClientRect();
+        const need = oldV.length * 8 + 24 > r.width;            // הטקסט לא נכנס ברוחב התא
+        const W = need ? Math.min(420, Math.max(r.width, 260)) : r.width - 4;
+        inp.style.width = W + 'px';
+        // נפתח לכיוון שיש בו מקום: אם אין מקום שמאלה, נצמד לצד השמאלי של התא
+        if (r.right - W < 8) { inp.style.left = '2px'; inp.style.right = 'auto'; }
+        const grow = () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight + 2, 320) + 'px'; };
+        inp.addEventListener('input', grow); grow();
+      }
       // בלי לסמן הכול: הסמן בסוף, ואפשר ללחוץ באמצע הטקסט ולשנות שם
-      const inp = td.querySelector('input'); inp.focus(); const L = inp.value.length; inp.setSelectionRange(L, L);
+      inp.focus(); const L = inp.value.length; inp.setSelectionRange(L, L);
+      const oneLine = () => inp.tagName === 'INPUT' || (!inp.value.includes('\n') && inp.scrollHeight <= 40);
       let done = false;
       const finish = async (ok, dir) => {
         if (done) return; done = true;
@@ -788,11 +811,11 @@
         } catch (e) { window.UI.toast(e.message || 'השמירה נכשלה', 'err'); draw(); }
       };
       inp.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }   // Shift+Enter = שורה חדשה
         else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
         else if (e.key === 'Tab') { e.preventDefault(); finish(true, e.shiftKey ? 'prev' : 'next'); }
-        else if (e.key === 'ArrowDown') { e.preventDefault(); finish(true, 'down'); }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); finish(true, 'up'); }
+        else if (e.key === 'ArrowDown' && oneLine()) { e.preventDefault(); finish(true, 'down'); }
+        else if (e.key === 'ArrowUp' && oneLine()) { e.preventDefault(); finish(true, 'up'); }
       });
       inp.addEventListener('blur', () => finish(true));
     }
@@ -1066,7 +1089,7 @@
       const open = t.closest('[data-open]');
       if (open) { openStudent(Number(open.dataset.open)); return; }
       const cell = t.closest('.mds-ed');
-      if (cell && !t.closest('input')) startEdit(cell);
+      if (cell && !t.closest('input, textarea')) startEdit(cell);
     });
     $('#mdsCls').addEventListener('change', e => { cls = e.target.value; draw(); });
     $('#mdsQ').addEventListener('input', e => { q = (e.target.value || '').trim(); draw(); });
